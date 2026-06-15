@@ -1,0 +1,21 @@
+{
+  "name": "gym-web",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "dev": "npm run dev:frontend",
+    "dev:frontend": "npm run dev -w apps/frontend",
+    "dev:backend": "npm run dev -w apps/backend",
+    "build:frontend": "npm run build -w apps/frontend",
+    "build:backend": "npm run build -w apps/backend",
+    "build:contracts": "npm run build -w packages/contracts",
+    "docker:dev": "docker compose up --build"
+  },
+  "devDependencies": {
+    "msw": "^2.12.0"
+  }
+}
