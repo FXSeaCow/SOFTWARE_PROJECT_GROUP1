@@ -1,7 +1,5 @@
 require('dotenv').config();
 
-console.log(process.env.DB_PASSWORD);
-
 module.exports = {
   PORT: process.env.PORT || 4000,
   JWT_SECRET: process.env.JWT_SECRET,
