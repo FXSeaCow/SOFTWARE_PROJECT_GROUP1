@@ -23,7 +23,7 @@
  */
 
 const db = require('../config/db');
-const logger = require('./logger');
+const logger = require('./Logger');
 
 /**
  * Execute a callback function inside a PostgreSQL transaction.
