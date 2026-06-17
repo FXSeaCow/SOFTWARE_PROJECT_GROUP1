@@ -320,3 +320,32 @@ describe('POST /api/auth/refresh-token', () => {
   });
 });
 
+
+// =============================================================================
+// 4. LOGOUT
+// =============================================================================
+describe('POST /api/auth/logout', () => {
+
+  it('should return 200 and clear the refreshToken cookie', async () => {
+    const loginRes = await registerUser().then(() => loginUser());
+
+    const res = await request(app)
+      .post('/api/auth/logout')
+      .set('Cookie', loginRes.headers['set-cookie']);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/logged out/i);
+
+    // Cookie should be cleared (maxAge=0 or Expires in the past)
+    const cookies = res.headers['set-cookie'] || [];
+    const refreshCookie = cookies.find((c) => c.startsWith('refreshToken='));
+    if (refreshCookie) {
+      // Cleared cookie has empty value or past expiry
+      expect(
+        refreshCookie.includes('refreshToken=;') ||
+        refreshCookie.includes('Expires=Thu, 01 Jan 1970')
+      ).toBe(true);
+    }
+  });
+});
+

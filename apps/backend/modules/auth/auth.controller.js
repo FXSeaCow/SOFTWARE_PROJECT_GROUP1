@@ -35,7 +35,7 @@ const register = asyncHandler(async (req, res) => {
   res.status(201).json(
     ApiResponse.created(
       { user, accessToken },
-      'Tạo tài khoản thành công'
+      'Account created successfully'
     )
   );
 });
@@ -59,7 +59,7 @@ const login = asyncHandler(async (req, res) => {
   res.status(200).json(
     ApiResponse.success(
       { user, accessToken },
-      'Đăng nhập thành công'
+      'Login successful'
     )
   );
 });
@@ -75,7 +75,7 @@ const refreshToken = asyncHandler(async (req, res) => {
 
   if (!token) {
     return res.status(401).json(
-      ApiResponse.error('Refresh token bị thiếu')
+      ApiResponse.error('Refresh token missing')
     );
   }
 
@@ -86,7 +86,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   res.cookie('refreshToken', newRefreshToken, cookieOptions());
 
   res.status(200).json(
-    ApiResponse.success({ accessToken }, 'Làm mới token thành công')
+    ApiResponse.success({ accessToken }, 'Tokens refreshed successfully')
   );
 });
 
@@ -100,7 +100,7 @@ const logout = asyncHandler(async (req, res) => {
   res.clearCookie('refreshToken', cookieOptions());
 
   res.status(200).json(
-    ApiResponse.success(null, 'Đã đăng xuất')
+    ApiResponse.success(null, 'logged out successfully')
   );
 });
 
