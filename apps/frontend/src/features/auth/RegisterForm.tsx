@@ -7,7 +7,7 @@ import {
   Mail,
   User,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
@@ -23,6 +23,10 @@ type FormState = {
 type FormErrors = Partial<Record<keyof FormState, string>> & {
   form?: string;
 };
+
+type RegisterLocationState = {
+  email?: string;
+} | null;
 
 const initialForm: FormState = {
   name: "",
@@ -63,8 +67,13 @@ function validate(values: FormState): FormErrors {
 
 export function RegisterForm() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as RegisterLocationState;
 
-  const [form, setForm] = useState<FormState>(initialForm);
+  const [form, setForm] = useState<FormState>({
+    ...initialForm,
+    email: locationState?.email ?? "",
+  });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -93,6 +102,7 @@ export function RegisterForm() {
         replace: true,
         state: {
           success: "Account created successfully. Please sign in.",
+          email: form.email.trim().toLowerCase(),
         },
       });
     } catch (error) {
@@ -357,6 +367,9 @@ export function RegisterForm() {
           Already have an account?{" "}
           <Link
             to="/login"
+            state={{
+              email: form.email.trim(),
+            }}
             style={{
               color: "#050816",
               fontWeight: 600,

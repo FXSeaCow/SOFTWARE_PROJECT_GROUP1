@@ -8,7 +8,7 @@ export function LoginPage() {
   const currentUser = getCurrentUser();
 
   if (currentUser) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <LoginForm />;
