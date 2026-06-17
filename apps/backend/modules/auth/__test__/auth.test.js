@@ -267,3 +267,56 @@ describe('POST /api/auth/login', () => {
   });
 });
 
+
+// =============================================================================
+// 3. REFRESH TOKEN
+// =============================================================================
+describe('POST /api/auth/refresh-token', () => {
+
+  it('should return new tokens when a valid refresh token is sent in body', async () => {
+    // Login to get a refresh token
+    const loginRes = await registerUser().then(() => loginUser());
+    const cookie   = loginRes.headers['set-cookie']
+      .find((c) => c.startsWith('refreshToken='));
+    const refreshToken = cookie.split(';')[0].replace('refreshToken=', '');
+
+    const res = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refresh_token: refreshToken });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.accessToken).toBeDefined();
+
+    // New refresh token cookie rotated
+    const newCookies = res.headers['set-cookie'];
+    expect(newCookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
+  });
+
+  it('should return new tokens when refresh token is sent via cookie', async () => {
+    const loginRes = await registerUser().then(() => loginUser());
+
+    const res = await request(app)
+      .post('/api/auth/refresh-token')
+      .set('Cookie', loginRes.headers['set-cookie']); // forward the cookie
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.accessToken).toBeDefined();
+  });
+
+  it('should return 401 for an invalid refresh token', async () => {
+    const res = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({ refresh_token: 'totally.invalid.token' });
+
+    expect(res.status).toBe(401);
+  });
+
+  it('should return 401 when no refresh token is provided', async () => {
+    const res = await request(app)
+      .post('/api/auth/refresh-token')
+      .send({});
+
+    expect(res.status).toBe(400); // fails Joi validation first
+  });
+});
+
