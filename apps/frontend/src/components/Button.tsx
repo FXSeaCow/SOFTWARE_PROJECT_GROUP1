@@ -6,6 +6,7 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   isLoading?: boolean;
   variant?: ButtonVariant;
   leftIcon?: React.ReactNode;
+  loadingText?: string;
 };
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
@@ -33,6 +34,7 @@ export function Button({
   style,
   variant = "primary",
   leftIcon,
+  loadingText = "Signing in...",
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || isLoading;
@@ -70,7 +72,7 @@ export function Button({
         </span>
       ) : null}
 
-      {isLoading ? "Signing in..." : children}
+      {isLoading ? loadingText : children}
     </button>
   );
 }
