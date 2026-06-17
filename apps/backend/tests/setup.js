@@ -11,6 +11,9 @@
 // Load .env.test before anything else imports config/db.js
 require('dotenv').config({ path: '.env.test' });
 
+// Ensure tests run with NODE_ENV=test so middleware and configs can detect test runs.
+process.env.NODE_ENV = 'test';
+
 const db = require('../config/db');
 
 // ─── Global helpers available in every test file ──────────────────────────────

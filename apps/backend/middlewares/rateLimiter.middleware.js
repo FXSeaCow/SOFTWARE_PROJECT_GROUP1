@@ -52,10 +52,11 @@ const authLimiter = rateLimit({
   standardHeaders: true,    // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
   handler: rateLimitHandler,
-  // During tests we disable the limiter to avoid flakiness from many
-  // synthetic requests from the same process/IP.
-  skip: () => process.env.NODE_ENV === 'test',
   // Skip successful requests — only count failures toward the limit
+  // Disable limiter during tests by default to avoid flakiness from many
+  // synthetic requests originating from the test runner process/IP.
+  // Tests that need the limiter can opt-in by setting `ENABLE_RATE_LIMITER=true`.
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_RATE_LIMITER !== 'true',
   skipSuccessfulRequests: true,
 });
 
@@ -69,7 +70,10 @@ const passwordLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  skip: () => process.env.NODE_ENV === 'test',
+  // Disable limiter during tests to avoid flakiness from many synthetic
+  // requests originating from the test runner process/IP.
+  // Opt-in via ENABLE_RATE_LIMITER=true when a test needs real rate limiting.
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_RATE_LIMITER !== 'true',
 });
 
 /**
@@ -82,7 +86,8 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  skip: () => process.env.NODE_ENV === 'test',
+  // Opt-in via ENABLE_RATE_LIMITER=true when a test needs real rate limiting.
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_RATE_LIMITER !== 'true',
 });
 
 module.exports = { authLimiter, passwordLimiter, generalLimiter };
