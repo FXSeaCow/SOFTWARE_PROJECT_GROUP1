@@ -32,6 +32,12 @@ const register = asyncHandler(async (req, res) => {
   // Lưu refresh token vào httpOnly cookie (bảo mật hơn so với trả body)
   res.cookie('refreshToken', refreshToken, cookieOptions());
 
+  // Extra safety: ensure sensitive fields are not leaked in the response
+  if (user) {
+    delete user.password_hash;
+    delete user.qr_code_token;
+  }
+
   res.status(201).json(
     ApiResponse.created(
       { user, accessToken },
@@ -55,6 +61,12 @@ const login = asyncHandler(async (req, res) => {
   });
 
   res.cookie('refreshToken', refreshToken, cookieOptions());
+
+  // Ensure no sensitive fields leak (defence in depth)
+  if (user) {
+    delete user.password_hash;
+    delete user.qr_code_token;
+  }
 
   res.status(200).json(
     ApiResponse.success(
@@ -137,6 +149,12 @@ const resetPassword = asyncHandler(async (req, res) => {
  */
 const getMe = asyncHandler(async (req, res) => {
   const user = await authService.getMe(req.user.id);
+
+  // Sanitize just in case the service ever returns sensitive fields
+  if (user) {
+    delete user.password_hash;
+    delete user.qr_code_token;
+  }
 
   res.status(200).json(ApiResponse.success(user));
 });

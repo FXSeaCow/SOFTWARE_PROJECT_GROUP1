@@ -14,6 +14,7 @@ const { generateTokens, verifyRefreshToken } = require('../../utils/Jwt');
 const { withTransaction } = require('../../utils/Transaction');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
+const Mailer = require('../../utils/Mailer');
 
 // Mốc thời gian token reset mật khẩu (phút)
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
@@ -37,7 +38,7 @@ const register = async ({ full_name, email, password, phone }) => {
 
   // 3. Insert user + streak row atomically
   const user = await withTransaction(async (client) => {
-    const newUser = await repo.createUser({ email, password_hash, full_name, phone });
+    const newUser = await repo.createUser({ email, password_hash, full_name, phone }, client);
     await repo.initStreakRecord(newUser.id, client);
     return newUser;
   });
@@ -123,13 +124,26 @@ const forgotPassword = async (email) => {
 
   logger.info('Password reset token generated', { userId: user.id });
 
-  // TODO: tích hợp email service để gửi link
+  // Gửi email chứa link reset (không làm flow fail nếu gửi lỗi)
+  try {
+    const mailResult = await Mailer.sendPasswordResetEmail({
+      to: user.email,
+      token: plainToken,
+      fullName: user.full_name,
+    });
 
-  if (process.env.NODE_ENV === 'development') {
-    return { message: GENERIC_MSG, resetToken: plainToken };
+    if (process.env.NODE_ENV === 'development') {
+      return { message: GENERIC_MSG, resetToken: plainToken, mailResult };
+    }
+
+    return { message: GENERIC_MSG };
+  } catch (err) {
+    logger.error('Error sending password reset email', { err: err.message, userId: user.id });
+    if (process.env.NODE_ENV === 'development') {
+      return { message: GENERIC_MSG, resetToken: plainToken };
+    }
+    return { message: GENERIC_MSG };
   }
-
-  return { message: GENERIC_MSG };
 };
 
 // ─── Reset Password (FR-03) ────────────────────────────────────────────────

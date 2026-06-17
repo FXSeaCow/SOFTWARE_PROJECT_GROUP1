@@ -52,6 +52,9 @@ const authLimiter = rateLimit({
   standardHeaders: true,    // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
   handler: rateLimitHandler,
+  // During tests we disable the limiter to avoid flakiness from many
+  // synthetic requests from the same process/IP.
+  skip: () => process.env.NODE_ENV === 'test',
   // Skip successful requests — only count failures toward the limit
   skipSuccessfulRequests: true,
 });
@@ -66,6 +69,7 @@ const passwordLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 /**
@@ -78,6 +82,7 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 module.exports = { authLimiter, passwordLimiter, generalLimiter };

@@ -51,7 +51,12 @@ router.post(
 // Refresh access token
 router.post(
   '/refresh-token',
-  validate(refreshTokenSchema),
+  // Allow refresh token to come from either an httpOnly cookie OR the request body.
+  // If a cookie is present we skip body validation; otherwise validate the body.
+  (req, res, next) => {
+    if (req.cookies && req.cookies.refreshToken) return next();
+    return validate(refreshTokenSchema)(req, res, next);
+  },
   ctrl.refreshToken
 );
 

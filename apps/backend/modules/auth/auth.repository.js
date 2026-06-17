@@ -40,8 +40,13 @@ const findById = async (id) => {
 /**
  * Tạo user mới (đăng ký). Trả về user (không bao gồm password_hash).
  */
-const createUser = async ({ email, password_hash, full_name, phone }) => {
-  const { rows } = await db.query(
+/**
+ * Create a new user. Accepts an optional `client` for running inside
+ * a transaction (so user + related inserts can be atomic).
+ */
+const createUser = async ({ email, password_hash, full_name, phone }, client) => {
+  const runner = client || db;
+  const { rows } = await runner.query(
     `INSERT INTO users (email, password_hash, full_name, phone)
      VALUES ($1, $2, $3, $4)
      RETURNING id, email, full_name, phone, role, qr_code_token, created_at`,
