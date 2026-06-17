@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('./config/db');
+const env = require('./config/env');
 
 const app = express();
 
@@ -8,6 +9,9 @@ app.get('/', async (req, res) => {
   res.json(result.rows[0]);
 });
 
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
+const PORT = env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = app; // exported for tests/harnesses

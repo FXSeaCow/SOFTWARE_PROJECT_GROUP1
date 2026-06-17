@@ -13,8 +13,8 @@
  */
 
 const { verifyAccessToken } = require('../utils/Jwt');
-const ApiError              = require('../utils/ApiError');
-const asyncHandler          = require('../utils/AsyncHandler');
+const ApiError              = require('../utils/Apierror');
+const asyncHandler          = require('../utils/Asynchandler');
 const db                    = require('../config/db');
 
 /**

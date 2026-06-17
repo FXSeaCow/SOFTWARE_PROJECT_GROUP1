@@ -13,7 +13,7 @@
  *   router.get('/', validate(null, null, querySchema), ctrl.list);
  */
 
-const ApiError = require('../utils/ApiError');
+const ApiError = require('../utils/Apierror');
 
 const JOI_OPTIONS = {
   abortEarly: false,  // collect ALL errors, not just the first one
