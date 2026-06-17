@@ -55,6 +55,8 @@ beforeEach(async () => {
   await global.truncateAll();
 });
 
+// IMFORTANT: TEST EACH GROUP IN ISOLATION (describe block) — To avoid rateLimiter (Too many requests from the same IP).
+
 // =============================================================================
 // 1. REGISTER
 // =============================================================================
@@ -189,6 +191,78 @@ describe('POST /api/auth/register', () => {
   it('should not expose qr_code_token in register response', async () => {
     const res = await registerUser();
     // qr_code_token should not leak in auth responses — only via /users/me/qr
+    expect(res.body.data.user.qr_code_token).toBeUndefined();
+  });
+});
+
+
+// =============================================================================
+// 2. LOGIN
+// =============================================================================
+describe('POST /api/auth/login', () => {
+
+  beforeEach(async () => {
+    await registerUser(); // ensure user exists
+  });
+
+  it('should login with correct credentials and return 200 with tokens', async () => {
+    const res = await loginUser();
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.user.email).toBe(VALID_USER.email);
+    expect(res.body.data.accessToken).toBeDefined();
+
+    // Refresh cookie set
+    const cookies = res.headers['set-cookie'];
+    expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
+  });
+
+  it('should return 401 for wrong password', async () => {
+    const res = await loginUser(VALID_USER.email, 'WrongPass1');
+
+    expect(res.status).toBe(401);
+    // Generic message — does not reveal whether email exists
+    expect(res.body.message).toMatch(/invalid email or password/i);
+  });
+
+  it('should return 401 for non-existent email', async () => {
+    const res = await loginUser('nobody@example.com', 'Password1');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/invalid email or password/i);
+  });
+
+  it('should return 400 when email is missing', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ password: 'Password1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'email' }),
+      ])
+    );
+  });
+
+  it('should return 400 when password is missing', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: VALID_USER.email });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'password' }),
+      ])
+    );
+  });
+
+  it('should never return password_hash  in login response', async () => {
+    const res = await loginUser();
+
+    expect(res.body.data.user.password_hash).toBeUndefined();
     expect(res.body.data.user.qr_code_token).toBeUndefined();
   });
 });

@@ -71,7 +71,7 @@ const login = async ({ email, password }) => {
 
   const { accessToken, refreshToken } = generateTokens({ id: user.id, role: user.role });
 
-  const { password_hash: _, ...safeUser } = user;
+  const { password_hash: _, qr_code_token: __, ...safeUser } = user; // Exclude sensitive fields
 
   logger.info('User logged in', { userId: user.id });
 
