@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 
 import { LoginPage } from "./src/pages/LoginPage";
+import { RegisterPage } from "./src/pages/RegisterPage";
 import { DashboardPage } from "./src/pages/DashboardPage";
 import { getCurrentUser } from "./src/services/authService";
 
@@ -29,6 +30,7 @@ function AppRouter() {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<RegisterPage />} />
         <Route
           path="/dashboard"
           element={

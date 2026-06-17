@@ -43,6 +43,9 @@ function validate(values: FormState): FormErrors {
 export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
+  const successMessage = (
+    location.state as { success?: string; from?: { pathname?: string } } | null
+  )?.success;
 
   const [form, setForm] = useState<FormState>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -263,6 +266,21 @@ export function LoginForm() {
             }}
           >
             {errors.form}
+          </div>
+        ) : null}
+
+        {successMessage ? (
+          <div
+            style={{
+              borderRadius: 12,
+              padding: "12px 14px",
+              background: "#dcfce7",
+              color: "#166534",
+              fontSize: 14,
+              marginBottom: 16,
+            }}
+          >
+            {successMessage}
           </div>
         ) : null}
 
