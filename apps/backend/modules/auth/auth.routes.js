@@ -1,0 +1,82 @@
+/**
+ * auth.routes.js
+ * Registers all authentication endpoints.
+ *
+ * Base path (mounted in app.js): /api/auth
+ *
+ * Public routes (no token required):
+ *   POST   /api/auth/register          FR-01
+ *   POST   /api/auth/login             FR-02
+ *   POST   /api/auth/refresh-token
+ *   POST   /api/auth/logout
+ *   POST   /api/auth/forgot-password   FR-03
+ *   POST   /api/auth/reset-password    FR-03
+ *
+ * Protected routes (token required):
+ *   GET    /api/auth/me
+ */
+
+const router  = require('express').Router();
+const ctrl    = require('./auth.controller');
+const { validate }            = require('../../middlewares/validate.middleware');
+const { authenticate }        = require('../../middlewares/auth.middleware');
+const { authLimiter,
+        passwordLimiter }     = require('../../middlewares/rateLimiter.middleware');
+const {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  refreshTokenSchema,
+} = require('./auth.validation');
+
+// ── Public routes ─────────────────────────────────────────────────────────────
+
+// Register a new account (FR-01)
+router.post(
+  '/register',
+  authLimiter,
+  validate(registerSchema),
+  ctrl.register
+);
+
+// Login (FR-02)
+router.post(
+  '/login',
+  authLimiter,
+  validate(loginSchema),
+  ctrl.login
+);
+
+// Refresh access token
+router.post(
+  '/refresh-token',
+  validate(refreshTokenSchema),
+  ctrl.refreshToken
+);
+
+// Logout (clears cookie)
+router.post('/logout', ctrl.logout);
+
+// Forgot password — send reset email (FR-03)
+router.post(
+  '/forgot-password',
+  passwordLimiter,
+  validate(forgotPasswordSchema),
+  ctrl.forgotPassword
+);
+
+// Reset password with token (FR-03)
+router.post(
+  '/reset-password',
+  passwordLimiter,
+  validate(resetPasswordSchema),
+  ctrl.resetPassword
+);
+
+// ── Protected routes ──────────────────────────────────────────────────────────
+
+// Get current user profile
+router.get('/me', authenticate, ctrl.getMe);
+
+module.exports = router;
