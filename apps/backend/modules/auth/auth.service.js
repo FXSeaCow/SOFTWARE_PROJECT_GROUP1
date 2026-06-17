@@ -46,8 +46,9 @@ const register = async ({ full_name, email, password, phone }) => {
 
   // 4. Issue tokens
   const { accessToken, refreshToken } = generateTokens({ id: user.id, role: user.role });
+  const { qr_code_token: _, password_hash: __, ...safeUser } = user;
 
-  return { user, accessToken, refreshToken };
+  return { user: safeUser, accessToken, refreshToken };
 };
 
 // ─── Login (FR-02) ──────────────────────────────────────────────────────────

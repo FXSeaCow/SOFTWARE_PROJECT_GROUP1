@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --runInBand --forceExit",
+    "test:watch": "jest --watch --runInBand",
+    "test:coverage": "jest --coverage --runInBand --forceExit",
+    "test:auth": "jest --testPathPatterns=modules/auth --runInBand --forceExit"
   },
   "keywords": [],
   "author": "",
@@ -14,5 +17,29 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.21.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "./tests/setup.js"
+    ],
+    "testMatch": [
+      "**/__test__/**/*.test.js",
+      "**/__tests__/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "modules/**/*.js",
+      "middlewares/**/*.js",
+      "utils/**/*.js",
+      "!**/*.validation.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }
