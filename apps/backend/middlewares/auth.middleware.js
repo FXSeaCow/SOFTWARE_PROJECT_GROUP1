@@ -1,6 +1,20 @@
+/**
+ * auth.middleware.js
+ * Verifies the JWT access token on every protected route.
+ * Attaches the decoded payload to req.user so downstream
+ * controllers/services can access { id, role } without
+ * hitting the database again.
+ *
+ * Usage in routes:
+ *   router.get('/me', authenticate, ctrl.getMe);
+ *
+ * Token must be sent as:
+ *   Authorization: Bearer <access_token>
+ */
+
 const { verifyAccessToken } = require('../utils/Jwt');
-const ApiError              = require('../utils/Apierror');
-const asyncHandler          = require('../utils/Asynchandler');
+const ApiError              = require('../utils/ApiError');
+const asyncHandler          = require('../utils/AsyncHandler');
 const db                    = require('../config/db');
 
 /**
