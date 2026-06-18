@@ -451,3 +451,141 @@ describe('POST /api/auth/forgot-password', () => {
     expect(parseInt(rows[0].count)).toBe(1);
   });
 });
+
+
+// =============================================================================
+// 6. RESET PASSWORD
+// =============================================================================
+describe('POST /api/auth/reset-password', () => {
+
+  let resetToken;
+
+  beforeEach(async () => {
+    await registerUser();
+
+    // Get a fresh reset token
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    resetToken = res.body.data.resetToken;
+  });
+
+  it('should reset the password and return 200', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            resetToken,
+        password:         'NewPassword1',
+        confirm_password: 'NewPassword1',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/reset successfully/i);
+  });
+
+  it('should allow login with the new password after reset', async () => {
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            resetToken,
+        password:         'NewPassword1',
+        confirm_password: 'NewPassword1',
+      });
+
+    // Old password should fail
+    const oldLogin = await loginUser(VALID_USER.email, VALID_USER.password);
+    expect(oldLogin.status).toBe(401);
+
+    // New password should work
+    const newLogin = await loginUser(VALID_USER.email, 'NewPassword1');
+    expect(newLogin.status).toBe(200);
+  });
+
+  it('should mark the token as used after a successful reset', async () => {
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            resetToken,
+        password:         'NewPassword1',
+        confirm_password: 'NewPassword1',
+      });
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    const { rows } = await db.query(
+      'SELECT used_at FROM password_reset_tokens WHERE token_hash = $1',
+      [tokenHash]
+    );
+
+    expect(rows[0].used_at).not.toBeNull(); // marked used, NULL = have not been used yet
+  });
+
+  it('should return 400 when the same token is used twice (one-time use)', async () => {
+    const payload = {
+      token:            resetToken,
+      password:         'NewPassword1',
+      confirm_password: 'NewPassword1',
+    };
+
+    await request(app).post('/api/auth/reset-password').send(payload); // first use
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send(payload); // second use
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid or has expired/i);
+  });
+
+  it('should return 400 for an invalid token', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        password:         'NewPassword1',
+        confirm_password: 'NewPassword1',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid or has expired/i);
+  });
+
+  it('should return 400 when new passwords do not match', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            resetToken,
+        password:         'NewPassword1',
+        confirm_password: 'DifferentPass1',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'confirm_password' }),
+      ])
+    );
+  });
+
+  it('should return 400 when new password is too weak', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token:            resetToken,
+        password:         'weakpassword',
+        confirm_password: 'weakpassword',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'password' }),
+      ])
+    );
+  });
+});
+
