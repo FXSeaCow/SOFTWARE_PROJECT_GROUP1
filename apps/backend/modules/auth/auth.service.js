@@ -132,14 +132,14 @@ const forgotPassword = async (email) => {
       fullName: user.full_name,
     });
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       return { message: GENERIC_MSG, resetToken: plainToken, mailResult };
     }
 
     return { message: GENERIC_MSG };
   } catch (err) {
     logger.error('Error sending password reset email', { err: err.message, userId: user.id });
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       return { message: GENERIC_MSG, resetToken: plainToken };
     }
     return { message: GENERIC_MSG };

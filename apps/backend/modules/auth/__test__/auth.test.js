@@ -349,3 +349,105 @@ describe('POST /api/auth/logout', () => {
   });
 });
 
+
+// =============================================================================
+// 5. FORGOT PASSWORD
+// =============================================================================
+describe('POST /api/auth/forgot-password', () => {
+
+  beforeEach(async () => {
+    await registerUser();
+  });
+
+  it('should return 200 with the same message whether email exists or not', async () => {
+    const resExists = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    console.log('resExists.body.message:', resExists.body.message);
+
+    const resNotExists = await request(app)
+    .post('/api/auth/forgot-password')
+    .send({ email: 'ghost@example.com' });
+    
+    
+    expect(resExists.status).toBe(200);
+    expect(resNotExists.status).toBe(200);
+    
+    // Both return the SAME message — prevents email enumeration
+    expect(resExists.body.message).toBe(resNotExists.body.message);
+    console.log('resNotExists.body.message:', resNotExists.body.message);
+  });
+
+  it('should return a resetToken in development environment', async () => {
+    // NODE_ENV=test is treated like development for this check
+    // (The service returns resetToken when NODE_ENV !== 'production')
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.resetToken).toBeDefined();
+    expect(typeof res.body.data.resetToken).toBe('string');
+    expect(res.body.data.resetToken).toHaveLength(64); // 32 bytes → 64 hex chars
+  });
+
+  it('should store a hashed token in password_reset_tokens', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const plainToken = res.body.data.resetToken;
+    const tokenHash  = crypto
+      .createHash('sha256')
+      .update(plainToken)
+      .digest('hex');
+
+    const { rows } = await db.query(
+      'SELECT * FROM password_reset_tokens WHERE token_hash = $1',
+      [tokenHash]
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].used_at).toBeNull(); // not used yet
+    expect(new Date(rows[0].expires_at) > new Date()).toBe(true); // future expiry
+  });
+
+  it('should return 400 when email format is invalid', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'not-valid' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'email' }),
+      ])
+    );
+  });
+
+  it('should overwrite an existing token when requested again', async () => {
+    // First request
+    const res1 = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    // Second request — should replace the first token
+    const res2 = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: VALID_USER.email });
+
+    const token1 = res1.body.data.resetToken;
+    const token2 = res2.body.data.resetToken;
+
+    expect(token1).not.toBe(token2); // new token generated
+
+    // Only one row per user in DB (ON CONFLICT DO UPDATE)
+    const { rows } = await db.query(
+      `SELECT COUNT(*) FROM password_reset_tokens
+       WHERE user_id = (SELECT id FROM users WHERE email = $1)`,
+      [VALID_USER.email]
+    );
+    expect(parseInt(rows[0].count)).toBe(1);
+  });
+});
