@@ -1,45 +1,69 @@
-const { AUTH_TOKEN_TYPE } = require("../config/constants");
-const { findUserById } = require("../config/db");
-const { createHttpError } = require("../utils/httpError");
-const { verifyToken } = require("../utils/token");
+const { verifyAccessToken } = require('../utils/Jwt');
+const ApiError              = require('../utils/Apierror');
+const asyncHandler          = require('../utils/Asynchandler');
+const db                    = require('../config/db');
 
-function toPublicUser(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
+/**
+ * authenticate
+ * Validates the Bearer token and sets req.user = { id, role, email }.
+ * Also does a lightweight DB check to confirm the user still exists
+ * (handles the case where an account is deleted but the token is still valid).
+ */
+const authenticate = asyncHandler(async (req, res, next) => {
+  // 1. Extract token from header
+  // sample header: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw ApiError.unauthorized('Access token missing');
+  }
+  const token = authHeader.split(' ')[1];
 
-function getBearerToken(req) {
-  // Lấy token từ header Authorization: Bearer <token>.
-  const authorization = req.headers.authorization || "";
-  const [type, token] = authorization.split(" ");
+  // 2. Verify signature and expiry
+  const payload = verifyAccessToken(token); // throws ApiError 401 if invalid
 
-  if (type !== AUTH_TOKEN_TYPE || !token) {
-    throw createHttpError(401, "Authorization token is required");
+  // 3. Confirm user still exists in DB (light query — only id, role, email)
+  const { rows } = await db.query(
+    'SELECT id, role, email, full_name FROM users WHERE id = $1',
+    [payload.id]
+  );
+
+  if (!rows.length) {
+    throw ApiError.unauthorized('Account no longer exists');
   }
 
-  return token;
-}
+  // 4. Attach to request — available to all downstream handlers
+  req.user = rows[0]; // { id, role, email, full_name }
+  next();
+});
 
-async function requireAuth(req) {
-  // Xác thực token rồi nạp lại user hiện tại từ nơi lưu trữ.
-  const token = getBearerToken(req);
-  const payload = verifyToken(token);
-  const user = await findUserById(payload.sub);
-
-  if (!user) {
-    throw createHttpError(401, "Authenticated user no longer exists");
+/**
+ * optionalAuthenticate
+ * Same as authenticate but does NOT throw if no token is present.
+ * Useful for routes that behave differently for logged-in vs guest users.
+ * Sets req.user = null if no valid token is found.
+ */
+const optionalAuthenticate = asyncHandler(async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    return next();
   }
 
-  return toPublicUser(user);
-}
+  try {
+    const token   = authHeader.split(' ')[1];
+    const payload = verifyAccessToken(token);
 
-module.exports = {
-  requireAuth,
-  toPublicUser,
-};
+    const { rows } = await db.query(
+      'SELECT id, role, email, full_name FROM users WHERE id = $1',
+      [payload.id]
+    );
+
+    req.user = rows[0] || null;
+  } catch {
+    req.user = null;
+  }
+
+  next();
+});
+
+module.exports = { authenticate, optionalAuthenticate };
