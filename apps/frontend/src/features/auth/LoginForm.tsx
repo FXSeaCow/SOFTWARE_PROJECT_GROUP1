@@ -16,6 +16,12 @@ type FormErrors = Partial<Record<keyof FormState, string>> & {
   form?: string;
 };
 
+type LoginLocationState = {
+  success?: string;
+  email?: string;
+  from?: { pathname?: string };
+} | null;
+
 const initialForm: FormState = {
   email: "",
   password: "",
@@ -43,8 +49,13 @@ function validate(values: FormState): FormErrors {
 export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as LoginLocationState;
+  const successMessage = locationState?.success;
 
-  const [form, setForm] = useState<FormState>(initialForm);
+  const [form, setForm] = useState<FormState>({
+    ...initialForm,
+    email: locationState?.email ?? "",
+  });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -67,10 +78,9 @@ export function LoginForm() {
         password: form.password,
       });
 
-      const from = (location.state as { from?: { pathname?: string } } | null)
-        ?.from?.pathname;
+      const from = locationState?.from?.pathname;
 
-      navigate(from || "/dashboard", { replace: true });
+      navigate(from || "/", { replace: true });
     } catch (error) {
       setErrors({
         form:
@@ -266,6 +276,21 @@ export function LoginForm() {
           </div>
         ) : null}
 
+        {successMessage ? (
+          <div
+            style={{
+              borderRadius: 12,
+              padding: "12px 14px",
+              background: "#dcfce7",
+              color: "#166534",
+              fontSize: 14,
+              marginBottom: 16,
+            }}
+          >
+            {successMessage}
+          </div>
+        ) : null}
+
         {/* Sign in */}
         <Button type="submit" isLoading={isSubmitting}>
           Sign in
@@ -343,6 +368,9 @@ export function LoginForm() {
           Don&apos;t have an account?{" "}
           <Link
             to="/signup"
+            state={{
+              email: form.email.trim(),
+            }}
             style={{
               color: "#050816",
               fontWeight: 600,

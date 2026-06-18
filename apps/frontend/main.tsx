@@ -9,7 +9,8 @@ import {
 } from "react-router-dom";
 
 import { LoginPage } from "./src/pages/LoginPage";
-import { DashboardPage } from "./src/pages/DashboardPage";
+import { RegisterPage } from "./src/pages/RegisterPage";
+import { MainMenuPage } from "./src/pages/MainMenuPage";
 import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -27,16 +28,18 @@ function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<MainMenuPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<RegisterPage />} />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <Navigate to="/" replace />
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
