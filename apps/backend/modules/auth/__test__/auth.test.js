@@ -589,3 +589,53 @@ describe('POST /api/auth/reset-password', () => {
   });
 });
 
+
+// =============================================================================
+// 7. GET /api/auth/me
+// =============================================================================
+describe('GET /api/auth/me', () => {
+
+  let accessToken;
+
+  beforeEach(async () => {
+    const res  = await registerUser();
+    accessToken = res.body.data.accessToken;
+  });
+
+  it('should return the current user profile with a valid token', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      email:     VALID_USER.email,
+      full_name: VALID_USER.full_name,
+      role:      'member',
+    });
+    expect(res.body.data.password_hash).toBeUndefined();
+  });
+
+  it('should return 401 when no token is provided', async () => {
+    const res = await request(app).get('/api/auth/me');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/access token missing/i);
+  });
+
+  it('should return 401 for a malformed token', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer not.a.real.token');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('should return 401 when Authorization header is missing Bearer prefix', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', accessToken); // missing "Bearer " prefix
+
+    expect(res.status).toBe(401);
+  });
+});
