@@ -1,3 +1,5 @@
+import { apiClient } from "./apiClient";
+
 type LoginPayload = {
   email: string;
   password: string;
@@ -7,6 +9,7 @@ type RegisterPayload = {
   name: string;
   email: string;
   password: string;
+  confirm_password: string;
 };
 
 type User = {
@@ -18,6 +21,21 @@ type User = {
 type AuthSession = {
   accessToken: string;
   user: User;
+};
+
+// The type shape returned by Joi validation / Controller ib backend
+type BackendAuthResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    accessToken: string;
+    user: {
+      id: string;
+      email: string;
+      full_name: string;
+      role: string;
+    };
+  };
 };
 
 const STORAGE_KEY = "gym-web.auth-session";
@@ -33,25 +51,18 @@ const demoUser: AuthSession = {
 };
 
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  await new Promise((resolve) => window.setTimeout(resolve, 500));
 
-  const users = getStoredUsers();
-  const matchedUser = users.find(
-    (user) =>
-      user.email.toLowerCase() === payload.email.toLowerCase() &&
-      user.password === payload.password,
-  );
-
-  if (!matchedUser) {
-    throw new Error("Email or password is incorrect");
-  }
+  const response = await apiClient<BackendAuthResponse>("/auth/login", {
+    method: "POST",
+    body: payload,
+  });
 
   const session: AuthSession = {
-    accessToken: `token-${matchedUser.id}`,
+    accessToken: response.data.accessToken,
     user: {
-      id: matchedUser.id,
-      email: matchedUser.email,
-      name: matchedUser.name,
+      id: response.data.user.id,
+      email: response.data.user.email,
+      name: response.data.user.full_name, // Mapping full_name -> name
     },
   };
 
@@ -60,29 +71,22 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
 }
 
 export async function register(payload: RegisterPayload): Promise<User> {
-  await new Promise((resolve) => window.setTimeout(resolve, 500));
-
-  const users = getStoredUsers();
-  const email = payload.email.trim().toLowerCase();
-
-  if (users.some((user) => user.email.toLowerCase() === email)) {
-    throw new Error("Email is already registered");
-  }
-
-  const newUser = {
-    id: `user-${Date.now()}`,
-    name: payload.name.trim(),
-    email,
+  const backendPayload = {
+    full_name: payload.name,
+    email: payload.email,
     password: payload.password,
+    confirm_password: payload.confirm_password, 
   };
 
-  users.push(newUser);
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  const response = await apiClient<BackendAuthResponse>("/auth/register", {
+    method: "POST",
+    body: backendPayload,
+  });
 
   return {
-    id: newUser.id,
-    name: newUser.name,
-    email: newUser.email,
+    id: response.data.user.id,
+    email: response.data.user.email,
+    name: response.data.user.full_name,
   };
 }
 

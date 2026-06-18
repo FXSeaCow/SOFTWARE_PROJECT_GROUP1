@@ -96,6 +96,7 @@ export function RegisterForm() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
+        confirm_password: form.confirmPassword,
       });
 
       navigate("/login", {

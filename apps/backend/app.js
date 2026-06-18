@@ -4,7 +4,9 @@ const requestLogger = require('./middlewares/RequestLogger.middleware');
 const notFound = require('./middlewares/NotFound.middleware');
 const errorHandler = require('./middlewares/ErrorHandler.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
+const { generalLimiter } = require('./middlewares/rateLimiter.middleware');
 
+const cors = require('cors');
 const app = express();
 
 app.use(express.json());
@@ -32,9 +34,17 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api', generalLimiter);
 }
 
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use('/api/auth', authRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
+
 
 module.exports = app;
