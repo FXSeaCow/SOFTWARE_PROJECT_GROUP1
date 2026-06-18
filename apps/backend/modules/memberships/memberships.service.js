@@ -17,6 +17,39 @@ const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError                   = require('../../utils/Apierror');
 const logger                     = require('../../utils/Logger');
 
+/**
+ * Format a Date or date-like value as YYYY-MM-DD using local calendar parts.
+ * PostgreSQL DATE values arrive as JS Date objects, so we must avoid
+ * toISOString() here or the day can shift in non-UTC timezones.
+ *
+ * @param {Date|string} value
+ * @returns {string}
+ */
+const formatDateOnly = (value) => {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Normalize membership date fields before returning them from the service.
+ * This keeps DATE columns stable in JSON responses across timezones.
+ *
+ * @param {object} membership
+ * @returns {object}
+ */
+const normalizeMembershipDates = (membership) => {
+  if (!membership) return membership;
+
+  return {
+    ...membership,
+    start_date: membership.start_date ? formatDateOnly(membership.start_date) : membership.start_date,
+    end_date: membership.end_date ? formatDateOnly(membership.end_date) : membership.end_date,
+  };
+};
+
 // ─── Membership Plans (public) ────────────────────────────────────────────────
 
 /**
@@ -98,7 +131,11 @@ const getMyMembership = async (userId) => {
   const daysRemaining = daysUntilExpiry(membership.end_date);
   const expiringSoon  = isExpiringSoon(membership.end_date);
 
-  return { ...membership, days_remaining: daysRemaining, expiring_soon: expiringSoon };
+  return {
+    ...normalizeMembershipDates(membership),
+    days_remaining: daysRemaining,
+    expiring_soon: expiringSoon,
+  };
 };
 
 /**
@@ -108,7 +145,8 @@ const getMyMembership = async (userId) => {
  * @returns {Promise<object[]>}
  */
 const getMyMembershipHistory = async (userId) => {
-  return repo.findAllByUser(userId);
+  const history = await repo.findAllByUser(userId);
+  return history.map(normalizeMembershipDates);
 };
 
 // ─── Member: renew membership (FR-05) ────────────────────────────────────────
@@ -151,8 +189,8 @@ const renewMembership = async (userId, planId) => {
       {
         user_id:    userId,
         plan_id:    planId,
-        start_date: startDate.toISOString().slice(0, 10),
-        end_date:   endDate.toISOString().slice(0, 10),
+        start_date: formatDateOnly(startDate),
+        end_date:   formatDateOnly(endDate),
       },
       client
     );
@@ -165,7 +203,7 @@ const renewMembership = async (userId, planId) => {
     endDate: membership.end_date,
   });
 
-  return { ...membership, plan_name: plan.name, price: plan.price };
+  return { ...normalizeMembershipDates(membership), plan_name: plan.name, price: plan.price };
 };
 
 // ─── Admin: manage memberships (FR-06) ───────────────────────────────────────
@@ -193,8 +231,8 @@ const adminCreateMembership = async ({ user_id, plan_id, start_date }, adminId) 
       {
         user_id,
         plan_id,
-        start_date: startDate.toISOString().slice(0, 10),
-        end_date:   endDate.toISOString().slice(0, 10),
+        start_date: formatDateOnly(startDate),
+        end_date:   formatDateOnly(endDate),
         updated_by: adminId,
       },
       client
@@ -207,7 +245,7 @@ const adminCreateMembership = async ({ user_id, plan_id, start_date }, adminId) 
     membershipId: membership.id,
   });
 
-  return { ...membership, plan_name: plan.name };
+  return { ...normalizeMembershipDates(membership), plan_name: plan.name };
 };
 
 /**
@@ -249,7 +287,7 @@ const listAllMemberships = async (query) => {
     limit,
     offset,
   });
-  return { memberships: rows, total, page, limit };
+  return { memberships: rows.map(normalizeMembershipDates), total, page, limit };
 };
 
 /**
