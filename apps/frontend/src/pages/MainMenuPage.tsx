@@ -61,16 +61,30 @@ export function MainMenuPage() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const displayName = currentUser?.email
-    ? currentUser.email.split("@")[0].replace(/[._-]+/g, " ").toUpperCase()
-    : "ALEX CARTER";
-  const profileInitials = currentUser?.email
-    ? currentUser.email.slice(0, 2).toUpperCase()
-    : "AC";
+  const displayName = currentUser?.name?.trim()
+    ? currentUser.name.toUpperCase()
+    : currentUser?.email
+      ? currentUser.email.split("@")[0].replace(/[._-]+/g, " ").toUpperCase()
+      : "ALEX CARTER";
+  const profileInitials = currentUser?.name
+    ? currentUser.name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("")
+    : currentUser?.email
+      ? currentUser.email.slice(0, 2).toUpperCase()
+      : "AC";
 
   return (
     <DashboardLayout
-      bottomNav={<MainMenuBottomNav profileHref={currentUser ? "/" : "/login"} />}
+      bottomNav={
+        <MainMenuBottomNav
+          profileHref={currentUser ? "/" : "/login"}
+          activeItem="home"
+        />
+      }
     >
       <MainMenuHeader
         displayName={displayName}
@@ -78,6 +92,14 @@ export function MainMenuPage() {
         isProfileMenuOpen={isProfileMenuOpen}
         onProfileClick={() => {
           setIsProfileMenuOpen((current) => !current);
+        }}
+        onMembershipClick={() => {
+          setIsProfileMenuOpen(false);
+          navigate("/membership");
+        }}
+        onAccountClick={() => {
+          setIsProfileMenuOpen(false);
+          navigate("/account");
         }}
         onLogoutClick={() => {
           logout();

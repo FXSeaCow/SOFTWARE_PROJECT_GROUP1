@@ -37,6 +37,7 @@ const initialForm: FormState = {
 
 function validate(values: FormState): FormErrors {
   const errors: FormErrors = {};
+  const hasUppercaseLetter = /[A-Z]/.test(values.password);
 
   if (!values.name.trim()) {
     errors.name = "Full name is required";
@@ -52,8 +53,10 @@ function validate(values: FormState): FormErrors {
 
   if (!values.password.trim()) {
     errors.password = "Password is required";
-  } else if (values.password.length < 6) {
-    errors.password = "Password must be at least 6 characters";
+  } else if (values.password.length < 8) {
+    errors.password = "Password must be at least 8 characters";
+  } else if (!hasUppercaseLetter) {
+    errors.password = "Password must contain at least 1 uppercase letter";
   }
 
   if (!values.confirmPassword.trim()) {
@@ -78,6 +81,8 @@ export function RegisterForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const passwordHasMinLength = form.password.length >= 8;
+  const passwordHasUppercase = /[A-Z]/.test(form.password);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -248,6 +253,31 @@ export function RegisterForm() {
               }))
             }
           />
+          <p
+            style={{
+              margin: "-10px 0 0",
+              fontSize: 13,
+              color: "#667085",
+            }}
+          >
+            <span
+              style={{
+                display: "block",
+                color: passwordHasMinLength ? "#166534" : "#667085",
+              }}
+            >
+              {passwordHasMinLength ? "[OK]" : "[ ]"} At least 8 characters
+            </span>
+            <span
+              style={{
+                display: "block",
+                marginTop: 4,
+                color: passwordHasUppercase ? "#166534" : "#667085",
+              }}
+            >
+              {passwordHasUppercase ? "[OK]" : "[ ]"} At least 1 uppercase letter
+            </span>
+          </p>
 
           <Input
             label="Confirm password"

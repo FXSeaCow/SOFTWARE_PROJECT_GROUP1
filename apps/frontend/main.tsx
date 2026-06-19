@@ -11,6 +11,8 @@ import {
 import { LoginPage } from "./src/pages/LoginPage";
 import { RegisterPage } from "./src/pages/RegisterPage";
 import { MainMenuPage } from "./src/pages/MainMenuPage";
+import { MembershipPage } from "./src/pages/MembershipPage";
+import { AccountPage } from "./src/pages/AccountPage";
 import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +33,22 @@ function AppRouter() {
         <Route path="/" element={<MainMenuPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<RegisterPage />} />
+        <Route
+          path="/membership"
+          element={
+            <ProtectedRoute>
+              <MembershipPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

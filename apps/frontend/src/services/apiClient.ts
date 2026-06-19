@@ -39,10 +39,7 @@ export async function apiClient<T>(
 
   const response = await fetch(url, {
     method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 

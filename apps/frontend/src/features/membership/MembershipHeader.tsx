@@ -1,19 +1,31 @@
 import React from "react";
 import { Bell } from "lucide-react";
 
-import { iconButtonStyle } from "./styles";
+import { iconButtonStyle } from "../../components/main-menu/styles";
 
-export function MainMenuHeader({
-  displayName,
-  profileInitials,
+function menuButtonStyle(primary = false): React.CSSProperties {
+  return {
+    width: "100%",
+    minHeight: 44,
+    border: primary ? "none" : "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    background: primary ? "#ff6a13" : "rgba(255,255,255,0.04)",
+    color: primary ? "#050505" : "#f8fafc",
+    fontSize: 14,
+    fontWeight: 800,
+    cursor: "pointer",
+  };
+}
+
+export function MembershipHeader({
+  initials,
   isProfileMenuOpen,
   onProfileClick,
   onMembershipClick,
   onAccountClick,
   onLogoutClick,
 }: {
-  displayName: string;
-  profileInitials: string;
+  initials: string;
   isProfileMenuOpen: boolean;
   onProfileClick: () => void;
   onMembershipClick: () => void;
@@ -24,37 +36,38 @@ export function MainMenuHeader({
     <header
       style={{
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "space-between",
         gap: 16,
         paddingBottom: 18,
         borderBottom: "1px solid rgba(255,255,255,0.08)",
-        marginBottom: 18,
+        marginBottom: 0,
       }}
     >
       <div>
         <div
           style={{
-            fontSize: 13,
-            letterSpacing: "0.24em",
+            color: "#9ca3af",
+            fontSize: 14,
+            letterSpacing: "0.22em",
+            fontWeight: 700,
             textTransform: "uppercase",
-            color: "rgba(255,255,255,0.48)",
-            marginBottom: 8,
+            marginBottom: 6,
           }}
         >
-          Good Morning
+          Ironcore Gym
         </div>
         <h1
           style={{
             margin: 0,
-            fontSize: "clamp(2rem, 3.6vw, 3rem)",
-            lineHeight: 0.92,
-            fontWeight: 900,
-            letterSpacing: "-0.05em",
+            fontSize: "clamp(2rem, 4vw, 3rem)",
+            lineHeight: 0.95,
+            fontWeight: 1000,
+            letterSpacing: "-0.06em",
             textTransform: "uppercase",
           }}
         >
-          {displayName}
+          Membership
         </h1>
       </div>
 
@@ -62,8 +75,7 @@ export function MainMenuHeader({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          flexShrink: 0,
+          gap: 14,
         }}
       >
         <button type="button" aria-label="Notifications" style={iconButtonStyle}>
@@ -76,7 +88,7 @@ export function MainMenuHeader({
               width: 9,
               height: 9,
               borderRadius: "50%",
-              background: "#ff7a1a",
+              background: "#ff6a13",
             }}
           />
         </button>
@@ -85,19 +97,17 @@ export function MainMenuHeader({
           <button
             type="button"
             onClick={onProfileClick}
-            aria-label="Open profile menu"
-            title="Open profile menu"
             style={{
               ...iconButtonStyle,
               width: 48,
               borderRadius: "50%",
-              background: "#ff7a1a",
-              color: "#111111",
-              fontWeight: 900,
-              fontSize: 20,
+              background: "#ff6a13",
+              color: "#050505",
+              fontWeight: 1000,
+              fontSize: 16,
             }}
           >
-            {profileInitials}
+            {initials}
           </button>
 
           {isProfileMenuOpen ? (
@@ -118,55 +128,13 @@ export function MainMenuHeader({
                 zIndex: 20,
               }}
             >
-              <button
-                type="button"
-                onClick={onMembershipClick}
-                style={{
-                  width: "100%",
-                  minHeight: 44,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 12,
-                  background: "rgba(255,255,255,0.04)",
-                  color: "#f5f5f5",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
+              <button type="button" onClick={onMembershipClick} style={menuButtonStyle()}>
                 Membership
               </button>
-              <button
-                type="button"
-                onClick={onAccountClick}
-                style={{
-                  width: "100%",
-                  minHeight: 44,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 12,
-                  background: "rgba(255,255,255,0.04)",
-                  color: "#f5f5f5",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
+              <button type="button" onClick={onAccountClick} style={menuButtonStyle()}>
                 Account
               </button>
-              <button
-                type="button"
-                onClick={onLogoutClick}
-                style={{
-                  width: "100%",
-                  minHeight: 44,
-                  border: "none",
-                  borderRadius: 12,
-                  background: "#ff7a1a",
-                  color: "#111111",
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
+              <button type="button" onClick={onLogoutClick} style={menuButtonStyle(true)}>
                 Log out
               </button>
             </div>

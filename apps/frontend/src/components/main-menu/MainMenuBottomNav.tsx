@@ -4,7 +4,15 @@ import { Link } from "react-router-dom";
 
 import { bottomNavItemStyle } from "./styles";
 
-export function MainMenuBottomNav({ profileHref }: { profileHref: string }) {
+type NavItem = "home" | "train" | "progress" | "schedule" | "profile" | "none";
+
+export function MainMenuBottomNav({
+  profileHref,
+  activeItem = "home",
+}: {
+  profileHref: string;
+  activeItem?: NavItem;
+}) {
   return (
     <nav
       style={{
@@ -29,23 +37,32 @@ export function MainMenuBottomNav({ profileHref }: { profileHref: string }) {
           alignItems: "center",
         }}
       >
-        <MainMenuBottomNavLink label="Home" icon={<Home size={21} />} to="/" active />
+        <MainMenuBottomNavLink
+          label="Home"
+          icon={<Home size={21} />}
+          to="/"
+          active={activeItem === "home"}
+        />
         <MainMenuBottomNavButton
           label="Train"
           icon={<Dumbbell size={21} />}
+          active={activeItem === "train"}
         />
         <MainMenuBottomNavButton
           label="Progress"
           icon={<LineChart size={21} />}
+          active={activeItem === "progress"}
         />
         <MainMenuBottomNavButton
           label="Schedule"
           icon={<CalendarDays size={21} />}
+          active={activeItem === "schedule"}
         />
         <MainMenuBottomNavLink
           label="Profile"
           icon={<User size={21} />}
           to={profileHref}
+          active={activeItem === "profile"}
         />
       </div>
     </nav>
@@ -83,21 +100,23 @@ export function MainMenuBottomNavButton({
   label,
   icon,
   onClick,
+  active = false,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick?: () => void;
+  active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        ...bottomNavItemStyle(false),
+        ...bottomNavItemStyle(active),
         width: "100%",
         border: "none",
         background: "transparent",
-        color: "rgba(255,255,255,0.28)",
+        color: active ? "#ff7a1a" : "rgba(255,255,255,0.28)",
         cursor: onClick ? "pointer" : "default",
       }}
     >
