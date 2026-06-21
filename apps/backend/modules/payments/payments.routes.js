@@ -20,8 +20,8 @@ const router = require('express').Router();
 const ctrl   = require('./payments.controller');
 
 const { authenticate }  = require('../../middlewares/Auth.middleware');
-const { requireRole }   = require('../../middlewares/role.middleware');
-const { validate }      = require('../../middlewares/validate.middleware');
+const { requireRole }   = require('../../middlewares/Role.middleware');
+const { validate }      = require('../../middlewares/Validate.middleware');
 const {
   uuidParam,
   requestPaymentSchema,

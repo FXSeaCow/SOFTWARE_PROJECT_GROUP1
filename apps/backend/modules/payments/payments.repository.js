@@ -208,7 +208,7 @@ const getRevenueSummary = async ({ from_date, to_date } = {}) => {
     `SELECT
        date_trunc('day', paid_at) AS report_date,
        COUNT(*)::INT               AS transaction_count,
-       SUM(amount)                 AS total_revenue
+       SUM(amount)::FLOAT          AS total_revenue
      FROM payments
      WHERE ${conditions.join(' AND ')}
      GROUP BY date_trunc('day', paid_at)

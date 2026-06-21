@@ -37,13 +37,7 @@ const requestPayment = async (userId, { membership_id, provider, transfer_note }
   // 1. Verify membership exists and belongs to member
   const membership = await membershipRepo.findById(membership_id);
   if (!membership)                       throw ApiError.notFound('Membership');
-  // if (membership.user_id !== userId)     throw ApiError.forbidden();
-  try {
-  if (membership.user_id !== userId) throw ApiError.forbidden();
-  } catch (error) {
-    console.error("THE EXACT ERROR IS:", error); // Look at your test console output
-    throw error;
-  }
+  if (membership.user_id !== userId)     throw ApiError.forbidden();
 
   // 2. Check for an existing completed payment
   const db = require('../../config/db');
@@ -152,15 +146,19 @@ const rejectPayment = async (paymentId, adminId, reason) => {
     );
   }
 
-  const rejected = await repo.markFailed(paymentId, adminId, reason);
+  const rejected = await withTransaction(async (client) => {
+    const rj = await repo.markFailed(paymentId, adminId, reason, client);
 
-  // Deactivate the membership
-  await client.query(
-    `UPDATE memberships
-     SET status = 'inactive', updated_at = now(), updated_by = $1
-     WHERE id = $2`,
-    [adminId, payment.membership_id]
-  );
+    // Deactivate the membership
+    await client.query(
+      `UPDATE memberships
+      SET status = 'suspended', updated_at = now(), updated_by = $1
+      WHERE id = $2`,
+      [adminId, payment.membership_id]
+    );
+
+    return rj;
+  });
 
   logger.info('Payment rejected by admin', { paymentId, adminId, reason });
 
@@ -186,15 +184,19 @@ const refundPayment = async (paymentId, adminId, reason) => {
     throw ApiError.badRequest('Only completed payments can be refunded');
   }
 
-  const refunded = await repo.markRefunded(paymentId, adminId, reason);
+  const refunded = await withTransaction(async (client) => {
+      
+    const rf = await repo.markRefunded(paymentId, adminId, reason, client);
 
-  // Deactivate the membership
+    // Deactivate the membership
     await client.query(
       `UPDATE memberships
-       SET status = 'inactive', updated_at = now(), updated_by = $1
+       SET status = 'cancelled', updated_at = now(), updated_by = $1
        WHERE id = $2`,
       [adminId, payment.membership_id]
     );
+    return rf;
+  });
 
   logger.info('Payment refunded by admin', { paymentId, adminId, reason });
 

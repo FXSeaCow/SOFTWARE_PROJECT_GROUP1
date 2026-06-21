@@ -18,7 +18,7 @@
 
 const router  = require('express').Router();
 const ctrl    = require('./auth.controller');
-const { validate }            = require('../../middlewares/validate.middleware');
+const { validate }            = require('../../middlewares/Validate.middleware');
 const { authenticate }        = require('../../middlewares/Auth.middleware');
 const { authLimiter,
         passwordLimiter }     = require('../../middlewares/RateLimiter.middleware');
