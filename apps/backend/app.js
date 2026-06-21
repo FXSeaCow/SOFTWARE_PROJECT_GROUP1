@@ -6,6 +6,7 @@ const errorHandler = require('./middlewares/ErrorHandler.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
 const usersRoutes = require('./modules/users/users.routes');
 const membershipsRoutes = require('./modules/memberships/memberships.routes');
+const workoutsRoutes = require('./modules/workouts/workouts.routes');
 
 const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
 
@@ -47,6 +48,7 @@ app.use(cors({
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/memberships', membershipsRoutes);
+app.use('/api/workouts', workoutsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
