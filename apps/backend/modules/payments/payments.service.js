@@ -13,10 +13,10 @@
 
 const repo                       = require('./payments.repository');
 const membershipRepo             = require('../memberships/memberships.repository');
-const { withTransaction }        = require('../../utils/transaction');
-const { parse: parsePagination } = require('../../utils/pagination');
-const ApiError                   = require('../../utils/ApiError');
-const logger                     = require('../../utils/logger');
+const { withTransaction }        = require('../../utils/Transaction');
+const { parse: parsePagination } = require('../../utils/Pagination');
+const ApiError                   = require('../../utils/Apierror');
+const logger                     = require('../../utils/Logger');
 
 // ─── FR-25: Member requests a payment ────────────────────────────────────────
 
@@ -37,7 +37,13 @@ const requestPayment = async (userId, { membership_id, provider, transfer_note }
   // 1. Verify membership exists and belongs to member
   const membership = await membershipRepo.findById(membership_id);
   if (!membership)                       throw ApiError.notFound('Membership');
-  if (membership.user_id !== userId)     throw ApiError.forbidden();
+  // if (membership.user_id !== userId)     throw ApiError.forbidden();
+  try {
+  if (membership.user_id !== userId) throw ApiError.forbidden();
+  } catch (error) {
+    console.error("THE EXACT ERROR IS:", error); // Look at your test console output
+    throw error;
+  }
 
   // 2. Check for an existing completed payment
   const db = require('../../config/db');

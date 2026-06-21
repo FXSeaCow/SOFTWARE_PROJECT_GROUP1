@@ -5,8 +5,8 @@
  */
 
 const service      = require('./payments.service');
-const asyncHandler = require('../../utils/asyncHandler');
-const ApiResponse  = require('../../utils/ApiResponse');
+const asyncHandler = require('../../utils/Asynchandler');
+const ApiResponse  = require('../../utils/Apiresponse');
 
 // ─── Member routes ────────────────────────────────────────────────────────────
 

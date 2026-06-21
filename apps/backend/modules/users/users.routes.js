@@ -20,7 +20,7 @@
 const router = require('express').Router();
 const ctrl   = require('./users.controller');
 
-const { authenticate }           = require('../../middlewares/auth.middleware');
+const { authenticate }           = require('../../middlewares/Auth.middleware');
 const { requireRole, requireSelf } = require('../../middlewares/role.middleware');
 const { validate }               = require('../../middlewares/validate.middleware');
 const {
