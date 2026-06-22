@@ -159,6 +159,9 @@ const deleteUser = async (userId, requestingAdminId) => {
 
   const user = await repo.findById(userId);
   if (!user) throw ApiError.notFound('User');
+  if (user.role === 'admin') {
+    throw ApiError.badRequest('Cannot delete another admin account');
+  }
 
   await repo.deleteUser(userId);
   logger.info('User deleted', { deletedUserId: userId, byAdmin: requestingAdminId });
