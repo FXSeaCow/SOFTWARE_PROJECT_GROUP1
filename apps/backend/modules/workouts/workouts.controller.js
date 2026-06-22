@@ -47,6 +47,40 @@ const updateExercise = asyncHandler(async (req, res) => {
   res.json(ApiResponse.success(exercise, 'Exercise updated'));
 });
 
+// ─── Goal resolver (Gemini NLP) ───────────────────────────────────────────────
+
+/**
+ * POST /api/workouts/resolve-goal
+ * Member types anything like "I want to lose belly fat" and gets back
+ * a structured goal classification.
+ *
+ * Response shapes:
+ *
+ *   Fitness-related, high confidence:
+ *     { success: true, data: { goal: 'weight_loss', confidence: 'high', ... } }
+ *
+ *   Not fitness-related:
+ *     { success: false, message: '<friendly redirect from Gemini>', data: { ... } }
+ *
+ *   Gemini unavailable (fallback):
+ *     { success: true, data: { goal: 'general_fitness', fallback: true, ... } }
+ */
+const resolveGoal = asyncHandler(async (req, res) => {
+  const result = await service.resolveGoal(req.body.text);
+
+  if (!result.is_fitness_related) {
+    // Return 400 so the frontend knows to show the redirect_message
+    // instead of proceeding to plan generation
+    return res.status(400).json({
+      success: false,
+      message: result.redirect_message,
+      data:    result,
+    });
+  }
+
+  res.json(ApiResponse.success(result, 'Goal resolved successfully'));
+});
+
 // ─── Workout plans ────────────────────────────────────────────────────────────
 
 /**
@@ -157,6 +191,7 @@ module.exports = {
   getExerciseById,
   createExercise,
   updateExercise,
+  resolveGoal,
   generatePlan,
   createCustomPlan,
   getActiveSchedule,

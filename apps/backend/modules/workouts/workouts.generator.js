@@ -319,12 +319,227 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog }
   return days;
 };
 
+// ─── Natural language → goal resolver (Gemini API) ────────────────────────────
+
+const VALID_GOALS    = Object.keys(GOALS);
+const VALID_CONFIDENCE = ['high', 'medium', 'low'];
+const GEMINI_MODEL   = 'gemini-2.0-flash';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+/**
+ * System prompt for Gemini.
+ *
+ * Key design decisions:
+ *   - Returns 4 fields so we handle fitness/non-fitness in ONE call (no second request).
+ *   - is_fitness_related = false triggers a friendly redirect message to the caller.
+ *   - redirect_message is written by Gemini in the member's own language/tone.
+ *   - temperature = 0 keeps the goal classification deterministic.
+ *   - responseMimeType = 'application/json' forces Gemini to skip markdown fences.
+ */
+const SYSTEM_PROMPT = `
+You are a fitness goal classifier embedded in a gym management app called GymHub.
+
+Your job is to read what a gym member types and do TWO things:
+  1. Decide if it is related to fitness / exercise / health goals.
+  2. If it is, classify it into exactly one goal key.
+
+─── RESPONSE SCHEMA ────────────────────────────────────────────────────────────
+Always respond with a single JSON object containing EXACTLY these four keys:
+
+{
+  "is_fitness_related": true | false,
+  "goal":               string | null,
+  "confidence":         "high" | "medium" | "low" | null,
+  "redirect_message":   string | null
+}
+
+─── RULES ───────────────────────────────────────────────────────────────────────
+
+IF the input IS fitness-related:
+  • Set "is_fitness_related" to true
+  • Set "goal" to one of:
+      "muscle_gain"     → building muscle, bulking, bigger/stronger, hypertrophy,
+                          bodybuilding, gaining mass, lifting heavy
+      "weight_loss"     → losing fat, cutting, burning calories, slimming, lean,
+                          losing belly fat, toning up, dropping weight
+      "endurance"       → stamina, running longer, cardio fitness, marathon,
+                          triathlon, cycling, not getting tired easily
+      "flexibility"     → stretching, mobility, yoga-style, range of motion,
+                          injury prevention, joint health, moving better
+      "general_fitness" → staying healthy, balanced training, overall wellness,
+                          not sure what goal, beginner with no specific goal
+  • Set "confidence" to how sure you are: "high", "medium", or "low"
+  • Set "redirect_message" to null
+
+IF the input is NOT fitness-related (e.g. food recipes, weather, coding, random chat):
+  • Set "is_fitness_related" to false
+  • Set "goal" to null
+  • Set "confidence" to null
+  • Set "redirect_message" to a SHORT, friendly message (1-2 sentences) telling
+    the user this app is for fitness goals, and asking them to describe their
+    fitness goal instead. Keep the tone warm and helpful, NOT robotic.
+
+─── EXAMPLES ────────────────────────────────────────────────────────────────────
+
+Input: "I want to lose belly fat and feel lighter"
+Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null}
+
+Input: "Build bigger arms and a wider back"
+Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null}
+
+Input: "I want to run a 10k without stopping"
+Output: {"is_fitness_related":true,"goal":"endurance","confidence":"high","redirect_message":null}
+
+Input: "I'm pretty stiff, I can't touch my toes"
+Output: {"is_fitness_related":true,"goal":"flexibility","confidence":"high","redirect_message":null}
+
+Input: "Just want to be healthier, I'm not sure where to start"
+Output: {"is_fitness_related":true,"goal":"general_fitness","confidence":"medium","redirect_message":null}
+
+Input: "How do I make pasta carbonara?"
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"That sounds delicious, but GymHub is here to help with your fitness journey! 😊 Could you tell me what you'd like to achieve at the gym — like losing weight, building muscle, or improving your stamina?"}
+
+Input: "What is the weather today?"
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"I can only help with fitness goals here! Tell me what you'd like to work on — for example, 'I want to get stronger' or 'I want more energy'."}
+
+Input: "xyzabc123!!!"
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"Hmm, I didn't quite catch that! I'm here to help you build your workout plan. What fitness goal are you working toward?"}
+`.trim();
+
+/**
+ * resolveGoalFromText
+ * Calls the Gemini API to:
+ *   1. Detect whether the member's input is fitness-related.
+ *   2. If yes → classify it into one of the five goal keys.
+ *   3. If no  → return a friendly redirect message to show the member.
+ *
+ * The caller (workouts.service.js) should check `is_fitness_related` before
+ * proceeding to `buildWeeklyPlan`. If false, surface `redirect_message` to
+ * the user and do not generate a plan.
+ *
+ * @param {string} userText
+ *   Raw natural language from the member, e.g. "I want to lose belly fat"
+ *
+ * @returns {Promise<{
+ *   is_fitness_related: boolean,
+ *   goal:               string|null,   — valid goal key, or null if not fitness-related
+ *   confidence:         string|null,   — 'high'|'medium'|'low', or null
+ *   redirect_message:   string|null,   — friendly message to show user, or null
+ *   raw_text:           string,        — original trimmed input
+ *   fallback:           boolean,       — true if Gemini was unavailable
+ * }>}
+ *
+ * @throws {Error} only for empty input — Gemini errors are caught and return fallback
+ */
+const resolveGoalFromText = async (userText) => {
+  if (!userText || !userText.trim()) {
+    throw new Error('Fitness goal description must not be empty');
+  }
+
+  const cleanText = userText.trim().slice(0, 500); // guard against huge inputs
+
+  // ── Gemini API call ──────────────────────────────────────────────────────────
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        contents: [
+          {
+            role:  'user',
+            parts: [{ text: cleanText }],
+          },
+        ],
+        generationConfig: {
+          temperature:      0,     // deterministic — same input → same goal every time
+          maxOutputTokens:  200,   // JSON + short redirect_message fits comfortably
+          responseMimeType: 'application/json', // Gemini skips markdown fences
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`Gemini API error ${response.status}: ${errBody}`);
+    }
+
+    const data = await response.json();
+
+    // Extract raw text content from Gemini's nested response structure
+    const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Defensive strip of any accidental markdown fences
+    const jsonText = rawContent
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    const parsed = JSON.parse(jsonText);
+
+    // ── Validate and sanitise every field from Gemini ─────────────────────────
+
+    const isFitnessRelated = Boolean(parsed.is_fitness_related);
+
+    // Ensure goal is a recognised key, or null if not fitness-related
+    const goal = isFitnessRelated
+      ? (VALID_GOALS.includes(parsed.goal) ? parsed.goal : 'general_fitness')
+      : null;
+
+    // Ensure confidence is valid, or null if not fitness-related
+    const confidence = isFitnessRelated
+      ? (VALID_CONFIDENCE.includes(parsed.confidence) ? parsed.confidence : 'low')
+      : null;
+
+    // Sanitise redirect_message: only present when not fitness-related
+    const redirectMessage = !isFitnessRelated && typeof parsed.redirect_message === 'string'
+      ? parsed.redirect_message.trim()
+      : null;
+
+    return {
+      is_fitness_related: isFitnessRelated,
+      goal,
+      confidence,
+      redirect_message: redirectMessage,
+      raw_text:         cleanText,
+      fallback:         false,
+    };
+
+  } catch (err) {
+    // ── Graceful fallback when Gemini is unavailable ───────────────────────────
+    // Never throw to the caller — return a safe default instead.
+    const logger = require('../../utils/Logger');
+    logger.warn('resolveGoalFromText: Gemini call failed, using fallback', {
+      error: err.message,
+      input: cleanText,
+    });
+
+    return {
+      is_fitness_related: true,            // assume fitness-related so user isn't blocked
+      goal:               'general_fitness',
+      confidence:         'low',
+      redirect_message:   null,
+      raw_text:           cleanText,
+      fallback:           true,            // caller can show "our AI is unavailable" note
+    };
+  }
+};
+
 module.exports = {
   buildWeeklyPlan,
+  resolveGoalFromText,
   // Export internals for unit testing
   buildCatalogIndex,
   scoreExercise,
   pickBestExercises,
   GOAL_PROFILES,
   SPLITS,
+  VALID_GOALS,
 };

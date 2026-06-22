@@ -8,7 +8,8 @@
  */
 
 const repo                = require('./workouts.repository');
-const { buildWeeklyPlan } = require('./workouts.generator');
+const { buildWeeklyPlan,
+        resolveGoalFromText } = require('./workouts.generator');
 const { withTransaction } = require('../../utils/Transaction');
 const ApiError            = require('../../utils/Apierror');
 const logger              = require('../../utils/Logger');
@@ -66,6 +67,24 @@ const updateExercise = async (exerciseId, fields) => {
   }
 
   return repo.updateExercise(exerciseId, fields);
+};
+
+// ─── FR-07 helper: Resolve natural language → goal ────────────────────────────
+
+/**
+ * Resolve a member's free-text goal description into a structured goal key.
+ * Delegates to Gemini via resolveGoalFromText().
+ *
+ * The caller (controller) should:
+ *   - If is_fitness_related = false → return 400 with redirect_message to member
+ *   - If is_fitness_related = true  → pass goal into generatePlan or createCustomPlan
+ *   - If fallback = true            → optionally show "AI unavailable" notice
+ *
+ * @param {string} userText  - raw text typed by the member
+ * @returns {Promise<object>} - see resolveGoalFromText JSDoc for shape
+ */
+const resolveGoal = async (userText) => {
+  return resolveGoalFromText(userText);
 };
 
 // ─── FR-07: Generate a workout plan ──────────────────────────────────────────
@@ -407,6 +426,7 @@ module.exports = {
   getExerciseById,
   createExercise,
   updateExercise,
+  resolveGoal,
   generatePlan,
   getActiveSchedule,
   listMyPlans,

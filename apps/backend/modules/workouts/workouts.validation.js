@@ -155,10 +155,24 @@ const setDayExercisesSchema = Joi.object({
     }),
 });
 
+/**
+ * POST /api/workouts/resolve-goal
+ * Member types a free-text fitness goal description.
+ * Gemini classifies it into a goal key.
+ */
+const resolveGoalSchema = Joi.object({
+  text: Joi.string().trim().min(2).max(500).required().messages({
+    'string.min':   'Please describe your fitness goal in at least 2 characters',
+    'string.max':   'Description must not exceed 500 characters',
+    'any.required': 'A fitness goal description is required',
+  }),
+});
+
 module.exports = {
   uuidParam,
   createExerciseSchema,
   updateExerciseSchema,
+  resolveGoalSchema,
   generatePlanSchema,
   createPlanSchema,
   updatePlanSchema,

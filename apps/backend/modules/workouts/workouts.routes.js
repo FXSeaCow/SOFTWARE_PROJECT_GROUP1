@@ -36,6 +36,7 @@ const {
   uuidParam,
   createExerciseSchema,
   updateExerciseSchema,
+  resolveGoalSchema,
   generatePlanSchema,
   createPlanSchema,
   updatePlanSchema,
@@ -66,6 +67,14 @@ router.patch(
   requireRole('admin'),
   validate(updateExerciseSchema, uuidParam('exerciseId')),
   ctrl.updateExercise
+);
+
+// ── Goal resolver (Gemini NLP) — must come BEFORE requireActiveMembership ────
+// Member can call this to figure out their goal before committing to a plan.
+router.post(
+  '/resolve-goal',
+  validate(resolveGoalSchema),
+  ctrl.resolveGoal
 );
 
 // ── Member: workout plans (require active membership) ─────────────────────────
