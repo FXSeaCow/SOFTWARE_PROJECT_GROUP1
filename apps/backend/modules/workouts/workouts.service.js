@@ -328,10 +328,10 @@ const deletePlan = async (planId, userId) => {
  */
 const updateDay = async (planId, dayId, userId, fields) => {
   const plan = await repo.findPlanByIdAndUser(planId, userId);
-  if (!plan) throw ApiError.notFound('Workout plan');
+  if (!plan) throw ApiError.notFound('Workout plan user');
 
   const day = await repo.findDayByIdAndPlan(dayId, planId);
-  if (!day) throw ApiError.notFound('Workout day');
+  if (!day) throw ApiError.notFound('Workout day plan');
 
   const updated = await repo.updateDay(dayId, fields);
 

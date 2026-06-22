@@ -323,8 +323,8 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog }
 
 const VALID_GOALS    = Object.keys(GOALS);
 const VALID_CONFIDENCE = ['high', 'medium', 'low'];
-const GEMINI_MODEL   = 'gemini-2.0-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 /**
  * System prompt for Gemini.
@@ -440,29 +440,27 @@ const resolveGoalFromText = async (userText) => {
 
   // ── Gemini API call ──────────────────────────────────────────────────────────
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not set in environment variables');
+      throw new Error('GROQ_API_KEY is not set in environment variables');
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    const response = await fetch(`${GROQ_API_URL}?key=${apiKey}`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: 
+      { 'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+       },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            role:  'user',
-            parts: [{ text: cleanText }],
-          },
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: cleanText }
         ],
-        generationConfig: {
-          temperature:      0,     // deterministic — same input → same goal every time
-          maxOutputTokens:  200,   // JSON + short redirect_message fits comfortably
-          responseMimeType: 'application/json', // Gemini skips markdown fences
-        },
+        temperature: 0,
+        max_tokens: 200,
+        // Forces Groq to output valid JSON matching your schema
+        response_format: { type: 'json_object' }
       }),
     });
 
@@ -474,7 +472,7 @@ const resolveGoalFromText = async (userText) => {
     const data = await response.json();
 
     // Extract raw text content from Gemini's nested response structure
-    const rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const rawContent = data?.choices?.[0]?.message?.content || '';
 
     // Defensive strip of any accidental markdown fences
     const jsonText = rawContent

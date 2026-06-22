@@ -122,13 +122,13 @@ router.delete(
 
 router.patch(
   '/:planId/days/:dayId',
-  validate(updateDaySchema, uuidParam('planId')),
+  validate(updateDaySchema, uuidParam('planId').concat(uuidParam('dayId'))),
   ctrl.updateDay
 );
 
 router.put(
   '/:planId/days/:dayId/exercises',
-  validate(setDayExercisesSchema, uuidParam('planId')),
+  validate(setDayExercisesSchema, uuidParam('planId').concat(uuidParam('dayId'))),
   ctrl.setDayExercises
 );
 

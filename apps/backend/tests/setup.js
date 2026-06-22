@@ -39,7 +39,8 @@ global.truncateAll = async () => {
       memberships,
       membership_plans,
       password_reset_tokens,
-      users
+      users,
+      exercises
     RESTART IDENTITY CASCADE
   `);
 };
