@@ -10,7 +10,8 @@
     "test:auth": "jest --testPathPatterns=modules/auth --runInBand --forceExit",
     "test:users": "jest --testPathPatterns=modules/users --runInBand --forceExit",
     "test:memberships": "jest --testPathPatterns=modules/memberships --runInBand --forceExit",
-    "test:workouts": "jest --testPathPatterns=modules/workouts --runInBand --forceExit"
+    "test:workouts": "jest --testPathPatterns=modules/workouts --runInBand --forceExit",
+    "test:payments": "jest --testPathPatterns=modules/payments --runInBand --forceExit"
   },
   "keywords": [],
   "author": "",
