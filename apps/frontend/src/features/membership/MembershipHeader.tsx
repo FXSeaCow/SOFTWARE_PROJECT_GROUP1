@@ -23,6 +23,8 @@ export function MembershipHeader({
   onProfileClick,
   onMembershipClick,
   onAccountClick,
+  onAdminClick,
+  showAdminEntry = false,
   onLogoutClick,
 }: {
   initials: string;
@@ -30,6 +32,8 @@ export function MembershipHeader({
   onProfileClick: () => void;
   onMembershipClick: () => void;
   onAccountClick: () => void;
+  onAdminClick?: () => void;
+  showAdminEntry?: boolean;
   onLogoutClick: () => void;
 }) {
   return (
@@ -134,6 +138,20 @@ export function MembershipHeader({
               <button type="button" onClick={onAccountClick} style={menuButtonStyle()}>
                 Account
               </button>
+              {showAdminEntry && onAdminClick ? (
+                <button
+                  type="button"
+                  onClick={onAdminClick}
+                  style={{
+                    ...menuButtonStyle(),
+                    border: "1px solid rgba(255,122,26,0.28)",
+                    background: "rgba(255,122,26,0.12)",
+                    color: "#ffb15f",
+                  }}
+                >
+                  Admin Console
+                </button>
+              ) : null}
               <button type="button" onClick={onLogoutClick} style={menuButtonStyle(true)}>
                 Log out
               </button>

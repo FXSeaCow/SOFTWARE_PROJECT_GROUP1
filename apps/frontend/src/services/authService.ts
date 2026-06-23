@@ -12,10 +12,11 @@ type RegisterPayload = {
   confirm_password: string;
 };
 
-type User = {
+export type User = {
   id: string;
   email: string;
   name: string;
+  role?: "member" | "admin";
 };
 
 type AuthSession = {
@@ -41,12 +42,38 @@ type BackendAuthResponse = {
 const STORAGE_KEY = "gym-web.auth-session";
 const USERS_STORAGE_KEY = "gym-web.users";
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isJwtLike(value: string): boolean {
+  return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(value);
+}
+
+function isValidSession(session: unknown): session is AuthSession {
+  if (!session || typeof session !== "object") {
+    return false;
+  }
+
+  const candidate = session as Partial<AuthSession>;
+  return (
+    typeof candidate.accessToken === "string" &&
+    isJwtLike(candidate.accessToken) &&
+    !!candidate.user &&
+    typeof candidate.user.id === "string" &&
+    isUuid(candidate.user.id) &&
+    typeof candidate.user.email === "string" &&
+    typeof candidate.user.name === "string"
+  );
+}
+
 const demoUser: AuthSession = {
   accessToken: "demo-token",
   user: {
     id: "user-1",
     email: "member@gym.com",
     name: "Demo Member",
+    role: "member",
   },
 };
 
@@ -63,6 +90,7 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
       id: response.data.user.id,
       email: response.data.user.email,
       name: response.data.user.full_name, // Mapping full_name -> name
+      role: response.data.user.role as User["role"],
     },
   };
 
@@ -112,7 +140,13 @@ function getSession(): AuthSession | null {
   }
 
   try {
-    return JSON.parse(raw) as AuthSession;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isValidSession(parsed)) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
     return null;

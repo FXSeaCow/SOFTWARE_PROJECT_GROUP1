@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gymhub-db
+    environment:
+      POSTGRES_DB: gymhub
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: passs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gymhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: gymhub-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: passs
+      DB_NAME: gymhub
+      JWT_ACCESS_SECRET: 4f0e0a2c470d3de5869815c4d84d9e68712295e101c92580fbc08f74eba0bbf8b8a0b668dedb0884514d8c9ecd55f63f3c93f46dc1b1fadd1791c400686593cf
+      JWT_REFRESH_SECRET: 85331c629f08c0974645d7efbc56a7567a6358b1bc6b8f615ad1dbc2b903d39277f8d0eb149f87550f9a6903bcd8da010350e177a011042a090aca0515e59a92
+      NODE_ENV: development
+      ADMIN_EMAIL: admin@gym.com
+      ADMIN_PASSWORD: Admin123
+      ADMIN_FULL_NAME: System Admin
+      ADMIN_PHONE: ""
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: gymhub-frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:3000
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:

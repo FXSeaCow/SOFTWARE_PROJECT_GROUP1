@@ -6,6 +6,18 @@ type ApiResponse<T> = {
   data: T;
 };
 
+type PaginatedApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
+
 export type MembershipPlan = {
   id: string;
   name: string;
@@ -36,6 +48,11 @@ export type CurrentMembership = MembershipRecord & {
   expiring_soon: boolean;
 };
 
+export type AdminMembershipRecord = MembershipRecord & {
+  user_name: string;
+  user_email: string;
+};
+
 export async function getMembershipPlans(): Promise<MembershipPlan[]> {
   const response = await apiClient<ApiResponse<MembershipPlan[]>>("/memberships/plans");
   return response.data;
@@ -55,6 +72,47 @@ export async function renewMembership(planId: string): Promise<MembershipRecord>
   const response = await apiClient<ApiResponse<MembershipRecord>>("/memberships/renew", {
     method: "POST",
     body: {
+      plan_id: planId,
+    },
+  });
+
+  return response.data;
+}
+
+export async function getAdminMembershipPlans(): Promise<MembershipPlan[]> {
+  const response = await apiClient<ApiResponse<MembershipPlan[]>>("/memberships/admin/plans");
+  return response.data;
+}
+
+export async function listAdminMemberships(params: {
+  userId?: string;
+  status?: MembershipRecord["status"];
+  limit?: number;
+} = {}): Promise<AdminMembershipRecord[]> {
+  const query = new URLSearchParams();
+
+  if (params.userId) {
+    query.set("user_id", params.userId);
+  }
+
+  if (params.status) {
+    query.set("status", params.status);
+  }
+
+  query.set("limit", String(params.limit ?? 10));
+
+  const response = await apiClient<PaginatedApiResponse<AdminMembershipRecord[]>>(
+    `/memberships/admin?${query.toString()}`,
+  );
+
+  return response.data;
+}
+
+export async function createAdminMembership(userId: string, planId: string): Promise<MembershipRecord> {
+  const response = await apiClient<ApiResponse<MembershipRecord>>("/memberships/admin", {
+    method: "POST",
+    body: {
+      user_id: userId,
       plan_id: planId,
     },
   });

@@ -79,9 +79,19 @@ const listUsersQuerySchema = Joi.object({
   search: Joi.string().trim().max(100).optional(), // search by name or email
 });
 
+const updateUserRoleSchema = Joi.object({
+  role: Joi.string().valid('member', 'admin').required(),
+});
+
+const updateUserAccountStatusSchema = Joi.object({
+  account_status: Joi.string().valid('active', 'locked').required(),
+});
+
 module.exports = {
   uuidParam,
   updateProfileSchema,
   changePasswordSchema,
   listUsersQuerySchema,
+  updateUserRoleSchema,
+  updateUserAccountStatusSchema,
 };

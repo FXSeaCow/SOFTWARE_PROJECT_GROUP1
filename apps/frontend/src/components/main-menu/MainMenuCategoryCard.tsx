@@ -1,4 +1,5 @@
 import React from "react";
+import { ChevronRight } from "lucide-react";
 
 import { panelStyle } from "./styles";
 
@@ -7,11 +8,13 @@ export function MainMenuCategoryCard({
   subtitle,
   icon,
   accent,
+  metric,
 }: {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   accent: string;
+  metric: string;
 }) {
   return (
     <div
@@ -41,16 +44,26 @@ export function MainMenuCategoryCard({
       </div>
 
       <div>
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: 800,
-            marginBottom: 4,
-          }}
-        >
-          {title}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div
+              style={{
+                fontSize: 20,
+                fontWeight: 800,
+                marginBottom: 4,
+              }}
+            >
+              {title}
+            </div>
+            <div style={{ color: "#8d98a7", fontSize: 14, lineHeight: 1.45 }}>{subtitle}</div>
+            <div style={{ color: accent, fontSize: 14, fontWeight: 800, marginTop: 10 }}>
+              {metric}
+            </div>
+          </div>
+          <div style={{ alignSelf: "end", color: "#d0d5dd" }}>
+            <ChevronRight size={18} />
+          </div>
         </div>
-        <div style={{ color: "#8d98a7", fontSize: 14 }}>{subtitle}</div>
       </div>
     </div>
   );

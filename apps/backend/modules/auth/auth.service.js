@@ -64,6 +64,10 @@ const login = async ({ email, password }) => {
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  if (user.account_status === 'locked') {
+    throw ApiError.forbidden('This account is locked');
+  }
+
   const isMatch = await comparePassword(password, user.password_hash);
   if (!isMatch) {
     logger.warn('Failed login attempt', { email });

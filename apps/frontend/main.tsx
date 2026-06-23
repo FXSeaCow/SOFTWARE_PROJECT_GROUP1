@@ -14,6 +14,7 @@ import { MainMenuPage } from "./src/pages/MainMenuPage";
 import { MembershipPage } from "./src/pages/MembershipPage";
 import { AccountPage } from "./src/pages/AccountPage";
 import { getCurrentUser } from "./src/services/authService";
+import { AdminUsersPage } from "./src/pages/AdminUsersPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -21,6 +22,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const user = getCurrentUser();
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (user.role !== "admin") {
+    return <Navigate to="/account" replace />;
   }
 
   return <>{children}</>;
@@ -55,6 +71,14 @@ function AppRouter() {
             <ProtectedRoute>
               <Navigate to="/" replace />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <AdminUsersPage />
+            </AdminRoute>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

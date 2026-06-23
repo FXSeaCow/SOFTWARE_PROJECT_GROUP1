@@ -44,7 +44,7 @@ export function MainMenuWeeklyGoal({
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          gap: 8,
+          gap: 10,
           marginBottom: 8,
         }}
       >
@@ -52,34 +52,24 @@ export function MainMenuWeeklyGoal({
           <div
             key={labels[index]}
             style={{
+              height: 46,
+              borderRadius: 10,
               display: "grid",
-              gap: 8,
+              placeItems: "center",
+              fontSize: 13,
+              fontWeight: 800,
+              color: done ? "#f8f1e8" : "rgba(255,255,255,0.64)",
+              background: done
+                ? index === 4
+                  ? "#dd7418"
+                  : "linear-gradient(180deg, #cb6516 0%, #dd7418 100%)"
+                : "rgba(255,255,255,0.08)",
+              border: done
+                ? "1px solid rgba(255,146,66,0.22)"
+                : "1px solid rgba(255,255,255,0.04)",
             }}
           >
-            <div
-              style={{
-                height: 46,
-                borderRadius: 6,
-                background: done
-                  ? index === 4
-                    ? "#ff8628"
-                    : "rgba(183,103,35,0.78)"
-                  : "rgba(255,255,255,0.07)",
-                border: done
-                  ? "1px solid rgba(255,146,66,0.18)"
-                  : "1px solid rgba(255,255,255,0.04)",
-              }}
-            />
-            <div
-              style={{
-                textAlign: "center",
-                fontSize: 12,
-                color: done ? "#ff7a1a" : "rgba(255,255,255,0.24)",
-                fontWeight: 700,
-              }}
-            >
-              {labels[index]}
-            </div>
+            {labels[index]}
           </div>
         ))}
       </div>

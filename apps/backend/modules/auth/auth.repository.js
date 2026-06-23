@@ -16,7 +16,7 @@ const db = require('../../config/db');
  */
 const findByEmail = async (email) => {
   const { rows } = await db.query(
-    `SELECT id, email, password_hash, full_name, phone, role, created_at
+    `SELECT id, email, password_hash, full_name, phone, role, account_status, created_at
      FROM users
      WHERE email = $1`,
     [email]
@@ -29,7 +29,7 @@ const findByEmail = async (email) => {
  */
 const findById = async (id) => {
   const { rows } = await db.query(
-    `SELECT id, email, full_name, phone, role, created_at
+    `SELECT id, email, full_name, phone, role, account_status, created_at
      FROM users
      WHERE id = $1`,
     [id]
@@ -44,13 +44,13 @@ const findById = async (id) => {
  * Create a new user. Accepts an optional `client` for running inside
  * a transaction (so user + related inserts can be atomic).
  */
-const createUser = async ({ email, password_hash, full_name, phone }, client) => {
+const createUser = async ({ email, password_hash, full_name, phone, role = 'member' }, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
-    `INSERT INTO users (email, password_hash, full_name, phone)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, email, full_name, phone, role, qr_code_token, created_at`,
-    [email, password_hash, full_name, phone || null]
+    `INSERT INTO users (email, password_hash, full_name, phone, role)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, email, full_name, phone, role, account_status, qr_code_token, created_at`,
+    [email, password_hash, full_name, phone || null, role]
   );
   return rows[0];
 };

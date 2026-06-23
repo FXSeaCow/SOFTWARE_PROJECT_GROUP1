@@ -12,7 +12,9 @@
  *   5. POST   /api/users/me/qr/regenerate
  *   6. GET    /api/users             [admin]
  *   7. GET    /api/users/:userId     [admin]
- *   8. DELETE /api/users/:userId     [admin]
+ *   8. PATCH  /api/users/:userId/role
+ *   9. PATCH  /api/users/:userId/account-status
+ *  10. DELETE /api/users/:userId     [admin]
  */
 
 const request = require('supertest');
@@ -525,6 +527,24 @@ describe('GET /api/users (admin)', () => {
     });
   });
 
+  it('should include account_status and membership_status in the list', async () => {
+    const { user: member } = await registerAndLogin();
+    await db.query(`UPDATE users SET account_status = 'locked' WHERE id = $1`, [member.id]);
+    const { accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toEqual(
+      expect.objectContaining({
+        account_status: expect.any(String),
+        membership_status: expect.any(String),
+      })
+    );
+  });
+
   it('should return 403 for a regular member', async () => {
     const { accessToken } = await registerAndLogin();
 
@@ -593,7 +613,85 @@ describe('GET /api/users/:userId (admin)', () => {
 
 
 // =============================================================================
-// 8. DELETE /api/users/:userId  [admin]
+// 8. PATCH /api/users/:userId/role [admin]
+// =============================================================================
+describe('PATCH /api/users/:userId/role (admin)', () => {
+
+  it('should update a user role to admin', async () => {
+    const { user: member } = await registerAndLogin();
+    const { accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .patch(`/api/users/${member.id}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'admin' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.role).toBe('admin');
+  });
+
+  it('should block admin from removing their own admin role', async () => {
+    const { user: admin, accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .patch(`/api/users/${admin.id}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'member' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+
+// =============================================================================
+// 9. PATCH /api/users/:userId/account-status [admin]
+// =============================================================================
+describe('PATCH /api/users/:userId/account-status (admin)', () => {
+
+  it('should lock a user account', async () => {
+    const { user: member } = await registerAndLogin();
+    const { accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .patch(`/api/users/${member.id}/account-status`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ account_status: 'locked' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.account_status).toBe('locked');
+  });
+
+  it('should prevent locked user from logging in', async () => {
+    const { user: member } = await registerAndLogin();
+    const { accessToken } = await registerAndLoginAdmin();
+
+    await request(app)
+      .patch(`/api/users/${member.id}/account-status`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ account_status: 'locked' });
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'member@example.com', password: 'Password1' });
+
+    expect(loginRes.status).toBe(403);
+  });
+
+  it('should block admin from locking themselves', async () => {
+    const { user: admin, accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .patch(`/api/users/${admin.id}/account-status`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ account_status: 'locked' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+
+// =============================================================================
+// 10. DELETE /api/users/:userId  [admin]
 // =============================================================================
 describe('DELETE /api/users/:userId (admin)', () => {
 

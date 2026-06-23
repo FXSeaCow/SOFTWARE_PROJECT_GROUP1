@@ -6,34 +6,47 @@ export function MainMenuStatCard({
   label,
   value,
   icon,
+  note,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
+  note: string;
 }) {
   return (
-    <div style={panelStyle}>
-      <div style={{ color: "#ff7a1a", marginBottom: 8 }}>{icon}</div>
-      <div
-        style={{
-          color: "#ff7a1a",
-          fontSize: 24,
-          fontWeight: 900,
-          lineHeight: 1,
-          marginBottom: 8,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{
-          color: "#93a0b2",
-          fontSize: 13,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
+    <div style={{ ...panelStyle, minHeight: 132, padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            display: "grid",
+            placeItems: "center",
+            color: "#ff7a1a",
+            background: "rgba(255,122,26,0.08)",
+            border: "1px solid rgba(255,122,26,0.16)",
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </div>
+        <div>
+          <div style={{ color: "#d3dae5", fontSize: 15, marginBottom: 10 }}>{label}</div>
+          <div
+            style={{
+              color: "#f5f5f5",
+              fontSize: 24,
+              fontWeight: 900,
+              lineHeight: 1,
+              marginBottom: 10,
+              letterSpacing: "-0.04em",
+            }}
+          >
+            {value}
+          </div>
+          <div style={{ color: "#8f98a7", fontSize: 13 }}>{note}</div>
+        </div>
       </div>
     </div>
   );

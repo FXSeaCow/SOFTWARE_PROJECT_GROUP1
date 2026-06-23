@@ -82,6 +82,24 @@ const getUserById = asyncHandler(async (req, res) => {
   res.json(ApiResponse.success(user));
 });
 
+const updateUserRole = asyncHandler(async (req, res) => {
+  const user = await usersService.updateUserRole(
+    req.params.userId,
+    req.body.role,
+    req.user.id
+  );
+  res.json(ApiResponse.success(user, 'User role updated successfully'));
+});
+
+const updateUserAccountStatus = asyncHandler(async (req, res) => {
+  const user = await usersService.updateUserAccountStatus(
+    req.params.userId,
+    req.body.account_status,
+    req.user.id
+  );
+  res.json(ApiResponse.success(user, 'User account status updated successfully'));
+});
+
 /**
  * DELETE /api/users/:userId
  * Permanently delete a user account. Admin-only.
@@ -99,5 +117,7 @@ module.exports = {
   regenerateMyQrCode,
   listUsers,
   getUserById,
+  updateUserRole,
+  updateUserAccountStatus,
   deleteUser,
 };

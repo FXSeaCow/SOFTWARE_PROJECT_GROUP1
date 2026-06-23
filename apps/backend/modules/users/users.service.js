@@ -143,6 +143,32 @@ const getUserById = async (userId) => {
   return user;
 };
 
+const updateUserRole = async (userId, role, requestingAdminId) => {
+  const user = await repo.findById(userId);
+  if (!user) throw ApiError.notFound('User');
+
+  if (userId === requestingAdminId && role !== 'admin') {
+    throw ApiError.badRequest('Admins cannot remove their own admin role');
+  }
+
+  const updated = await repo.updateRole(userId, role);
+  logger.info('User role updated', { userId, role, byAdmin: requestingAdminId });
+  return updated;
+};
+
+const updateUserAccountStatus = async (userId, accountStatus, requestingAdminId) => {
+  const user = await repo.findById(userId);
+  if (!user) throw ApiError.notFound('User');
+
+  if (userId === requestingAdminId && accountStatus === 'locked') {
+    throw ApiError.badRequest('Admins cannot lock their own account');
+  }
+
+  const updated = await repo.updateAccountStatus(userId, accountStatus);
+  logger.info('User account status updated', { userId, accountStatus, byAdmin: requestingAdminId });
+  return updated;
+};
+
 // ─── Admin: delete a user ─────────────────────────────────────────────────────
 
 /**
@@ -172,5 +198,7 @@ module.exports = {
   regenerateQrCode,
   listUsers,
   getUserById,
+  updateUserRole,
+  updateUserAccountStatus,
   deleteUser,
 };

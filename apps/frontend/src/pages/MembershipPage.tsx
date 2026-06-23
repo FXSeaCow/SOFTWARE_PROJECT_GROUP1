@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { MainMenuBottomNav } from "../components/main-menu/MainMenuBottomNav";
 import { MembershipBenefits } from "../features/membership/MembershipBenefits";
 import { MembershipComparePlans } from "../features/membership/MembershipComparePlans";
 import { MembershipFeaturedPlan } from "../features/membership/MembershipFeaturedPlan";
@@ -9,7 +8,7 @@ import { MembershipHeader } from "../features/membership/MembershipHeader";
 import { MembershipHero } from "../features/membership/MembershipHero";
 import { benefitCards, tierContent } from "../features/membership/constants";
 import { getUserInitials, inferTier } from "../features/membership/utils";
-import { DashboardLayout } from "../layouts/DashboardLayout";
+import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 import {
   CurrentMembership,
@@ -22,6 +21,7 @@ import {
 export function MembershipPage() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
+  const isAdmin = currentUser?.role === "admin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [currentMembership, setCurrentMembership] = useState<CurrentMembership | null>(null);
@@ -103,7 +103,7 @@ export function MembershipPage() {
   }
 
   return (
-    <DashboardLayout bottomNav={<MainMenuBottomNav profileHref="/" activeItem="none" />}>
+    <AppShell activeItem="none">
       <MembershipHeader
         initials={initials}
         isProfileMenuOpen={isProfileMenuOpen}
@@ -118,6 +118,11 @@ export function MembershipPage() {
           setIsProfileMenuOpen(false);
           navigate("/account");
         }}
+        onAdminClick={() => {
+          setIsProfileMenuOpen(false);
+          navigate("/admin/users");
+        }}
+        showAdminEntry={isAdmin}
         onLogoutClick={() => {
           logout();
           navigate("/login", { replace: true });
@@ -172,6 +177,6 @@ export function MembershipPage() {
         tierContent={tierContent}
         onSelectPlan={setSelectedPlanId}
       />
-    </DashboardLayout>
+    </AppShell>
   );
 }

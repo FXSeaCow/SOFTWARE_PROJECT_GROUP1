@@ -9,14 +9,13 @@ export function MainMenuHeroCard({ startHref }: { startHref: string }) {
     <section
       style={{
         ...panelStyle,
-        minHeight: 250,
+        minHeight: 260,
         padding: 24,
         marginBottom: 18,
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
+        alignItems: "center",
         background:
-          "linear-gradient(90deg, rgba(18,12,8,0.92) 0%, rgba(76,38,15,0.82) 46%, rgba(15,15,15,0.78) 100%), radial-gradient(circle at center, rgba(255,122,26,0.16), transparent 38%)",
+          "linear-gradient(90deg, rgba(18,12,8,0.96) 0%, rgba(51,28,11,0.92) 46%, rgba(12,12,12,0.92) 100%)",
         position: "relative",
         overflow: "hidden",
       }}
@@ -31,8 +30,33 @@ export function MainMenuHeroCard({ startHref }: { startHref: string }) {
           pointerEvents: "none",
         }}
       />
+      <div
+        style={{
+          position: "absolute",
+          right: -120,
+          top: -80,
+          width: 420,
+          height: 420,
+          borderRadius: "50%",
+          border: "2px solid rgba(255,122,26,0.18)",
+          boxShadow: "0 0 60px rgba(255,122,26,0.12)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          right: 48,
+          top: 28,
+          width: 180,
+          height: 180,
+          borderRadius: "50%",
+          border: "1px solid rgba(255,122,26,0.14)",
+          pointerEvents: "none",
+        }}
+      />
 
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 560 }}>
         <div
           style={{
             display: "inline-flex",
@@ -45,7 +69,7 @@ export function MainMenuHeroCard({ startHref }: { startHref: string }) {
             fontWeight: 900,
             textTransform: "uppercase",
             letterSpacing: "0.12em",
-            marginBottom: 36,
+            marginBottom: 20,
           }}
         >
           Today's Challenge
@@ -60,37 +84,40 @@ export function MainMenuHeroCard({ startHref }: { startHref: string }) {
             textTransform: "uppercase",
             fontWeight: 900,
             maxWidth: 520,
+            marginBottom: 18,
           }}
         >
           <span style={{ color: "#f5f5f5" }}>Iron Warrior</span>
           <br />
           <span style={{ color: "#ff7a1a" }}>Challenge</span>
         </h2>
-      </div>
-
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          display: "flex",
-          alignItems: "center",
-          gap: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={heroMetaStyle}>
-          <Timer size={16} />
-          <span>75 min</span>
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={heroMetaStyle}>
+            <Timer size={16} />
+            <span>75 min</span>
+          </div>
+          <div style={heroMetaStyle}>
+            <Flame size={16} />
+            <span>680 kcal</span>
+          </div>
         </div>
-        <div style={heroMetaStyle}>
-          <Flame size={16} />
-          <span>680 kcal</span>
-        </div>
 
-        <Link to={startHref} style={{ textDecoration: "none" }}>
-          <button type="button" style={startButtonStyle}>
+        <Link
+          to={startHref}
+          style={{ textDecoration: "none", display: "inline-block", marginTop: 18 }}
+        >
+          <button type="button" style={{ ...startButtonStyle, minHeight: 46, padding: "0 24px" }}>
             <Play size={18} fill="currentColor" />
-            <span>Start</span>
+            <span>Start workout</span>
           </button>
         </Link>
       </div>

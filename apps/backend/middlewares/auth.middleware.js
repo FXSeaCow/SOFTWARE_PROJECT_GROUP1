@@ -37,12 +37,16 @@ const authenticate = asyncHandler(async (req, res, next) => {
 
   // 3. Confirm user still exists in DB (light query — only id, role, email)
   const { rows } = await db.query(
-    'SELECT id, role, email, full_name FROM users WHERE id = $1',
+    'SELECT id, role, email, full_name, account_status FROM users WHERE id = $1',
     [payload.id]
   );
 
   if (!rows.length) {
     throw ApiError.unauthorized('Account no longer exists');
+  }
+
+  if (rows[0].account_status === 'locked') {
+    throw ApiError.forbidden('This account is locked');
   }
 
   // 4. Attach to request — available to all downstream handlers
@@ -68,11 +72,11 @@ const optionalAuthenticate = asyncHandler(async (req, res, next) => {
     const payload = verifyAccessToken(token);
 
     const { rows } = await db.query(
-      'SELECT id, role, email, full_name FROM users WHERE id = $1',
+      'SELECT id, role, email, full_name, account_status FROM users WHERE id = $1',
       [payload.id]
     );
 
-    req.user = rows[0] || null;
+    req.user = rows[0] && rows[0].account_status !== 'locked' ? rows[0] : null;
   } catch {
     req.user = null;
   }

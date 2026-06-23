@@ -28,6 +28,8 @@ const {
   updateProfileSchema,
   changePasswordSchema,
   listUsersQuerySchema,
+  updateUserRoleSchema,
+  updateUserAccountStatusSchema,
 } = require('./users.validation');
 
 // All users routes require authentication
@@ -69,6 +71,20 @@ router.get(
   requireRole('admin'),
   validate(null, uuidParam),
   ctrl.getUserById
+);
+
+router.patch(
+  '/:userId/role',
+  requireRole('admin'),
+  validate(updateUserRoleSchema, uuidParam),
+  ctrl.updateUserRole
+);
+
+router.patch(
+  '/:userId/account-status',
+  requireRole('admin'),
+  validate(updateUserAccountStatusSchema, uuidParam),
+  ctrl.updateUserAccountStatus
 );
 
 router.delete(

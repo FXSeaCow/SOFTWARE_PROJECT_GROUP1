@@ -14,10 +14,21 @@ const db = require('../../config/db');
  */
 const findById = async (id) => {
   const { rows } = await db.query(
-    `SELECT id, email, full_name, phone, role,
-            qr_code_token, created_at, updated_at
-     FROM users
-     WHERE id = $1`,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.account_status,
+            u.qr_code_token, u.created_at, u.updated_at,
+            COALESCE((
+              SELECT CASE
+                WHEN m.status = 'active' AND m.end_date >= CURRENT_DATE THEN 'active'::text
+                WHEN m.status = 'active' AND m.end_date < CURRENT_DATE THEN 'expired'::text
+                ELSE m.status::text
+              END
+              FROM memberships m
+              WHERE m.user_id = u.id
+              ORDER BY m.created_at DESC
+              LIMIT 1
+            ), 'none'::text) AS membership_status
+     FROM users u
+     WHERE u.id = $1`,
     [id]
   );
   return rows[0] || null;
@@ -51,13 +62,13 @@ const findAll = async ({ role, search, limit, offset }) => {
   let   idx        = 1;
 
   if (role) {
-    conditions.push(`role = $${idx++}`);
+    conditions.push(`u.role = $${idx++}`);
     values.push(role);
   }
 
   if (search) {
     conditions.push(
-      `(full_name ILIKE $${idx} OR email ILIKE $${idx})`
+      `(u.full_name ILIKE $${idx} OR u.email ILIKE $${idx})`
     );
     values.push(`%${search}%`);
     idx++;
@@ -67,17 +78,29 @@ const findAll = async ({ role, search, limit, offset }) => {
 
   // Total count (for pagination metadata)
   const countResult = await db.query(
-    `SELECT COUNT(*) FROM users ${where}`,
+    `SELECT COUNT(*) FROM users u ${where}`,
     values
   );
   const total = parseInt(countResult.rows[0].count);
 
   // Paginated rows
   const { rows } = await db.query(
-    `SELECT id, email, full_name, phone, role, created_at, updated_at
-     FROM users
+    `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.account_status,
+            u.created_at, u.updated_at,
+            COALESCE((
+              SELECT CASE
+                WHEN m.status = 'active' AND m.end_date >= CURRENT_DATE THEN 'active'::text
+                WHEN m.status = 'active' AND m.end_date < CURRENT_DATE THEN 'expired'::text
+                ELSE m.status::text
+              END
+              FROM memberships m
+              WHERE m.user_id = u.id
+              ORDER BY m.created_at DESC
+              LIMIT 1
+            ), 'none'::text) AS membership_status
+     FROM users u
      ${where}
-     ORDER BY created_at DESC
+     ORDER BY u.created_at DESC
      LIMIT $${idx++} OFFSET $${idx++}`,
     [...values, limit, offset]
   );
@@ -117,10 +140,32 @@ const updateProfile = async (id, fields) => {
     `UPDATE users
      SET ${setClauses.join(', ')}
      WHERE id = $${idx}
-     RETURNING id, email, full_name, phone, role, updated_at`,
+     RETURNING id, email, full_name, phone, role, account_status, updated_at`,
     values
   );
   return rows[0];
+};
+
+const updateRole = async (id, role) => {
+  const { rows } = await db.query(
+    `UPDATE users
+     SET role = $1, updated_at = now()
+     WHERE id = $2
+     RETURNING id, email, full_name, phone, role, account_status, created_at, updated_at`,
+    [role, id]
+  );
+  return rows[0] || null;
+};
+
+const updateAccountStatus = async (id, accountStatus) => {
+  const { rows } = await db.query(
+    `UPDATE users
+     SET account_status = $1, updated_at = now()
+     WHERE id = $2
+     RETURNING id, email, full_name, phone, role, account_status, created_at, updated_at`,
+    [accountStatus, id]
+  );
+  return rows[0] || null;
 };
 
 /**
@@ -181,6 +226,8 @@ module.exports = {
   findByIdWithHash,
   findAll,
   updateProfile,
+  updateRole,
+  updateAccountStatus,
   updatePassword,
   regenerateQrToken,
   deleteUser,

@@ -3,10 +3,9 @@ import { Eye, EyeOff, KeyRound, Mail, ShieldCheck, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
-import { MainMenuBottomNav } from "../components/main-menu/MainMenuBottomNav";
 import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
-import { DashboardLayout } from "../layouts/DashboardLayout";
+import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 import { changeMyPassword, getMyProfile, UserProfile } from "../services/userService";
 
@@ -159,6 +158,7 @@ function DarkInput({
 export function AccountPage() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
+  const isAdmin = currentUser?.role === "admin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -248,7 +248,7 @@ export function AccountPage() {
   }
 
   return (
-    <DashboardLayout bottomNav={<MainMenuBottomNav profileHref="/" activeItem="none" />}>
+    <AppShell activeItem="none">
       <MainMenuHeader
         displayName={displayName}
         profileInitials={profileInitials || "AC"}
@@ -264,6 +264,11 @@ export function AccountPage() {
           setIsProfileMenuOpen(false);
           navigate("/account");
         }}
+        onAdminClick={() => {
+          setIsProfileMenuOpen(false);
+          navigate("/admin/users");
+        }}
+        showAdminEntry={isAdmin}
         onLogoutClick={() => {
           logout();
           navigate("/login", { replace: true });
@@ -440,6 +445,41 @@ export function AccountPage() {
                   letter, and 1 number.
                 </div>
               </div>
+
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/users")}
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "rgba(255,122,26,0.12)",
+                    border: "1px solid rgba(255,122,26,0.24)",
+                    color: "#f5f5f5",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#ffb15f",
+                      fontSize: 13,
+                      textTransform: "uppercase",
+                      marginBottom: 10,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Admin
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+                    Open user management
+                  </div>
+                  <div style={{ color: "#ffd7b0", fontSize: 14, lineHeight: 1.5 }}>
+                    View all users, search by email or name, change roles, lock or
+                    unlock accounts, inspect membership status, and delete users.
+                  </div>
+                </button>
+              ) : null}
             </div>
           )}
         </aside>
@@ -594,6 +634,6 @@ export function AccountPage() {
           </form>
         </section>
       </section>
-    </DashboardLayout>
+    </AppShell>
   );
 }
