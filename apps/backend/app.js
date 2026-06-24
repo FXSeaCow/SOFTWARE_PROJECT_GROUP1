@@ -7,6 +7,11 @@ const { ensureAppReady } = require('./bootstrap/appInit');
 const authRoutes = require('./modules/auth/auth.routes');
 const usersRoutes = require('./modules/users/users.routes');
 const membershipsRoutes = require('./modules/memberships/memberships.routes');
+<<<<<<< HEAD
+const workoutsRoutes = require('./modules/workouts/workouts.routes');
+=======
+const paymentsRoutes = require('./modules/payments/payments.routes');
+>>>>>>> PS-49/BackEnd_Payment
 
 const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
 
@@ -50,6 +55,11 @@ app.use(ensureAppReady);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/memberships', membershipsRoutes);
+<<<<<<< HEAD
+app.use('/api/workouts', workoutsRoutes);
+=======
+app.use('/api/payments', paymentsRoutes);
+>>>>>>> PS-49/BackEnd_Payment
 
 app.use(notFound);
 app.use(errorHandler);
