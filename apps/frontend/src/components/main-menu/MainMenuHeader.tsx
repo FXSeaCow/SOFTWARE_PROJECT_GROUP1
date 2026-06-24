@@ -1,7 +1,7 @@
 import React from "react";
-import { Bell } from "lucide-react";
 
 import { iconButtonStyle } from "./styles";
+import { NotificationBell } from "../NotificationBell";
 
 export function MainMenuHeader({
   displayName,
@@ -77,20 +77,7 @@ export function MainMenuHeader({
         >
           {rightSlot}
 
-          <button type="button" aria-label="Notifications" style={iconButtonStyle}>
-            <Bell size={18} />
-            <span
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                width: 9,
-                height: 9,
-                borderRadius: "50%",
-                background: "#ff7a1a",
-              }}
-            />
-          </button>
+          <NotificationBell />
 
           <div style={{ position: "relative" }}>
             <button

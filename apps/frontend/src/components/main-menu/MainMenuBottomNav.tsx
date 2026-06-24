@@ -8,9 +8,11 @@ type NavItem = "home" | "train" | "progress" | "schedule" | "profile" | "none";
 
 export function MainMenuBottomNav({
   profileHref,
+  trainHref = "/exercises",
   activeItem = "home",
 }: {
   profileHref: string;
+  trainHref?: string;
   activeItem?: NavItem;
 }) {
   return (
@@ -43,9 +45,10 @@ export function MainMenuBottomNav({
           to="/"
           active={activeItem === "home"}
         />
-        <MainMenuBottomNavButton
+        <MainMenuBottomNavLink
           label="Train"
           icon={<Dumbbell size={21} />}
+          to={trainHref}
           active={activeItem === "train"}
         />
         <MainMenuBottomNavButton

@@ -44,13 +44,13 @@ const findById = async (id) => {
  * Create a new user. Accepts an optional `client` for running inside
  * a transaction (so user + related inserts can be atomic).
  */
-const createUser = async ({ email, password_hash, full_name, phone, role = 'member' }, client) => {
+const createUser = async ({ email, password_hash, full_name, phone, role = 'member', account_status = 'active' }, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
-    `INSERT INTO users (email, password_hash, full_name, phone, role)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users (email, password_hash, full_name, phone, role, account_status)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, email, full_name, phone, role, account_status, qr_code_token, created_at`,
-    [email, password_hash, full_name, phone || null, role]
+    [email, password_hash, full_name, phone || null, role, account_status]
   );
   return rows[0];
 };

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Ban,
   ChevronDown,
+  BellRing,
   Crown,
   EllipsisVertical,
   Lock,
@@ -321,6 +322,38 @@ export function AdminUsersPage() {
 
       <section
         style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Admin Console</div>
+          <div style={{ color: "#9ca8b7", fontSize: 14 }}>
+            Manage user accounts, memberships, and outbound announcements.
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          onClick={() => navigate("/admin/announcements")}
+          style={{
+            width: "auto",
+            height: 46,
+            background: "#ff7a1a",
+            color: "#111111",
+          }}
+          leftIcon={<BellRing size={16} />}
+        >
+          Send announcement
+        </Button>
+      </section>
+
+      <section
+        style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
           gap: 12,
@@ -461,7 +494,7 @@ export function AdminUsersPage() {
             </label>
 
             <Button type="submit" style={{ background: "#ff7a1a", color: "#111111", minHeight: 46 }}>
-              Create user
+              Search
             </Button>
           </form>
 

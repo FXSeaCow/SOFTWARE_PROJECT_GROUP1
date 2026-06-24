@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, Mail, ShieldCheck, User } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Mail, QrCode, ShieldCheck, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
@@ -7,7 +7,12 @@ import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
-import { changeMyPassword, getMyProfile, UserProfile } from "../services/userService";
+import {
+  changeMyPassword,
+  getMyProfile,
+  getMyQrCode,
+  UserProfile,
+} from "../services/userService";
 
 type PasswordFormState = {
   currentPassword: string;
@@ -161,6 +166,7 @@ export function AccountPage() {
   const isAdmin = currentUser?.role === "admin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(initialPasswordForm);
   const [errors, setErrors] = useState<PasswordFormErrors>({});
@@ -195,8 +201,9 @@ export function AccountPage() {
       setIsLoadingProfile(true);
 
       try {
-        const nextProfile = await getMyProfile();
+        const [nextProfile, nextQrCode] = await Promise.all([getMyProfile(), getMyQrCode()]);
         setProfile(nextProfile);
+        setQrCode(nextQrCode.qrCode);
       } catch (error) {
         setErrors({
           form:
@@ -326,7 +333,7 @@ export function AccountPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(280px, 1fr) minmax(0, 1.3fr)",
+          gridTemplateColumns: "minmax(320px, 1.05fr) minmax(300px, 0.95fr)",
           gap: 18,
           alignItems: "start",
         }}
@@ -418,33 +425,162 @@ export function AccountPage() {
                 </div>
               </div>
 
-              <div
+              <section
                 style={{
                   padding: 16,
                   borderRadius: 16,
-                  background: "rgba(255,122,26,0.12)",
-                  border: "1px solid rgba(255,122,26,0.24)",
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.08)",
                 }}
               >
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    color: "#ffb15f",
+                    color: "#9ca8b7",
                     fontSize: 13,
                     textTransform: "uppercase",
-                    marginBottom: 10,
+                    marginBottom: 6,
                   }}
                 >
-                  <ShieldCheck size={16} />
-                  <span>Password rule</span>
+                  Security
                 </div>
-                <div style={{ color: "#f5f5f5", fontSize: 14, lineHeight: 1.6 }}>
-                  Your new password must include at least 8 characters, 1 uppercase
-                  letter, and 1 number.
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 900,
+                    letterSpacing: "-0.04em",
+                    textTransform: "uppercase",
+                    marginBottom: 18,
+                  }}
+                >
+                  Change password
                 </div>
-              </div>
+
+                <form
+                  onSubmit={handleSubmit}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                  }}
+                >
+                  <DarkInput
+                    label="Current password"
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={passwordForm.currentPassword}
+                    onChange={(value) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        currentPassword: value,
+                      }))
+                    }
+                    autoComplete="current-password"
+                    placeholder="Enter current password"
+                    error={errors.currentPassword}
+                    leftIcon={<KeyRound size={18} />}
+                    rightIcon={showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    onRightIconClick={() => setShowCurrentPassword((current) => !current)}
+                  />
+
+                  <DarkInput
+                    label="New password"
+                    type={showNewPassword ? "text" : "password"}
+                    value={passwordForm.newPassword}
+                    onChange={(value) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        newPassword: value,
+                      }))
+                    }
+                    autoComplete="new-password"
+                    placeholder="Enter new password"
+                    error={errors.newPassword}
+                    leftIcon={<KeyRound size={18} />}
+                    rightIcon={showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    onRightIconClick={() => setShowNewPassword((current) => !current)}
+                  />
+
+                  <div
+                    style={{
+                      marginTop: -4,
+                      padding: 14,
+                      borderRadius: 14,
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      color: "#9ca8b7",
+                      fontSize: 14,
+                    }}
+                  >
+                    <div style={{ color: hasMinLength ? "#86efac" : "#9ca8b7" }}>
+                      {hasMinLength ? "[OK]" : "[ ]"} At least 8 characters
+                    </div>
+                    <div style={{ color: hasUppercase ? "#86efac" : "#9ca8b7", marginTop: 6 }}>
+                      {hasUppercase ? "[OK]" : "[ ]"} At least 1 uppercase letter
+                    </div>
+                    <div style={{ color: hasNumber ? "#86efac" : "#9ca8b7", marginTop: 6 }}>
+                      {hasNumber ? "[OK]" : "[ ]"} At least 1 number
+                    </div>
+                  </div>
+
+                  <DarkInput
+                    label="Confirm new password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={passwordForm.confirmPassword}
+                    onChange={(value) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        confirmPassword: value,
+                      }))
+                    }
+                    autoComplete="new-password"
+                    placeholder="Confirm new password"
+                    error={errors.confirmPassword}
+                    leftIcon={<KeyRound size={18} />}
+                    rightIcon={showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    onRightIconClick={() => setShowConfirmPassword((current) => !current)}
+                  />
+
+                  {errors.form ? (
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        background: "rgba(127,29,29,0.32)",
+                        color: "#fecaca",
+                        fontSize: 14,
+                      }}
+                    >
+                      {errors.form}
+                    </div>
+                  ) : null}
+
+                  {successMessage ? (
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        background: "rgba(22,101,52,0.28)",
+                        color: "#bbf7d0",
+                        fontSize: 14,
+                      }}
+                    >
+                      {successMessage}
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="submit"
+                    isLoading={isSubmitting}
+                    loadingText="Updating password..."
+                    style={{
+                      background: "#ff7a1a",
+                      color: "#111111",
+                      marginTop: 4,
+                    }}
+                  >
+                    Save new password
+                  </Button>
+                </form>
+              </section>
 
               {isAdmin ? (
                 <button
@@ -487,151 +623,104 @@ export function AccountPage() {
         <section style={panelStyle}>
           <div
             style={{
-              color: "#9ca8b7",
-              fontSize: 13,
-              textTransform: "uppercase",
-              marginBottom: 6,
-            }}
-          >
-            Security
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 900,
-              letterSpacing: "-0.04em",
-              textTransform: "uppercase",
-              marginBottom: 18,
-            }}
-          >
-            Change password
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            style={{
               display: "flex",
               flexDirection: "column",
-              gap: 16,
+              gap: 14,
             }}
           >
-            <DarkInput
-              label="Current password"
-              type={showCurrentPassword ? "text" : "password"}
-              value={passwordForm.currentPassword}
-              onChange={(value) =>
-                setPasswordForm((current) => ({
-                  ...current,
-                  currentPassword: value,
-                }))
-              }
-              autoComplete="current-password"
-              placeholder="Enter current password"
-              error={errors.currentPassword}
-              leftIcon={<KeyRound size={18} />}
-              rightIcon={showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              onRightIconClick={() => setShowCurrentPassword((current) => !current)}
-            />
-
-            <DarkInput
-              label="New password"
-              type={showNewPassword ? "text" : "password"}
-              value={passwordForm.newPassword}
-              onChange={(value) =>
-                setPasswordForm((current) => ({
-                  ...current,
-                  newPassword: value,
-                }))
-              }
-              autoComplete="new-password"
-              placeholder="Enter new password"
-              error={errors.newPassword}
-              leftIcon={<KeyRound size={18} />}
-              rightIcon={showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              onRightIconClick={() => setShowNewPassword((current) => !current)}
-            />
-
             <div
               style={{
-                marginTop: -4,
-                padding: 14,
-                borderRadius: 14,
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
                 color: "#9ca8b7",
-                fontSize: 14,
+                fontSize: 13,
+                textTransform: "uppercase",
+                marginBottom: 2,
               }}
             >
-              <div style={{ color: hasMinLength ? "#86efac" : "#9ca8b7" }}>
-                {hasMinLength ? "[OK]" : "[ ]"} At least 8 characters
+              Access
+            </div>
+            <div
+              style={{
+                padding: 18,
+                borderRadius: 18,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  color: "#9ca8b7",
+                  fontSize: 13,
+                  textTransform: "uppercase",
+                  marginBottom: 14,
+                }}
+              >
+                <QrCode size={16} />
+                <span>Personal QR code</span>
               </div>
-              <div style={{ color: hasUppercase ? "#86efac" : "#9ca8b7", marginTop: 6 }}>
-                {hasUppercase ? "[OK]" : "[ ]"} At least 1 uppercase letter
+
+              <div
+                style={{
+                  borderRadius: 18,
+                  background: "linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%)",
+                  padding: 18,
+                  display: "grid",
+                  placeItems: "center",
+                  minHeight: 280,
+                }}
+              >
+                {qrCode ? (
+                  <img
+                    src={qrCode}
+                    alt="Account QR code"
+                    style={{
+                      width: "100%",
+                      maxWidth: 240,
+                      aspectRatio: "1 / 1",
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  <div style={{ color: "#334155", fontSize: 14 }}>Unable to load QR code.</div>
+                )}
               </div>
-              <div style={{ color: hasNumber ? "#86efac" : "#9ca8b7", marginTop: 6 }}>
-                {hasNumber ? "[OK]" : "[ ]"} At least 1 number
+
+              <div style={{ color: "#9ca8b7", fontSize: 13, lineHeight: 1.6, marginTop: 14 }}>
+                This QR code is tied to the `qr_code_token` of your account and can be used for
+                gym check-in.
               </div>
             </div>
 
-            <DarkInput
-              label="Confirm new password"
-              type={showConfirmPassword ? "text" : "password"}
-              value={passwordForm.confirmPassword}
-              onChange={(value) =>
-                setPasswordForm((current) => ({
-                  ...current,
-                  confirmPassword: value,
-                }))
-              }
-              autoComplete="new-password"
-              placeholder="Confirm new password"
-              error={errors.confirmPassword}
-              leftIcon={<KeyRound size={18} />}
-              rightIcon={showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              onRightIconClick={() => setShowConfirmPassword((current) => !current)}
-            />
-
-            {errors.form ? (
-              <div
-                style={{
-                  borderRadius: 14,
-                  padding: "12px 14px",
-                  background: "rgba(127,29,29,0.32)",
-                  color: "#fecaca",
-                  fontSize: 14,
-                }}
-              >
-                {errors.form}
-              </div>
-            ) : null}
-
-            {successMessage ? (
-              <div
-                style={{
-                  borderRadius: 14,
-                  padding: "12px 14px",
-                  background: "rgba(22,101,52,0.28)",
-                  color: "#bbf7d0",
-                  fontSize: 14,
-                }}
-              >
-                {successMessage}
-              </div>
-            ) : null}
-
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              loadingText="Updating password..."
+            <div
               style={{
-                background: "#ff7a1a",
-                color: "#111111",
-                marginTop: 4,
+                padding: 16,
+                borderRadius: 16,
+                background: "rgba(255,122,26,0.12)",
+                border: "1px solid rgba(255,122,26,0.24)",
               }}
             >
-              Save new password
-            </Button>
-          </form>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  color: "#ffb15f",
+                  fontSize: 13,
+                  textTransform: "uppercase",
+                  marginBottom: 10,
+                }}
+              >
+                <ShieldCheck size={16} />
+                <span>Password rule</span>
+              </div>
+              <div style={{ color: "#f5f5f5", fontSize: 14, lineHeight: 1.6 }}>
+                Your new password must include at least 8 characters, 1 uppercase letter,
+                and 1 number.
+              </div>
+            </div>
+          </div>
         </section>
       </section>
     </AppShell>

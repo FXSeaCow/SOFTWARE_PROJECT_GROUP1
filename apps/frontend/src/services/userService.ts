@@ -16,6 +16,10 @@ export type UserProfile = {
   updated_at?: string;
 };
 
+export type UserQrCode = {
+  qrCode: string;
+};
+
 type ChangePasswordPayload = {
   current_password: string;
   new_password: string;
@@ -24,6 +28,11 @@ type ChangePasswordPayload = {
 
 export async function getMyProfile(): Promise<UserProfile> {
   const response = await apiClient<ApiResponse<UserProfile>>("/users/me");
+  return response.data;
+}
+
+export async function getMyQrCode(): Promise<UserQrCode> {
+  const response = await apiClient<ApiResponse<UserQrCode>>("/users/me/qr");
   return response.data;
 }
 

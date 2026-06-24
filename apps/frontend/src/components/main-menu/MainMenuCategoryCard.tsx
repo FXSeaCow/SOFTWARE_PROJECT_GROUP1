@@ -9,23 +9,31 @@ export function MainMenuCategoryCard({
   icon,
   accent,
   metric,
+  onClick,
 }: {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   accent: string;
   metric: string;
+  onClick?: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
       style={{
         ...panelStyle,
+        width: "100%",
         minHeight: 128,
         display: "grid",
         gap: 14,
         alignContent: "space-between",
         background:
           "linear-gradient(180deg, rgba(22,22,22,0.95) 0%, rgba(13,13,13,0.95) 100%)",
+        textAlign: "left",
+        color: "#f5f5f5",
+        cursor: onClick ? "pointer" : "default",
       }}
     >
       <div
@@ -65,6 +73,6 @@ export function MainMenuCategoryCard({
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

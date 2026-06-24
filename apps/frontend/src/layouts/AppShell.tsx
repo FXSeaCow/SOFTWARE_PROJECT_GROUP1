@@ -61,6 +61,7 @@ export function AppShell({
             activeItem={activeItem}
             rightSlot={topBarRightSlot}
             onHomeClick={() => navigate("/")}
+            onTrainClick={() => navigate("/exercises")}
           />
         ) : null}
 

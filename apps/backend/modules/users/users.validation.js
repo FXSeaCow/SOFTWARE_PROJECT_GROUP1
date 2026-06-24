@@ -20,6 +20,13 @@ const uuidParam = Joi.object({
   }),
 });
 
+const notificationIdParam = Joi.object({
+  notificationId: Joi.string().uuid().required().messages({
+    'string.uuid': 'notificationId must be a valid UUID',
+    'any.required': 'notificationId is required',
+  }),
+});
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 /**
@@ -89,6 +96,7 @@ const updateUserAccountStatusSchema = Joi.object({
 
 module.exports = {
   uuidParam,
+  notificationIdParam,
   updateProfileSchema,
   changePasswordSchema,
   listUsersQuerySchema,

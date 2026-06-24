@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Bell, CalendarDays, ChevronRight, Dumbbell, Flame, Target, Trophy } from "lucide-react";
+import { Activity, CalendarDays, ChevronRight, Dumbbell, Flame, Target, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { MainMenuCategoryCard } from "../components/main-menu/MainMenuCategoryCard";
@@ -8,6 +8,7 @@ import { MainMenuHeroCard } from "../components/main-menu/MainMenuHeroCard";
 import { MainMenuSearchBar } from "../components/main-menu/MainMenuSearchBar";
 import { MainMenuStatCard } from "../components/main-menu/MainMenuStatCard";
 import { MainMenuWeeklyGoal } from "../components/main-menu/MainMenuWeeklyGoal";
+import { NotificationBell } from "../components/NotificationBell";
 import { iconButtonStyle } from "../components/main-menu/styles";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
@@ -88,20 +89,7 @@ export function MainMenuPage() {
       topBarRightSlot={
         <>
           <MainMenuSearchBar />
-          <button type="button" aria-label="Notifications" style={iconButtonStyle}>
-            <Bell size={18} />
-            <span
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                width: 9,
-                height: 9,
-                borderRadius: "50%",
-                background: "#ff7a1a",
-              }}
-            />
-          </button>
+          <NotificationBell />
           <div style={{ position: "relative" }}>
             <button
               type="button"
@@ -309,6 +297,7 @@ export function MainMenuPage() {
           </div>
           <button
             type="button"
+            onClick={() => navigate("/exercises")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -340,6 +329,7 @@ export function MainMenuPage() {
               icon={category.icon}
               accent={category.accent}
               metric={category.metric}
+              onClick={() => navigate("/exercises")}
             />
           ))}
         </div>

@@ -15,6 +15,8 @@ import { MembershipPage } from "./src/pages/MembershipPage";
 import { AccountPage } from "./src/pages/AccountPage";
 import { getCurrentUser } from "./src/services/authService";
 import { AdminUsersPage } from "./src/pages/AdminUsersPage";
+import { WorkoutPage } from "./src/pages/WorkoutPage";
+import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -47,6 +49,7 @@ function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainMenuPage />} />
+        <Route path="/exercises" element={<WorkoutPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<RegisterPage />} />
         <Route
@@ -78,6 +81,14 @@ function AppRouter() {
           element={
             <AdminRoute>
               <AdminUsersPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/announcements"
+          element={
+            <AdminRoute>
+              <AdminAnnouncementsPage />
             </AdminRoute>
           }
         />

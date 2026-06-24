@@ -1,6 +1,6 @@
 import React from "react";
-import { Bell } from "lucide-react";
 
+import { NotificationBell } from "../../components/NotificationBell";
 import { iconButtonStyle } from "../../components/main-menu/styles";
 
 function menuButtonStyle(primary = false): React.CSSProperties {
@@ -82,20 +82,7 @@ export function MembershipHeader({
           gap: 14,
         }}
       >
-        <button type="button" aria-label="Notifications" style={iconButtonStyle}>
-          <Bell size={18} />
-          <span
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              background: "#ff6a13",
-            }}
-          />
-        </button>
+        <NotificationBell />
 
         <div style={{ position: "relative" }}>
           <button

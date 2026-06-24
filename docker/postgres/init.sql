@@ -54,6 +54,33 @@ CREATE TABLE IF NOT EXISTS memberships (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  title VARCHAR(160) NOT NULL,
+  body TEXT NOT NULL,
+  published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  announcement_id UUID REFERENCES announcements(id) ON DELETE SET NULL,
+  type TEXT NOT NULL DEFAULT 'announcement' CHECK (type IN ('announcement', 'system', 'membership', 'schedule')),
+  title VARCHAR(160) NOT NULL,
+  body TEXT NOT NULL,
+  is_read BOOLEAN NOT NULL DEFAULT false,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_sent_at
+  ON notifications (user_id, sent_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_announcement_id
+  ON notifications (announcement_id);
+
 INSERT INTO membership_plans (name, description, price, duration_days, is_active)
 SELECT '1 Month', 'Standard monthly membership', 300000, 30, true
 WHERE NOT EXISTS (
