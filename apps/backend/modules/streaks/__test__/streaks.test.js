@@ -8,6 +8,7 @@
 
 jest.mock('../streaks.repository', () => ({
   findUserById: jest.fn(),
+  findBranchById: jest.fn(),
   findStreakByUserId: jest.fn(),
   createStreakRecord: jest.fn(),
   updateStreak: jest.fn(),
@@ -33,6 +34,8 @@ const repo = require('../streaks.repository');
 const { withTransaction } = require('../../../utils/Transaction');
 const service = require('../streaks.service');
 const routes = require('../streaks.routes');
+const request = require('supertest');
+const app = require('../../../app');
 const { STREAK_STATUS } = require('../streaks.constants');
 
 const dateOnly = (offsetDays = 0) => {
@@ -44,6 +47,13 @@ const dateOnly = (offsetDays = 0) => {
   return `${year}-${month}-${day}`;
 };
 
+const branch = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Central Branch',
+  capacity: 20,
+  is_active: true,
+};
+
 describe('streaks module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -51,6 +61,13 @@ describe('streaks module', () => {
 
   it('loads the Express router', () => {
     expect(routes).toBeDefined();
+  });
+
+  it('mounts streak routes in the app', async () => {
+    const res = await request(app).get('/api/streaks/me');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/access token missing/i);
   });
 
   it('calculates current and longest streaks from check-in dates', () => {
@@ -113,6 +130,7 @@ describe('streaks module', () => {
     expect(repo.findCheckinsByUser).toHaveBeenCalledWith('user-1', {
       limit: 5,
       offset: 5,
+      branch_id: undefined,
       from_date: '2026-07-01',
       to_date: undefined,
     });
@@ -129,10 +147,12 @@ describe('streaks module', () => {
       longest_streak: 0,
       last_active_date: null,
     });
+    repo.findBranchById.mockResolvedValue(branch);
     repo.findCheckinByUserAndDate.mockResolvedValue(null);
     repo.createCheckin.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
+      branch_id: branch.id,
       checkin_date: today,
     });
     repo.findCheckinDatesByUser.mockResolvedValue([today]);
@@ -144,12 +164,18 @@ describe('streaks module', () => {
       last_active_date: today,
     });
 
-    const result = await service.recordCheckin('user-1', { checkin_date: today });
+    const result = await service.recordCheckin('user-1', {
+      branch_id: branch.id,
+      checkin_date: today,
+    });
 
     expect(withTransaction).toHaveBeenCalledTimes(1);
+    expect(repo.findBranchById).toHaveBeenCalledWith(branch.id, expect.any(Object));
     expect(repo.createCheckin).toHaveBeenCalledWith(
       'user-1',
+      branch.id,
       today,
+      expect.any(Date),
       expect.any(Object)
     );
     expect(repo.updateStreak).toHaveBeenCalledWith(
@@ -171,18 +197,25 @@ describe('streaks module', () => {
       longest_streak: 4,
       last_active_date: today,
     });
+    repo.findBranchById.mockResolvedValue(branch);
     repo.findCheckinByUserAndDate.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
+      branch_id: branch.id,
+      branch_name: branch.name,
       checkin_date: today,
     });
     repo.countCheckinsByUser.mockResolvedValue(4);
 
-    const result = await service.recordCheckin('user-1', { checkin_date: today });
+    const result = await service.recordCheckin('user-1', {
+      branch_id: branch.id,
+      checkin_date: today,
+    });
 
     expect(repo.createCheckin).not.toHaveBeenCalled();
     expect(repo.updateStreak).not.toHaveBeenCalled();
     expect(result.already_checked_in).toBe(true);
+    expect(result.branch).toEqual({ id: branch.id, name: branch.name });
   });
 
   it('rejects future check-in dates', async () => {

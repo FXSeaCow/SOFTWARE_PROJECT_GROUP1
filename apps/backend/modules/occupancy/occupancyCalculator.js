@@ -114,10 +114,10 @@ const toDate = (value) => {
  * @returns {boolean}
  */
 const overlapsHour = (session, hourStart, hourEnd, fallbackEnd) => {
-  const checkInAt = toDate(session.check_in_at);
+  const checkInAt = toDate(session.checked_in_at || session.check_in_at);
   if (!checkInAt) return false;
 
-  const checkOutAt = toDate(session.check_out_at) || fallbackEnd;
+  const checkOutAt = toDate(session.checked_out_at || session.check_out_at) || fallbackEnd;
   return checkInAt < hourEnd && checkOutAt > hourStart;
 };
 
@@ -196,7 +196,9 @@ const buildDailyReport = (
   const peakHour = calculatePeakHour(sessions, date);
   const averageOccupancy = calculateAverageOccupancy(sessions, date);
   const uniqueMembers = new Set(sessions.map((session) => session.user_id)).size;
-  const openSessions = sessions.filter((session) => !session.check_out_at).length;
+  const openSessions = sessions.filter(
+    (session) => !(session.checked_out_at || session.check_out_at)
+  ).length;
 
   return {
     date,

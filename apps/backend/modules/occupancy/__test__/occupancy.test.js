@@ -1,12 +1,15 @@
 /**
  * occupancy.test.js
- * Unit tests for the occupancy module.
+ * Unit tests for the branch-aware occupancy module.
  *
- * Repository and transaction helpers are mocked so the tests focus on module
- * behavior, calculations, and scheduler orchestration.
+ * Repository, notification, and transaction helpers are mocked so the tests
+ * focus on module behavior, calculations, and scheduler orchestration.
  */
 
 jest.mock('../occupancy.repository', () => ({
+  findActiveBranches: jest.fn(),
+  findBranchById: jest.fn(),
+  findCurrentOccupancy: jest.fn(),
   findUserByQrToken: jest.fn(),
   findUserById: jest.fn(),
   findActiveMembership: jest.fn(),
@@ -24,6 +27,10 @@ jest.mock('../occupancy.repository', () => ({
   updateWorkoutStreak: jest.fn(),
 }));
 
+jest.mock('../../notifications/notifications.service', () => ({
+  createFromTemplate: jest.fn(),
+}));
+
 jest.mock('../../../utils/Transaction', () => ({
   withTransaction: jest.fn(async (callback) => callback({ tx: true })),
 }));
@@ -35,10 +42,12 @@ jest.mock('../../../utils/Logger', () => ({
 }));
 
 const repo = require('../occupancy.repository');
+const notificationsService = require('../../notifications/notifications.service');
 const calculator = require('../occupancyCalculator');
 const service = require('../occupancy.service');
 const scheduler = require('../occupancy.scheduler');
 const routes = require('../occupancy.routes');
+const { NOTIFICATION_TEMPLATE } = require('../../notifications/notifications.constants');
 
 const member = {
   id: 'user-1',
@@ -51,6 +60,18 @@ const membership = {
   id: 'membership-1',
   user_id: 'user-1',
   status: 'active',
+};
+
+const branch = {
+  id: 'branch-1',
+  name: 'Central Branch',
+  address: '123 Main Street',
+  city: 'Ho Chi Minh City',
+  phone: '0900000000',
+  opening_time: '06:00:00',
+  closing_time: '22:00:00',
+  capacity: 20,
+  is_active: true,
 };
 
 const dateOnly = () => {
@@ -95,20 +116,20 @@ describe('occupancy module', () => {
       {
         id: 'session-1',
         user_id: 'user-1',
-        check_in_at: '2026-07-01T08:15:00',
-        check_out_at: '2026-07-01T10:10:00',
+        checked_in_at: '2026-07-01T08:15:00',
+        checked_out_at: '2026-07-01T10:10:00',
       },
       {
         id: 'session-2',
         user_id: 'user-2',
-        check_in_at: '2026-07-01T09:00:00',
-        check_out_at: '2026-07-01T11:00:00',
+        checked_in_at: '2026-07-01T09:00:00',
+        checked_out_at: '2026-07-01T11:00:00',
       },
       {
         id: 'session-3',
         user_id: 'user-1',
-        check_in_at: '2026-07-01T09:30:00',
-        check_out_at: '2026-07-01T10:30:00',
+        checked_in_at: '2026-07-01T09:30:00',
+        checked_out_at: '2026-07-01T10:30:00',
       },
     ];
 
@@ -130,20 +151,60 @@ describe('occupancy module', () => {
     expect(report.hourly_occupancy).toHaveLength(24);
   });
 
-  it('returns current occupancy from open gym sessions', async () => {
-    repo.countOpenSessions.mockResolvedValue(12);
+  it('returns current occupancy for all active branches', async () => {
+    repo.findActiveBranches.mockResolvedValue([branch]);
+    repo.findCurrentOccupancy.mockResolvedValue([
+      {
+        branch_id: branch.id,
+        branch_name: branch.name,
+        active_members_in_gym: 12,
+        capacity: branch.capacity,
+      },
+    ]);
 
     const result = await service.getCurrentOccupancy();
 
-    expect(repo.countOpenSessions).toHaveBeenCalled();
+    expect(repo.findActiveBranches).toHaveBeenCalled();
+    expect(repo.findCurrentOccupancy).toHaveBeenCalledWith();
     expect(result.current_occupancy).toBe(12);
+    expect(result.total_branches).toBe(1);
+    expect(result.branches[0]).toMatchObject({
+      branch_id: branch.id,
+      branch_name: branch.name,
+      current_occupancy: 12,
+      capacity: 20,
+    });
   });
 
-  it('checks a member in, creates a session, and syncs workout streak data', async () => {
+  it('returns current occupancy for one branch', async () => {
+    repo.findBranchById.mockResolvedValue(branch);
+    repo.findCurrentOccupancy.mockResolvedValue([
+      {
+        branch_id: branch.id,
+        branch_name: branch.name,
+        active_members_in_gym: 18,
+        capacity: branch.capacity,
+      },
+    ]);
+
+    const result = await service.getCurrentOccupancy({ branch_id: branch.id });
+
+    expect(repo.findBranchById).toHaveBeenCalledWith(branch.id, undefined);
+    expect(repo.findCurrentOccupancy).toHaveBeenCalledWith(branch.id);
+    expect(result).toMatchObject({
+      branch_id: branch.id,
+      current_occupancy: 18,
+      occupancy_rate: 90,
+      is_crowded: true,
+    });
+  });
+
+  it('checks a member into a branch, creates a session, and syncs workout streak data', async () => {
     const today = dateOnly();
 
     repo.findUserById.mockResolvedValue(member);
     repo.findActiveMembership.mockResolvedValue(membership);
+    repo.findBranchById.mockResolvedValue(branch);
     repo.findOpenSessionByUser.mockResolvedValue(null);
     repo.countOpenSessions
       .mockResolvedValueOnce(10)
@@ -151,14 +212,16 @@ describe('occupancy module', () => {
     repo.createSession.mockResolvedValue({
       id: 'session-1',
       user_id: 'user-1',
-      check_in_at: new Date(),
-      check_out_at: null,
+      branch_id: branch.id,
+      checked_in_at: new Date(),
+      checked_out_at: null,
     });
     repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
     repo.findWorkoutCheckinByUserAndDate.mockResolvedValue(null);
     repo.createWorkoutCheckin.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
+      branch_id: branch.id,
       checkin_date: today,
     });
     repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
@@ -170,46 +233,125 @@ describe('occupancy module', () => {
       last_active_date: today,
     });
 
-    const result = await service.checkIn(member, {});
+    const result = await service.checkIn(member, { branch_id: branch.id });
 
     expect(repo.createSession).toHaveBeenCalledWith(
       'user-1',
+      branch.id,
       expect.any(Date),
       expect.any(Object)
     );
     expect(repo.createWorkoutCheckin).toHaveBeenCalledWith(
       'user-1',
+      branch.id,
       today,
+      expect.any(Date),
       expect.any(Object)
     );
+    expect(result.branch.branch_id).toBe(branch.id);
     expect(result.occupancy.current_occupancy).toBe(11);
     expect(result.workout_checkin_created).toBe(true);
+    expect(notificationsService.createFromTemplate).not.toHaveBeenCalled();
+  });
+
+  it('creates an occupancy alert when check-in makes a branch crowded', async () => {
+    repo.findUserById.mockResolvedValue(member);
+    repo.findActiveMembership.mockResolvedValue(membership);
+    repo.findBranchById.mockResolvedValue({ ...branch, capacity: 10 });
+    repo.findOpenSessionByUser.mockResolvedValue(null);
+    repo.countOpenSessions
+      .mockResolvedValueOnce(8)
+      .mockResolvedValueOnce(9);
+    repo.createSession.mockResolvedValue({
+      id: 'session-1',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checked_in_at: new Date(),
+      checked_out_at: null,
+    });
+    repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    repo.findWorkoutCheckinByUserAndDate.mockResolvedValue({ id: 'checkin-1' });
+    repo.findWorkoutCheckinDatesByUser.mockResolvedValue([dateOnly()]);
+    repo.updateWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    notificationsService.createFromTemplate.mockResolvedValue({
+      id: 'alert-1',
+      type: 'occupancy_alert',
+    });
+
+    const result = await service.checkIn(member, { branch_id: branch.id });
+
+    expect(notificationsService.createFromTemplate).toHaveBeenCalledWith(
+      'user-1',
+      NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
+      expect.objectContaining({
+        branch_name: branch.name,
+        occupancy_rate: 90,
+        current_occupancy: 9,
+        capacity: 10,
+        reason: 'crowded',
+      })
+    );
+    expect(result.crowding_alert).toMatchObject({ id: 'alert-1' });
+  });
+
+  it('rejects check-in and notifies the member when the branch is full', async () => {
+    repo.findUserById.mockResolvedValue(member);
+    repo.findActiveMembership.mockResolvedValue(membership);
+    repo.findBranchById.mockResolvedValue({ ...branch, capacity: 10 });
+    repo.findOpenSessionByUser.mockResolvedValue(null);
+    repo.countOpenSessions.mockResolvedValueOnce(10);
+    notificationsService.createFromTemplate.mockResolvedValue({
+      id: 'alert-full',
+      type: 'occupancy_alert',
+    });
+
+    await expect(
+      service.checkIn(member, { branch_id: branch.id })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(repo.createSession).not.toHaveBeenCalled();
+    expect(notificationsService.createFromTemplate).toHaveBeenCalledWith(
+      'user-1',
+      NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
+      expect.objectContaining({
+        reason: 'full',
+        current_occupancy: 10,
+        capacity: 10,
+      })
+    );
   });
 
   it('rejects check-in when the member already has an open session', async () => {
     repo.findUserById.mockResolvedValue(member);
     repo.findActiveMembership.mockResolvedValue(membership);
+    repo.findBranchById.mockResolvedValue(branch);
     repo.findOpenSessionByUser.mockResolvedValue({
       id: 'session-open',
       user_id: 'user-1',
+      branch_id: branch.id,
+      branch_name: branch.name,
     });
 
-    await expect(service.checkIn(member, {})).rejects.toMatchObject({
-      statusCode: 409,
-    });
+    await expect(
+      service.checkIn(member, { branch_id: branch.id })
+    ).rejects.toMatchObject({ statusCode: 409 });
     expect(repo.createSession).not.toHaveBeenCalled();
   });
 
-  it('checks a member out and updates occupancy', async () => {
+  it('checks a member out and updates the branch occupancy', async () => {
     repo.findUserById.mockResolvedValue(member);
     repo.findOpenSessionByUser.mockResolvedValue({
       id: 'session-1',
       user_id: 'user-1',
+      branch_id: branch.id,
+      branch_name: branch.name,
     });
+    repo.findBranchById.mockResolvedValue(branch);
     repo.closeSession.mockResolvedValue({
       id: 'session-1',
       user_id: 'user-1',
-      check_out_at: new Date(),
+      branch_id: branch.id,
+      checked_out_at: new Date(),
     });
     repo.countOpenSessions.mockResolvedValue(3);
 
@@ -220,6 +362,10 @@ describe('occupancy module', () => {
       expect.any(Date),
       expect.any(Object)
     );
+    expect(repo.countOpenSessions).toHaveBeenCalledWith(
+      branch.id,
+      expect.any(Object)
+    );
     expect(result.occupancy.current_occupancy).toBe(3);
   });
 
@@ -228,29 +374,56 @@ describe('occupancy module', () => {
       rows: [{ id: 'session-1' }],
       total: 1,
     });
+    repo.findActiveBranches.mockResolvedValue([branch]);
     repo.findSessionsByDate.mockResolvedValue([
       {
         id: 'session-1',
         user_id: 'user-1',
-        check_in_at: '2026-07-01T09:00:00',
-        check_out_at: '2026-07-01T10:00:00',
+        branch_id: branch.id,
+        checked_in_at: '2026-07-01T09:00:00',
+        checked_out_at: '2026-07-01T10:00:00',
       },
     ]);
 
-    const list = await service.listMySessions('user-1', { page: '1', limit: '5' });
+    const list = await service.listMySessions('user-1', {
+      page: '1',
+      limit: '5',
+      branch_id: branch.id,
+    });
     const report = await service.getDailyReport({ date: '2026-07-01' });
 
+    expect(repo.findSessions).toHaveBeenCalledWith(
+      expect.objectContaining({ branch_id: branch.id })
+    );
+    expect(repo.findSessionsByDate).toHaveBeenCalledWith('2026-07-01', null);
     expect(list).toMatchObject({ total: 1, page: 1, limit: 5 });
-    expect(report).toMatchObject({ date: '2026-07-01', total_visits: 1 });
+    expect(report).toMatchObject({
+      date: '2026-07-01',
+      total_visits: 1,
+      branches_count: 1,
+    });
   });
 
   it('resets open sessions and refreshes the occupancy cache', async () => {
     repo.closeOpenSessions.mockResolvedValue([{ id: 'session-1' }]);
-    repo.countOpenSessions.mockResolvedValue(0);
+    repo.findActiveBranches.mockResolvedValue([branch]);
+    repo.findCurrentOccupancy.mockResolvedValue([
+      {
+        branch_id: branch.id,
+        branch_name: branch.name,
+        active_members_in_gym: 0,
+        capacity: branch.capacity,
+      },
+    ]);
 
     const reset = await service.resetOpenSessions();
     const cache = await service.refreshOccupancyCache();
 
+    expect(repo.closeOpenSessions).toHaveBeenCalledWith(
+      expect.any(Date),
+      null,
+      expect.any(Object)
+    );
     expect(reset.closed_count).toBe(1);
     expect(cache.data.current_occupancy).toBe(0);
     expect(service.getOccupancyCache().data.current_occupancy).toBe(0);
@@ -260,7 +433,11 @@ describe('occupancy module', () => {
     const refreshSpy = jest
       .spyOn(service, 'refreshOccupancyCache')
       .mockResolvedValue({
-        data: { occupancy_rate: 50, current_occupancy: 25 },
+        data: {
+          occupancy_rate: 50,
+          current_occupancy: 25,
+          total_branches: 1,
+        },
       });
     const currentSpy = jest
       .spyOn(service, 'getCurrentOccupancy')
@@ -268,6 +445,15 @@ describe('occupancy module', () => {
         occupancy_rate: 95,
         current_occupancy: 95,
         capacity: 100,
+        branches: [
+          {
+            branch_id: branch.id,
+            branch_name: branch.name,
+            occupancy_rate: 95,
+            current_occupancy: 95,
+            capacity: 100,
+          },
+        ],
       });
     const reportSpy = jest
       .spyOn(service, 'getDailyReport')

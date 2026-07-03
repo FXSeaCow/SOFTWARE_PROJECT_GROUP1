@@ -56,6 +56,10 @@ const dateOnly = Joi.string()
  * to check in the scanned member.
  */
 const checkInSchema = Joi.object({
+  branch_id: Joi.string().uuid().required().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+    'any.required': 'branch_id is required',
+  }),
   qr_code_token: Joi.string().uuid().optional().messages({
     'string.uuid': 'qr_code_token must be a valid UUID',
   }),
@@ -89,6 +93,9 @@ const sessionsQuerySchema = Joi.object({
   status: Joi.string()
     .valid(SESSION_STATUS.OPEN, SESSION_STATUS.CLOSED, SESSION_STATUS.ALL)
     .default(SESSION_STATUS.ALL),
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   from_date: dateOnly.optional(),
   to_date: dateOnly.optional(),
 }).custom((value, helpers) => {
@@ -114,7 +121,20 @@ const adminSessionsQuerySchema = sessionsQuerySchema.keys({
  * GET /api/occupancy/daily-report
  */
 const dailyReportQuerySchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   date: dateOnly.optional(),
+});
+
+/**
+ * GET /api/occupancy/current
+ * Optional branch filter. Without branch_id, the endpoint returns all branches.
+ */
+const currentOccupancyQuerySchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
 });
 
 /**
@@ -122,6 +142,9 @@ const dailyReportQuerySchema = Joi.object({
  * Allows admin/scheduler to close stale open sessions at a specific time.
  */
 const resetOpenSessionsSchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   checkout_at: Joi.date().iso().optional().messages({
     'date.format': 'checkout_at must be a valid ISO datetime',
   }),
@@ -134,5 +157,6 @@ module.exports = {
   sessionsQuerySchema,
   adminSessionsQuerySchema,
   dailyReportQuerySchema,
+  currentOccupancyQuerySchema,
   resetOpenSessionsSchema,
 };

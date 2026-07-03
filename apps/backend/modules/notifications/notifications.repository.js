@@ -1,9 +1,12 @@
 /**
  * notifications.repository.js
- * Raw PostgreSQL queries for notifications.
+ * Raw PostgreSQL queries for the notifications schema in gym.sql.
+ *
+ * Database columns:
+ *   id, user_id, announcement_id, type, title, body, is_read, sent_at, read_at
  *
  * This layer contains no business logic. Services decide what should be sent;
- * the repository only reads and writes database rows.
+ * the repository only reads and writes rows.
  */
 
 const db = require('../../config/db');
@@ -17,15 +20,13 @@ const db = require('../../config/db');
 const notificationSelect = (alias = 'n') => `
   ${alias}.id,
   ${alias}.user_id,
+  ${alias}.announcement_id,
   ${alias}.type,
-  ${alias}.priority,
   ${alias}.title,
-  ${alias}.message,
-  ${alias}.data,
+  ${alias}.body,
   ${alias}.is_read,
-  ${alias}.read_at,
-  ${alias}.created_at,
-  ${alias}.updated_at
+  ${alias}.sent_at,
+  ${alias}.read_at
 `;
 
 /**
@@ -68,22 +69,21 @@ const findUsers = async ({ role } = {}) => {
 /**
  * Create one notification.
  *
- * @param {{ user_id, type, priority, title, message, data? }} data
+ * @param {{ user_id, type, title, body, announcement_id? }} data
  * @returns {Promise<object>}
  */
 const createNotification = async ({
   user_id,
   type,
-  priority,
   title,
-  message,
-  data,
+  body,
+  announcement_id,
 }) => {
   const { rows } = await db.query(
-    `INSERT INTO notifications (user_id, type, priority, title, message, data)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO notifications (user_id, announcement_id, type, title, body)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING ${notificationSelect('notifications')}`,
-    [user_id, type, priority, title, message, data || {}]
+    [user_id, announcement_id || null, type, title, body || null]
   );
   return rows[0];
 };
@@ -91,11 +91,8 @@ const createNotification = async ({
 /**
  * Create notifications for many users.
  *
- * A loop keeps the code simple and works well for small class/project scale
- * broadcasts. For very large audiences, replace this with a bulk INSERT.
- *
  * @param {string[]} userIds
- * @param {{ type, priority, title, message, data? }} data
+ * @param {{ type, title, body, announcement_id? }} data
  * @returns {Promise<object[]>}
  */
 const createBulkNotifications = async (userIds, data) => {
@@ -106,10 +103,9 @@ const createBulkNotifications = async (userIds, data) => {
       await createNotification({
         user_id: userId,
         type: data.type,
-        priority: data.priority,
         title: data.title,
-        message: data.message,
-        data: data.data || {},
+        body: data.body,
+        announcement_id: data.announcement_id || null,
       })
     );
   }
@@ -210,7 +206,7 @@ const findAll = async (opts) => {
      FROM notifications n
      JOIN users u ON u.id = n.user_id
      ${where}
-     ORDER BY n.created_at DESC
+     ORDER BY n.sent_at DESC
      LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
     [...values, opts.limit, opts.offset]
   );
@@ -248,8 +244,7 @@ const markAsRead = async (notificationId) => {
   const { rows } = await db.query(
     `UPDATE notifications
      SET is_read = true,
-         read_at = COALESCE(read_at, now()),
-         updated_at = now()
+         read_at = COALESCE(read_at, now())
      WHERE id = $1
      RETURNING ${notificationSelect('notifications')}`,
     [notificationId]
@@ -267,8 +262,7 @@ const markAllAsRead = async (userId) => {
   const { rowCount } = await db.query(
     `UPDATE notifications
      SET is_read = true,
-         read_at = COALESCE(read_at, now()),
-         updated_at = now()
+         read_at = COALESCE(read_at, now())
      WHERE user_id = $1
        AND is_read = false`,
     [userId]
@@ -321,8 +315,8 @@ const findRecentByType = async (userId, type, since) => {
      FROM notifications n
      WHERE n.user_id = $1
        AND n.type = $2
-       AND n.created_at >= $3
-     ORDER BY n.created_at DESC
+       AND n.sent_at >= $3
+     ORDER BY n.sent_at DESC
      LIMIT 1`,
     [userId, type, since]
   );
@@ -384,7 +378,7 @@ const deleteOldReadNotifications = async (cutoffDate) => {
   const { rowCount } = await db.query(
     `DELETE FROM notifications
      WHERE is_read = true
-       AND created_at < $1`,
+       AND sent_at < $1`,
     [cutoffDate]
   );
   return rowCount;

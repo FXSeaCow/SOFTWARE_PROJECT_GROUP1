@@ -171,6 +171,19 @@ const ensureStreakRecord = async (userId, client) => {
 };
 
 /**
+ * Ensure the selected branch exists and can receive check-ins.
+ *
+ * @param {string} branchId
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object>}
+ */
+const requireBranch = async (branchId, client) => {
+  const branch = await repo.findBranchById(branchId, client);
+  if (!branch) throw ApiError.notFound('Gym branch');
+  return branch;
+};
+
+/**
  * Get a member's streak summary.
  *
  * @param {string} userId
@@ -194,6 +207,7 @@ const listMyCheckins = async (userId, query) => {
   const { rows, total } = await repo.findCheckinsByUser(userId, {
     limit,
     offset,
+    branch_id: query.branch_id,
     from_date: query.from_date,
     to_date: query.to_date,
   });
@@ -210,14 +224,16 @@ const listMyCheckins = async (userId, query) => {
  * Record a workout check-in and update the user's streak atomically.
  *
  * @param {string} userId
- * @param {{ checkin_date?: string }} data
+ * @param {{ branch_id: string, checkin_date?: string }} data
  * @returns {Promise<{ checkin: object, streak: object, already_checked_in: boolean }>}
  */
 const recordCheckin = async (userId, data = {}) => {
   const checkinDate = normalizeCheckinDate(data.checkin_date);
+  const checkedInAt = new Date();
 
   const result = await withTransaction(async (client) => {
     await ensureStreakRecord(userId, client);
+    const branch = await requireBranch(data.branch_id, client);
 
     const existingCheckin = await repo.findCheckinByUserAndDate(
       userId,
@@ -229,20 +245,33 @@ const recordCheckin = async (userId, data = {}) => {
       const streak = await repo.findStreakByUserId(userId, client);
       const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
 
+      const existingBranch = {
+        id: existingCheckin.branch_id,
+        name: existingCheckin.branch_name,
+      };
+
       return {
         checkin: existingCheckin,
+        branch: existingBranch,
         streak: decorateStreak(streak, totalCheckins),
         already_checked_in: true,
       };
     }
 
-    const checkin = await repo.createCheckin(userId, checkinDate, client);
+    const checkin = await repo.createCheckin(
+      userId,
+      branch.id,
+      checkinDate,
+      checkedInAt,
+      client
+    );
     const dates = await repo.findCheckinDatesByUser(userId, client);
     const stats = calculateStreakStats(dates);
     const updatedStreak = await repo.updateStreak(userId, stats, client);
 
     return {
       checkin,
+      branch,
       streak: decorateStreak(updatedStreak, dates.length),
       already_checked_in: false,
     };
@@ -250,6 +279,7 @@ const recordCheckin = async (userId, data = {}) => {
 
   logger.info('Workout check-in processed', {
     userId,
+    branchId: result.checkin.branch_id,
     checkinDate,
     alreadyCheckedIn: result.already_checked_in,
   });

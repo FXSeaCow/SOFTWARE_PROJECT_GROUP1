@@ -1,17 +1,19 @@
 /**
  * occupancy.service.js
- * Business logic for gym occupancy.
+ * Business logic for branch-aware gym occupancy.
  *
  * Main responsibilities:
- *   - Check members into and out of the gym.
- *   - Keep current occupancy below configured capacity.
- *   - Produce current and daily occupancy analytics.
+ *   - Check members into and out of a specific gym branch.
+ *   - Keep each branch occupancy below its own database capacity.
+ *   - Notify members when a selected branch is crowded or full.
+ *   - Produce current and daily occupancy analytics per branch or globally.
  *   - Maintain workout check-in and streak data when a member checks in.
  *
  * This layer does not know about Express req/res objects.
  */
 
 const repo = require('./occupancy.repository');
+const notificationsService = require('../notifications/notifications.service');
 const {
   calculateCurrentOccupancy,
   buildDailyReport,
@@ -20,7 +22,11 @@ const {
   DEFAULT_GYM_CAPACITY,
   CHECKIN_SOURCE,
   SESSION_STATUS,
+  OCCUPANCY_THRESHOLDS,
 } = require('./occupancy.constants');
+const {
+  NOTIFICATION_TEMPLATE,
+} = require('../notifications/notifications.constants');
 const { withTransaction } = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError = require('../../utils/Apierror');
@@ -63,6 +69,54 @@ const toUtcDayNumber = (dateString) => {
  * @returns {number}
  */
 const daysBetween = (dateA, dateB) => toUtcDayNumber(dateB) - toUtcDayNumber(dateA);
+
+/**
+ * Return a safe branch capacity.
+ *
+ * The database stores capacity per branch. The environment default is kept as
+ * a fallback for legacy rows or test fixtures that omit capacity.
+ *
+ * @param {object} branch
+ * @returns {number}
+ */
+const getBranchCapacity = (branch = {}) =>
+  Math.max(1, Number(branch.capacity) || DEFAULT_GYM_CAPACITY);
+
+/**
+ * Normalize branch fields from either gym_branches or current_occupancy rows.
+ *
+ * @param {object} branch
+ * @returns {object}
+ */
+const formatBranchMetadata = (branch = {}) => ({
+  branch_id: branch.id || branch.branch_id,
+  branch_name: branch.name || branch.branch_name,
+  address: branch.address,
+  city: branch.city,
+  phone: branch.phone,
+  opening_time: branch.opening_time,
+  closing_time: branch.closing_time,
+});
+
+/**
+ * Build a branch occupancy response with derived metrics.
+ *
+ * @param {object} branch
+ * @param {number} activeCount
+ * @returns {object}
+ */
+const formatBranchOccupancy = (branch, activeCount = 0) => {
+  const summary = calculateCurrentOccupancy(
+    activeCount,
+    getBranchCapacity(branch)
+  );
+
+  return {
+    ...formatBranchMetadata(branch),
+    ...summary,
+    is_crowded: summary.occupancy_rate >= OCCUPANCY_THRESHOLDS.ALERT,
+  };
+};
 
 /**
  * Calculate current and longest streaks from sorted unique check-in dates.
@@ -155,14 +209,71 @@ const requireTargetActiveMembership = async (user) => {
 };
 
 /**
+ * Find an active branch or throw a 404 error.
+ *
+ * @param {string} branchId
+ * @param {import('pg').PoolClient|undefined} client
+ * @returns {Promise<object>}
+ */
+const requireBranch = async (branchId, client) => {
+  const branch = await repo.findBranchById(branchId, client);
+  if (!branch) throw ApiError.notFound('Gym branch');
+  return branch;
+};
+
+/**
+ * Send a non-blocking crowded-branch notification.
+ *
+ * Occupancy should still work if the notification subsystem is temporarily
+ * unavailable, so this helper logs failures and returns null instead of
+ * breaking check-in/check-out flows.
+ *
+ * @param {string} userId
+ * @param {object} branch
+ * @param {object} occupancy
+ * @param {'crowded'|'full'} reason
+ * @returns {Promise<object|null>}
+ */
+const notifyBranchCrowding = async (userId, branch, occupancy, reason = 'crowded') => {
+  try {
+    return await notificationsService.createFromTemplate(
+      userId,
+      NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
+      {
+        branch_name: branch.name || branch.branch_name || occupancy.branch_name,
+        occupancy_rate: occupancy.occupancy_rate,
+        current_occupancy: occupancy.current_occupancy,
+        capacity: occupancy.capacity,
+        reason,
+      }
+    );
+  } catch (err) {
+    logger.error('Failed to create occupancy alert notification', {
+      userId,
+      branchId: branch.id || branch.branch_id,
+      error: err.message,
+    });
+    return null;
+  }
+};
+
+/**
  * Synchronize workout_checkins and workout_streaks after a gym check-in.
  *
  * @param {string} userId
+ * @param {string} branchId
  * @param {string} checkinDate - YYYY-MM-DD
+ * @param {Date} checkedInAt
  * @param {import('pg').PoolClient} client
  * @returns {Promise<{ workout_checkin: object|null, workout_checkin_created: boolean, streak: object }>}
  */
-const syncWorkoutCheckinAndStreak = async (userId, checkinDate, client) => {
+const syncWorkoutCheckinAndStreak = async (
+  userId,
+  branchId,
+  checkinDate,
+  checkedInAt,
+  client
+) => {
   await repo.ensureWorkoutStreak(userId, client);
 
   const existing = await repo.findWorkoutCheckinByUserAndDate(
@@ -175,7 +286,13 @@ const syncWorkoutCheckinAndStreak = async (userId, checkinDate, client) => {
   let created = false;
 
   if (!existing) {
-    workoutCheckin = await repo.createWorkoutCheckin(userId, checkinDate, client);
+    workoutCheckin = await repo.createWorkoutCheckin(
+      userId,
+      branchId,
+      checkinDate,
+      checkedInAt,
+      client
+    );
     created = true;
   }
 
@@ -191,71 +308,152 @@ const syncWorkoutCheckinAndStreak = async (userId, checkinDate, client) => {
 };
 
 /**
- * Return current gym occupancy.
+ * List active branches with their current occupancy summaries.
  *
- * @returns {Promise<object>}
+ * @returns {Promise<object[]>}
  */
-const getCurrentOccupancy = async () => {
-  const openSessionCount = await repo.countOpenSessions();
-  return calculateCurrentOccupancy(openSessionCount, DEFAULT_GYM_CAPACITY);
+const listBranches = async () => {
+  const current = await getCurrentOccupancy();
+  return current.branches;
 };
 
 /**
- * Check a member into the gym.
+ * Return current occupancy for one branch or all active branches.
+ *
+ * @param {{ branch_id?: string }} query
+ * @returns {Promise<object>}
+ */
+const getCurrentOccupancy = async (query = {}) => {
+  const branchId = query.branch_id || null;
+
+  if (branchId) {
+    const branch = await requireBranch(branchId);
+    const rows = await repo.findCurrentOccupancy(branchId);
+    const row = rows[0] || {};
+
+    return formatBranchOccupancy(
+      { ...branch, ...row, id: branch.id, name: branch.name },
+      row.active_members_in_gym || 0
+    );
+  }
+
+  const [branches, rows] = await Promise.all([
+    repo.findActiveBranches(),
+    repo.findCurrentOccupancy(),
+  ]);
+  const occupancyByBranchId = new Map(
+    rows.map((row) => [row.branch_id, row.active_members_in_gym || 0])
+  );
+
+  const branchSummaries = branches.map((branch) =>
+    formatBranchOccupancy(branch, occupancyByBranchId.get(branch.id) || 0)
+  );
+  const totalActiveMembers = branchSummaries.reduce(
+    (sum, branch) => sum + branch.current_occupancy,
+    0
+  );
+  const totalCapacity = branchSummaries.reduce(
+    (sum, branch) => sum + branch.capacity,
+    0
+  );
+
+  return {
+    ...calculateCurrentOccupancy(totalActiveMembers, totalCapacity || DEFAULT_GYM_CAPACITY),
+    total_branches: branchSummaries.length,
+    branches: branchSummaries,
+  };
+};
+
+/**
+ * Check a member into a specific gym branch.
  *
  * @param {object} actor - authenticated user.
- * @param {{ qr_code_token?: string, source?: string, notes?: string }} data
+ * @param {{ branch_id: string, qr_code_token?: string, source?: string, notes?: string }} data
  * @returns {Promise<object>}
  */
 const checkIn = async (actor, data = {}) => {
   const source = data.source || (data.qr_code_token ? CHECKIN_SOURCE.QR : CHECKIN_SOURCE.SELF);
   const targetUser = await resolveTargetUser(actor, data.qr_code_token);
   const membership = await requireTargetActiveMembership(targetUser);
+  const branch = await requireBranch(data.branch_id);
   const checkInAt = new Date();
   const checkinDate = toDateOnlyString(checkInAt);
 
-  const result = await withTransaction(async (client) => {
-    const existingOpenSession = await repo.findOpenSessionByUser(targetUser.id, client);
-    if (existingOpenSession) {
-      throw ApiError.conflict('This member is already checked in');
+  let result;
+
+  try {
+    result = await withTransaction(async (client) => {
+      const branchInTx = await requireBranch(branch.id, client);
+      const existingOpenSession = await repo.findOpenSessionByUser(targetUser.id, client);
+
+      if (existingOpenSession) {
+        throw ApiError.conflict(
+          `This member is already checked in at ${existingOpenSession.branch_name || 'another branch'}`
+        );
+      }
+
+      const currentCount = await repo.countOpenSessions(branchInTx.id, client);
+      const currentOccupancy = formatBranchOccupancy(branchInTx, currentCount);
+
+      if (currentOccupancy.is_full) {
+        const error = ApiError.conflict(
+          `${branchInTx.name} is currently full. Please choose another branch or try again later.`
+        );
+        error.occupancy = currentOccupancy;
+        throw error;
+      }
+
+      const session = await repo.createSession(
+        targetUser.id,
+        branchInTx.id,
+        checkInAt,
+        client
+      );
+      const streakSync = await syncWorkoutCheckinAndStreak(
+        targetUser.id,
+        branchInTx.id,
+        checkinDate,
+        checkInAt,
+        client
+      );
+      const updatedCount = await repo.countOpenSessions(branchInTx.id, client);
+      const occupancy = formatBranchOccupancy(branchInTx, updatedCount);
+
+      return {
+        session,
+        member: {
+          id: targetUser.id,
+          full_name: targetUser.full_name,
+          email: targetUser.email,
+        },
+        membership,
+        branch: formatBranchMetadata(branchInTx),
+        source,
+        ...streakSync,
+        occupancy,
+        crowding_alert: null,
+      };
+    });
+  } catch (err) {
+    if (err.statusCode === 409 && err.occupancy && err.occupancy.is_full) {
+      await notifyBranchCrowding(targetUser.id, branch, err.occupancy, 'full');
     }
+    throw err;
+  }
 
-    const currentCount = await repo.countOpenSessions(client);
-    const currentOccupancy = calculateCurrentOccupancy(
-      currentCount,
-      DEFAULT_GYM_CAPACITY
-    );
-
-    if (currentOccupancy.is_full) {
-      throw ApiError.conflict('Gym is currently full. Please try again later.');
-    }
-
-    const session = await repo.createSession(targetUser.id, checkInAt, client);
-    const streakSync = await syncWorkoutCheckinAndStreak(
+  if (result.occupancy.is_crowded) {
+    result.crowding_alert = await notifyBranchCrowding(
       targetUser.id,
-      checkinDate,
-      client
+      branch,
+      result.occupancy,
+      result.occupancy.is_full ? 'full' : 'crowded'
     );
-
-    const updatedCount = await repo.countOpenSessions(client);
-
-    return {
-      session,
-      member: {
-        id: targetUser.id,
-        full_name: targetUser.full_name,
-        email: targetUser.email,
-      },
-      membership,
-      source,
-      ...streakSync,
-      occupancy: calculateCurrentOccupancy(updatedCount, DEFAULT_GYM_CAPACITY),
-    };
-  });
+  }
 
   logger.info('Member checked in', {
     userId: targetUser.id,
     actorId: actor.id,
+    branchId: branch.id,
     source,
   });
 
@@ -279,8 +477,9 @@ const checkOut = async (actor, data = {}) => {
       throw ApiError.badRequest('This member is not currently checked in');
     }
 
+    const branch = await requireBranch(openSession.branch_id, client);
     const closedSession = await repo.closeSession(openSession.id, checkOutAt, client);
-    const updatedCount = await repo.countOpenSessions(client);
+    const updatedCount = await repo.countOpenSessions(branch.id, client);
 
     return {
       session: closedSession,
@@ -289,13 +488,15 @@ const checkOut = async (actor, data = {}) => {
         full_name: targetUser.full_name,
         email: targetUser.email,
       },
-      occupancy: calculateCurrentOccupancy(updatedCount, DEFAULT_GYM_CAPACITY),
+      branch: formatBranchMetadata(branch),
+      occupancy: formatBranchOccupancy(branch, updatedCount),
     };
   });
 
   logger.info('Member checked out', {
     userId: targetUser.id,
     actorId: actor.id,
+    branchId: result.branch.branch_id,
   });
 
   return result;
@@ -312,6 +513,7 @@ const listMySessions = async (userId, query = {}) => {
   const { page, limit, offset } = parsePagination(query);
   const { rows, total } = await repo.findSessions({
     user_id: userId,
+    branch_id: query.branch_id,
     status: query.status || SESSION_STATUS.ALL,
     from_date: query.from_date,
     to_date: query.to_date,
@@ -332,6 +534,7 @@ const listSessions = async (query = {}) => {
   const { page, limit, offset } = parsePagination(query);
   const { rows, total } = await repo.findSessions({
     user_id: query.user_id,
+    branch_id: query.branch_id,
     status: query.status || SESSION_STATUS.ALL,
     from_date: query.from_date,
     to_date: query.to_date,
@@ -343,46 +546,70 @@ const listSessions = async (query = {}) => {
 };
 
 /**
- * Build a daily occupancy report.
+ * Build a daily occupancy report for one branch or all branches.
  *
- * @param {{ date?: string }} query
+ * @param {{ date?: string, branch_id?: string }} query
  * @returns {Promise<object>}
  */
 const getDailyReport = async (query = {}) => {
   const date = query.date || toDateOnlyString();
-  const sessions = await repo.findSessionsByDate(date);
-  return buildDailyReport(sessions, {
+  const branch = query.branch_id ? await requireBranch(query.branch_id) : null;
+  const sessions = await repo.findSessionsByDate(date, branch ? branch.id : null);
+  const branches = branch ? [branch] : await repo.findActiveBranches();
+  const capacity = branches.reduce(
+    (sum, currentBranch) => sum + getBranchCapacity(currentBranch),
+    0
+  );
+  const report = buildDailyReport(sessions, {
     date,
-    capacity: DEFAULT_GYM_CAPACITY,
+    capacity: capacity || DEFAULT_GYM_CAPACITY,
   });
+
+  return {
+    ...report,
+    branch: branch ? formatBranchMetadata(branch) : null,
+    branches_count: branches.length,
+  };
 };
 
 /**
- * Close every open session.
+ * Close every open session, optionally scoped to one branch.
  *
- * @param {{ checkout_at?: string|Date }} data
+ * @param {{ branch_id?: string, checkout_at?: string|Date }} data
  * @returns {Promise<{ closed_count: number, sessions: object[], occupancy: object }>}
  */
 const resetOpenSessions = async (data = {}) => {
   const checkoutAt = data.checkout_at ? new Date(data.checkout_at) : new Date();
+  const branch = data.branch_id ? await requireBranch(data.branch_id) : null;
 
   const result = await withTransaction(async (client) => {
-    const sessions = await repo.closeOpenSessions(checkoutAt, client);
-    const updatedCount = await repo.countOpenSessions(client);
+    const sessions = await repo.closeOpenSessions(
+      checkoutAt,
+      branch ? branch.id : null,
+      client
+    );
 
     return {
       closed_count: sessions.length,
       sessions,
-      occupancy: calculateCurrentOccupancy(updatedCount, DEFAULT_GYM_CAPACITY),
     };
   });
 
+  const occupancy = branch
+    ? await getCurrentOccupancy({ branch_id: branch.id })
+    : await getCurrentOccupancy();
+
   logger.info('Open gym sessions reset', {
+    branchId: branch ? branch.id : null,
     closedCount: result.closed_count,
     checkoutAt,
   });
 
-  return result;
+  return {
+    ...result,
+    branch: branch ? formatBranchMetadata(branch) : null,
+    occupancy,
+  };
 };
 
 /**
@@ -411,6 +638,7 @@ const refreshOccupancyCache = async () => {
 const getOccupancyCache = () => occupancyCache;
 
 module.exports = {
+  listBranches,
   getCurrentOccupancy,
   checkIn,
   checkOut,
@@ -423,5 +651,7 @@ module.exports = {
 
   // Exported for focused unit tests without needing database access.
   calculateStreakStats,
+  formatBranchOccupancy,
+  notifyBranchCrowding,
   toDateOnlyString,
 };

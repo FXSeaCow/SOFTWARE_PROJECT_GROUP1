@@ -36,6 +36,28 @@ const findUserById = async (userId, client) => {
 };
 
 /**
+ * Find an active gym branch by ID.
+ *
+ * Standalone streak check-ins must include branch_id because the database
+ * requires every workout_checkins row to belong to a branch.
+ *
+ * @param {string} branchId
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object|null>}
+ */
+const findBranchById = async (branchId, client) => {
+  const runner = getRunner(client);
+  const { rows } = await runner.query(
+    `SELECT id, name, capacity, is_active
+     FROM gym_branches
+     WHERE id = $1
+       AND is_active = true`,
+    [branchId]
+  );
+  return rows[0] || null;
+};
+
+/**
  * Find the streak row for a user.
  *
  * @param {string} userId
@@ -49,7 +71,8 @@ const findStreakByUserId = async (userId, client) => {
             user_id,
             current_streak::INT AS current_streak,
             longest_streak::INT AS longest_streak,
-            last_active_date::TEXT AS last_active_date
+            last_active_date::TEXT AS last_active_date,
+            updated_at
      FROM workout_streaks
      WHERE user_id = $1`,
     [userId]
@@ -70,11 +93,13 @@ const createStreakRecord = async (userId, client) => {
   const { rows } = await runner.query(
     `INSERT INTO workout_streaks (user_id)
      VALUES ($1)
+     ON CONFLICT (user_id) DO UPDATE SET updated_at = workout_streaks.updated_at
      RETURNING id,
                user_id,
                current_streak::INT AS current_streak,
                longest_streak::INT AS longest_streak,
-               last_active_date::TEXT AS last_active_date`,
+               last_active_date::TEXT AS last_active_date,
+               updated_at`,
     [userId]
   );
   return rows[0];
@@ -94,13 +119,15 @@ const updateStreak = async (userId, fields, client) => {
     `UPDATE workout_streaks
      SET current_streak = $1,
          longest_streak = $2,
-         last_active_date = $3
+         last_active_date = $3,
+         updated_at = now()
      WHERE user_id = $4
      RETURNING id,
                user_id,
                current_streak::INT AS current_streak,
                longest_streak::INT AS longest_streak,
-               last_active_date::TEXT AS last_active_date`,
+               last_active_date::TEXT AS last_active_date,
+               updated_at`,
     [
       fields.current_streak,
       fields.longest_streak,
@@ -122,9 +149,17 @@ const updateStreak = async (userId, fields, client) => {
 const findCheckinByUserAndDate = async (userId, checkinDate, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `SELECT id, user_id, checkin_date::TEXT AS checkin_date, created_at
-     FROM workout_checkins
-     WHERE user_id = $1 AND checkin_date = $2`,
+    `SELECT wc.id,
+            wc.user_id,
+            wc.branch_id,
+            gb.name AS branch_name,
+            wc.checkin_date::TEXT AS checkin_date,
+            wc.checked_in_at,
+            wc.counted_for_streak
+     FROM workout_checkins wc
+     JOIN gym_branches gb ON gb.id = wc.branch_id
+     WHERE wc.user_id = $1
+       AND wc.checkin_date = $2`,
     [userId, checkinDate]
   );
   return rows[0] || null;
@@ -134,49 +169,88 @@ const findCheckinByUserAndDate = async (userId, checkinDate, client) => {
  * Insert a workout check-in for one calendar date.
  *
  * @param {string} userId
+ * @param {string} branchId
  * @param {string} checkinDate - YYYY-MM-DD
+ * @param {Date} checkedInAt
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const createCheckin = async (userId, checkinDate, client) => {
+const createCheckin = async (userId, branchId, checkinDate, checkedInAt, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `INSERT INTO workout_checkins (user_id, checkin_date)
-     VALUES ($1, $2)
-     RETURNING id, user_id, checkin_date::TEXT AS checkin_date, created_at`,
-    [userId, checkinDate]
+    `INSERT INTO workout_checkins (user_id, branch_id, checkin_date, checked_in_at)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id,
+               user_id,
+               branch_id,
+               checkin_date::TEXT AS checkin_date,
+               checked_in_at,
+               counted_for_streak`,
+    [userId, branchId, checkinDate, checkedInAt]
   );
   return rows[0];
 };
 
 /**
- * Count a user's check-ins, optionally inside a date range.
+ * Build aliased check-in filters.
  *
  * @param {string} userId
- * @param {{ from_date?: string, to_date?: string }} filters
+ * @param {object} filters
+ * @param {string} alias
+ * @returns {{ where: string, values: Array, nextIndex: number }}
+ */
+const buildCheckinFilters = (userId, filters = {}, alias = 'wc') => {
+  const column = (name) => `${alias}.${name}`;
+  const conditions = [`${column('user_id')} = $1`];
+  const values = [userId];
+  let idx = 2;
+
+  if (filters.countedOnly) {
+    conditions.push(`${column('counted_for_streak')} = true`);
+  }
+
+  if (filters.branch_id) {
+    conditions.push(`${column('branch_id')} = $${idx++}`);
+    values.push(filters.branch_id);
+  }
+
+  if (filters.from_date) {
+    conditions.push(`${column('checkin_date')} >= $${idx++}::date`);
+    values.push(filters.from_date);
+  }
+
+  if (filters.to_date) {
+    conditions.push(`${column('checkin_date')} <= $${idx++}::date`);
+    values.push(filters.to_date);
+  }
+
+  return {
+    where: conditions.join(' AND '),
+    values,
+    nextIndex: idx,
+  };
+};
+
+/**
+ * Count a user's streak-counted check-ins, optionally inside a date range.
+ *
+ * @param {string} userId
+ * @param {{ branch_id?: string, from_date?: string, to_date?: string }} filters
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<number>}
  */
 const countCheckinsByUser = async (userId, filters = {}, client) => {
   const runner = getRunner(client);
-  const conditions = ['user_id = $1'];
-  const values = [userId];
-  let idx = 2;
-
-  if (filters.from_date) {
-    conditions.push(`checkin_date >= $${idx++}`);
-    values.push(filters.from_date);
-  }
-
-  if (filters.to_date) {
-    conditions.push(`checkin_date <= $${idx++}`);
-    values.push(filters.to_date);
-  }
+  const { where, values } = buildCheckinFilters(
+    userId,
+    { ...filters, countedOnly: true },
+    'wc'
+  );
 
   const { rows } = await runner.query(
     `SELECT COUNT(*)::INT AS total
-     FROM workout_checkins
-     WHERE ${conditions.join(' AND ')}`,
+     FROM workout_checkins wc
+     WHERE ${where}`,
     values
   );
   return rows[0].total;
@@ -186,39 +260,32 @@ const countCheckinsByUser = async (userId, filters = {}, client) => {
  * List a user's check-ins with pagination and optional date filters.
  *
  * @param {string} userId
- * @param {{ limit: number, offset: number, from_date?: string, to_date?: string }} opts
+ * @param {{ limit: number, offset: number, branch_id?: string, from_date?: string, to_date?: string }} opts
  * @returns {Promise<{ rows: object[], total: number }>}
  */
 const findCheckinsByUser = async (userId, opts) => {
-  const conditions = ['user_id = $1'];
-  const values = [userId];
-  let idx = 2;
-
-  if (opts.from_date) {
-    conditions.push(`checkin_date >= $${idx++}`);
-    values.push(opts.from_date);
-  }
-
-  if (opts.to_date) {
-    conditions.push(`checkin_date <= $${idx++}`);
-    values.push(opts.to_date);
-  }
-
-  const where = conditions.join(' AND ');
+  const { where, values, nextIndex } = buildCheckinFilters(userId, opts, 'wc');
 
   const countResult = await db.query(
     `SELECT COUNT(*)::INT AS total
-     FROM workout_checkins
+     FROM workout_checkins wc
      WHERE ${where}`,
     values
   );
 
   const { rows } = await db.query(
-    `SELECT id, user_id, checkin_date::TEXT AS checkin_date, created_at
-     FROM workout_checkins
+    `SELECT wc.id,
+            wc.user_id,
+            wc.branch_id,
+            gb.name AS branch_name,
+            wc.checkin_date::TEXT AS checkin_date,
+            wc.checked_in_at,
+            wc.counted_for_streak
+     FROM workout_checkins wc
+     JOIN gym_branches gb ON gb.id = wc.branch_id
      WHERE ${where}
-     ORDER BY checkin_date DESC, created_at DESC
-     LIMIT $${idx++} OFFSET $${idx++}`,
+     ORDER BY wc.checkin_date DESC, wc.checked_in_at DESC
+     LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
     [...values, opts.limit, opts.offset]
   );
 
@@ -242,6 +309,7 @@ const findCheckinDatesByUser = async (userId, client) => {
     `SELECT DISTINCT checkin_date::TEXT AS checkin_date
      FROM workout_checkins
      WHERE user_id = $1
+       AND counted_for_streak = true
      ORDER BY checkin_date ASC`,
     [userId]
   );
@@ -275,6 +343,7 @@ const findLeaderboard = async ({ limit }) => {
 
 module.exports = {
   findUserById,
+  findBranchById,
   findStreakByUserId,
   createStreakRecord,
   updateStreak,

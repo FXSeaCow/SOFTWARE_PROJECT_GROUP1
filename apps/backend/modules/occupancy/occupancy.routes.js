@@ -5,6 +5,7 @@
  * Base path when mounted in app.js: /api/occupancy
  *
  * Member/authenticated routes:
+ *   GET  /api/occupancy/branches         - active branches with occupancy
  *   GET  /api/occupancy/current          - current gym occupancy
  *   POST /api/occupancy/checkin          - check in by self or QR token
  *   POST /api/occupancy/checkout         - check out by self or QR token
@@ -29,6 +30,7 @@ const {
   sessionsQuerySchema,
   adminSessionsQuerySchema,
   dailyReportQuerySchema,
+  currentOccupancyQuerySchema,
   resetOpenSessionsSchema,
 } = require('./occupancy.validation');
 
@@ -39,7 +41,13 @@ router.use(authenticate);
 // Member/authenticated routes
 // ---------------------------------------------------------------------------
 
-router.get('/current', ctrl.getCurrentOccupancy);
+router.get('/branches', ctrl.listBranches);
+
+router.get(
+  '/current',
+  validate(null, null, currentOccupancyQuerySchema),
+  ctrl.getCurrentOccupancy
+);
 
 router.post(
   '/checkin',

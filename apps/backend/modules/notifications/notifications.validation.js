@@ -9,7 +9,6 @@
 const Joi = require('joi');
 const {
   NOTIFICATION_TYPE,
-  NOTIFICATION_PRIORITY,
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_LIMITS,
 } = require('./notifications.constants');
@@ -64,17 +63,16 @@ const createNotificationSchema = Joi.object({
   }),
   type: Joi.string()
     .valid(...Object.values(NOTIFICATION_TYPE))
-    .default(NOTIFICATION_TYPE.SYSTEM),
-  priority: Joi.string()
-    .valid(...Object.values(NOTIFICATION_PRIORITY))
-    .default(NOTIFICATION_PRIORITY.NORMAL),
-  title: Joi.string().trim().min(2).max(150).required().messages({
+    .default(NOTIFICATION_TYPE.ANNOUNCEMENT),
+  announcement_id: Joi.string().uuid().allow(null).optional().messages({
+    'string.uuid': 'announcement_id must be a valid UUID',
+  }),
+  title: Joi.string().trim().min(2).max(200).required().messages({
     'any.required': 'title is required',
   }),
-  message: Joi.string().trim().min(2).max(1000).required().messages({
-    'any.required': 'message is required',
+  body: Joi.string().trim().min(2).max(2000).allow(null).required().messages({
+    'any.required': 'body is required',
   }),
-  data: Joi.object().unknown(true).default({}),
 });
 
 /**
@@ -93,7 +91,9 @@ const createFromTemplateSchema = Joi.object({
       'any.required': 'template is required',
     }),
   context: Joi.object().unknown(true).default({}),
-  data: Joi.object().unknown(true).default({}),
+  announcement_id: Joi.string().uuid().allow(null).optional().messages({
+    'string.uuid': 'announcement_id must be a valid UUID',
+  }),
 });
 
 /**
@@ -105,16 +105,15 @@ const broadcastNotificationSchema = Joi.object({
   type: Joi.string()
     .valid(...Object.values(NOTIFICATION_TYPE))
     .default(NOTIFICATION_TYPE.ANNOUNCEMENT),
-  priority: Joi.string()
-    .valid(...Object.values(NOTIFICATION_PRIORITY))
-    .default(NOTIFICATION_PRIORITY.NORMAL),
-  title: Joi.string().trim().min(2).max(150).required().messages({
+  announcement_id: Joi.string().uuid().allow(null).optional().messages({
+    'string.uuid': 'announcement_id must be a valid UUID',
+  }),
+  title: Joi.string().trim().min(2).max(200).required().messages({
     'any.required': 'title is required',
   }),
-  message: Joi.string().trim().min(2).max(1000).required().messages({
-    'any.required': 'message is required',
+  body: Joi.string().trim().min(2).max(2000).required().messages({
+    'any.required': 'body is required',
   }),
-  data: Joi.object().unknown(true).default({}),
 });
 
 /**

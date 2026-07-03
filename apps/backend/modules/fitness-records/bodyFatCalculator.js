@@ -6,7 +6,7 @@
  *   - Male:   waist, neck, height
  *   - Female: waist, neck, hip, height
  *
- * This is an estimate. If a member enters a measured body_fat_percent from a
+ * This is an estimate. If a member enters a measured body_fat_pct/body_fat_percent from a
  * smart scale or trainer assessment, the service can store that value directly.
  */
 
@@ -127,9 +127,13 @@ const classifyBodyFat = (bodyFatPercent, sex) => {
  * @returns {{ body_fat_percent: number|null, body_fat_category: string|null, estimated: boolean }}
  */
 const buildBodyFatSummary = (data) => {
-  const provided = data.body_fat_percent !== undefined && data.body_fat_percent !== null;
+  const providedValue =
+    data.body_fat_pct !== undefined && data.body_fat_pct !== null
+      ? data.body_fat_pct
+      : data.body_fat_percent;
+  const provided = providedValue !== undefined && providedValue !== null;
   const bodyFatPercent = provided
-    ? roundTwo(data.body_fat_percent)
+    ? roundTwo(providedValue)
     : calculateBodyFatPercentage(data);
 
   return {

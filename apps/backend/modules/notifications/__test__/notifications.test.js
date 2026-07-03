@@ -43,7 +43,7 @@ const {
 const {
   NOTIFICATION_TYPE,
   NOTIFICATION_TEMPLATE,
-  NOTIFICATION_PRIORITY,
+  NOTIFICATION_SEVERITY,
 } = require('../notifications.constants');
 
 const user = {
@@ -56,14 +56,13 @@ const user = {
 const notification = {
   id: 'notification-1',
   user_id: 'user-1',
-  type: NOTIFICATION_TYPE.SYSTEM,
-  priority: NOTIFICATION_PRIORITY.NORMAL,
+  announcement_id: null,
+  type: NOTIFICATION_TYPE.ANNOUNCEMENT,
   title: 'Hello',
-  message: 'Welcome back',
-  data: {},
+  body: 'Welcome back',
   is_read: false,
   read_at: null,
-  created_at: '2026-07-01T00:00:00.000Z',
+  sent_at: '2026-07-01T00:00:00.000Z',
 };
 
 describe('notifications module', () => {
@@ -83,36 +82,52 @@ describe('notifications module', () => {
 
   it('renders known templates and falls back for unknown templates', () => {
     const expiring = templates.renderTemplate(
-      NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRING,
+      NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRY,
       { days_remaining: 3 }
+    );
+    const occupancy = templates.renderTemplate(
+      NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
+      {
+        branch_name: 'Central Branch',
+        occupancy_rate: 100,
+        current_occupancy: 20,
+        capacity: 20,
+        reason: 'full',
+      }
     );
     const fallback = templates.renderTemplate('unknown_template', {
       title: 'Fallback title',
-      message: 'Fallback message',
+      body: 'Fallback body',
     });
 
     expect(expiring).toMatchObject({
-      type: NOTIFICATION_TYPE.MEMBERSHIP_EXPIRING,
-      priority: NOTIFICATION_PRIORITY.HIGH,
+      type: NOTIFICATION_TYPE.MEMBERSHIP_EXPIRY,
+      severity: NOTIFICATION_SEVERITY.WARNING,
       title: 'Membership expiring soon',
     });
-    expect(expiring.message).toContain('3 day');
+    expect(expiring.body).toContain('3 day');
+    expect(occupancy).toMatchObject({
+      type: NOTIFICATION_TYPE.OCCUPANCY_ALERT,
+      severity: NOTIFICATION_SEVERITY.DANGER,
+      title: 'Central Branch is crowded',
+    });
+    expect(occupancy.body).toContain('full capacity');
     expect(fallback).toMatchObject({
-      type: NOTIFICATION_TYPE.SYSTEM,
+      type: NOTIFICATION_TYPE.ANNOUNCEMENT,
       title: 'Fallback title',
-      message: 'Fallback message',
+      body: 'Fallback body',
     });
   });
 
   it('validates required notification payloads and broadcast payloads', () => {
     const missingUser = createNotificationSchema.validate({
       title: 'Hello',
-      message: 'Message',
+      body: 'Message',
     });
     const validBroadcast = broadcastNotificationSchema.validate({
       role: 'member',
       title: 'Announcement',
-      message: 'Gym closes early today',
+      body: 'Gym closes early today',
     });
 
     expect(missingUser.error).toBeDefined();
@@ -126,15 +141,14 @@ describe('notifications module', () => {
   it('normalizes notification payload defaults', () => {
     const normalized = service.normalizeNotification({
       title: 'Hello',
-      message: 'Message',
+      body: 'Message',
     });
 
     expect(normalized).toEqual({
-      type: NOTIFICATION_TYPE.SYSTEM,
-      priority: NOTIFICATION_PRIORITY.NORMAL,
+      type: NOTIFICATION_TYPE.ANNOUNCEMENT,
+      announcement_id: null,
       title: 'Hello',
-      message: 'Message',
-      data: {},
+      body: 'Message',
     });
   });
 
@@ -144,17 +158,16 @@ describe('notifications module', () => {
 
     const result = await service.createNotification('user-1', {
       title: 'Hello',
-      message: 'Welcome back',
+      body: 'Welcome back',
     });
 
     expect(repo.findUserById).toHaveBeenCalledWith('user-1');
     expect(repo.createNotification).toHaveBeenCalledWith({
       user_id: 'user-1',
-      type: NOTIFICATION_TYPE.SYSTEM,
-      priority: NOTIFICATION_PRIORITY.NORMAL,
+      type: NOTIFICATION_TYPE.ANNOUNCEMENT,
+      announcement_id: null,
       title: 'Hello',
-      message: 'Welcome back',
-      data: {},
+      body: 'Welcome back',
     });
     expect(result).toBe(notification);
   });
@@ -165,7 +178,7 @@ describe('notifications module', () => {
     await expect(
       service.createNotification('missing-user', {
         title: 'Hello',
-        message: 'Welcome back',
+        body: 'Welcome back',
       })
     ).rejects.toMatchObject({ statusCode: 404 });
   });
@@ -180,14 +193,14 @@ describe('notifications module', () => {
 
     const result = await service.createFromTemplate(
       'user-1',
-      NOTIFICATION_TEMPLATE.STREAK_AT_RISK,
+      NOTIFICATION_TEMPLATE.STREAK_WARNING,
       { last_active_date: '2026-07-01' }
     );
 
     expect(repo.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: 'user-1',
-        type: NOTIFICATION_TYPE.STREAK_AT_RISK,
+        type: NOTIFICATION_TYPE.STREAK_WARNING,
         title: 'Your workout streak needs attention',
       })
     );
@@ -287,7 +300,7 @@ describe('notifications module', () => {
     const result = await service.broadcastNotification({
       role: 'member',
       title: 'Announcement',
-      message: 'Gym closes early today',
+      body: 'Gym closes early today',
     });
 
     expect(repo.findUsers).toHaveBeenCalledWith({ role: 'member' });
@@ -332,6 +345,11 @@ describe('notifications module', () => {
     const result = await service.sendMembershipExpiryWarnings(7);
 
     expect(repo.findMembershipsExpiringSoon).toHaveBeenCalledWith(7);
+    expect(repo.findRecentByType).toHaveBeenCalledWith(
+      'user-1',
+      NOTIFICATION_TYPE.MEMBERSHIP_EXPIRY,
+      expect.any(Date)
+    );
     expect(repo.createNotification).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       scanned_count: 2,
@@ -361,7 +379,7 @@ describe('notifications module', () => {
     expect(repo.findStreaksAtRisk).toHaveBeenCalled();
     expect(repo.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: NOTIFICATION_TYPE.STREAK_AT_RISK,
+        type: NOTIFICATION_TYPE.STREAK_WARNING,
       })
     );
     expect(result.created_count).toBe(1);

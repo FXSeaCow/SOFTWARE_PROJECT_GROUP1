@@ -326,6 +326,136 @@ const VALID_CONFIDENCE = ['high', 'medium', 'low'];
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+const LOCAL_GOAL_KEYWORDS = {
+  muscle_gain: [
+    'muscle',
+    'build',
+    'bigger',
+    'gain mass',
+    'bulk',
+    'bulking',
+    'strength',
+    'stronger',
+    'hypertrophy',
+    'arms',
+    'chest',
+    'back',
+    'lift heavy',
+  ],
+  weight_loss: [
+    'lose weight',
+    'weight loss',
+    'fat',
+    'belly',
+    'slim',
+    'cut',
+    'cutting',
+    'lighter',
+    'calorie',
+    'burn',
+    'tone',
+  ],
+  endurance: [
+    'endurance',
+    'stamina',
+    'run',
+    'running',
+    '10k',
+    'marathon',
+    'cardio',
+    'cycling',
+    'not tired',
+  ],
+  flexibility: [
+    'flexibility',
+    'flexible',
+    'stretch',
+    'stretching',
+    'mobility',
+    'yoga',
+    'stiff',
+    'touch my toes',
+    'range of motion',
+  ],
+  general_fitness: [
+    'healthy',
+    'healthier',
+    'fitness',
+    'gym',
+    'workout',
+    'exercise',
+    'wellness',
+    'active',
+    'energy',
+  ],
+};
+
+const LOCAL_NON_FITNESS_KEYWORDS = [
+  'pasta',
+  'carbonara',
+  'recipe',
+  'cook',
+  'cooking',
+  'weather',
+  'coding',
+  'code',
+  'javascript',
+  'movie',
+  'music',
+  'travel',
+];
+
+const LOCAL_REDIRECT_MESSAGE =
+  'GymHub is here to help with fitness goals. Tell me what you want to improve at the gym, such as building muscle, losing weight, or improving stamina.';
+
+const countKeywordMatches = (text, keywords) =>
+  keywords.reduce((count, keyword) => (
+    text.includes(keyword) ? count + 1 : count
+  ), 0);
+
+/**
+ * Lightweight local fallback used when Groq is unavailable.
+ *
+ * @param {string} cleanText
+ * @returns {object}
+ */
+const classifyGoalLocally = (cleanText) => {
+  const text = cleanText.toLowerCase();
+  const scores = Object.entries(LOCAL_GOAL_KEYWORDS).map(([goal, keywords]) => ({
+    goal,
+    score: countKeywordMatches(text, keywords),
+  }));
+  scores.sort((a, b) => b.score - a.score);
+
+  const best = scores[0];
+  const nonFitnessScore = countKeywordMatches(text, LOCAL_NON_FITNESS_KEYWORDS);
+
+  if (!best || best.score === 0) {
+    if (nonFitnessScore > 0) {
+      return {
+        is_fitness_related: false,
+        goal: null,
+        confidence: null,
+        redirect_message: LOCAL_REDIRECT_MESSAGE,
+      };
+    }
+
+    return {
+      is_fitness_related: true,
+      goal: 'general_fitness',
+      confidence: 'low',
+      redirect_message: null,
+    };
+  }
+
+  return {
+    is_fitness_related: true,
+    goal: best.goal,
+    confidence: best.score >= 2 ? 'medium' : 'low',
+    redirect_message: null,
+  };
+};
+
 /**
  * System prompt for Gemini.
  *
@@ -519,13 +649,12 @@ const resolveGoalFromText = async (userText) => {
       input: cleanText,
     });
 
+    const localResult = classifyGoalLocally(cleanText);
+
     return {
-      is_fitness_related: true,            // assume fitness-related so user isn't blocked
-      goal:               'general_fitness',
-      confidence:         'low',
-      redirect_message:   null,
-      raw_text:           cleanText,
-      fallback:           true,            // caller can show "our AI is unavailable" note
+      ...localResult,
+      raw_text: cleanText,
+      fallback: true,            // caller can show "our AI is unavailable" note
     };
   }
 };
@@ -537,6 +666,7 @@ module.exports = {
   buildCatalogIndex,
   scoreExercise,
   pickBestExercises,
+  classifyGoalLocally,
   GOAL_PROFILES,
   SPLITS,
   VALID_GOALS,

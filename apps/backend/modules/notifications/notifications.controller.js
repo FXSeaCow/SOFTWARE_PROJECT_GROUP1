@@ -131,7 +131,7 @@ const createFromTemplate = asyncHandler(async (req, res) => {
     req.body.user_id,
     req.body.template,
     req.body.context,
-    req.body.data
+    { announcement_id: req.body.announcement_id }
   );
   res.status(201).json(
     ApiResponse.created(notification, NOTIFICATION_MESSAGES.CREATED)

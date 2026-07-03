@@ -2,8 +2,9 @@
  * fitness-records.validation.js
  * Joi schemas for fitness record endpoints.
  *
- * Validation strips unknown fields so transient calculator inputs such as
- * "sex" are accepted only where explicitly supported.
+ * gym.sql stores date-only records in recorded_date and body fat in
+ * body_fat_pct. Legacy aliases are still accepted at the API edge and mapped
+ * in the service layer.
  */
 
 const Joi = require('joi');
@@ -13,6 +14,8 @@ const {
   FITNESS_RECORD_LIMITS,
   MEASUREMENT_LIMITS,
 } = require('./fitness-records.constants');
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Build a UUID params schema for route IDs.
@@ -26,6 +29,28 @@ const uuidParam = (name) =>
       'string.uuid': `${name} must be a valid UUID`,
       'any.required': `${name} is required`,
     }),
+  });
+
+/**
+ * Validate a YYYY-MM-DD calendar date string.
+ */
+const dateOnly = Joi.string()
+  .pattern(DATE_ONLY_PATTERN)
+  .custom((value, helpers) => {
+    const [year, month, day] = value.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+
+    const isValidDate =
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day;
+
+    if (!isValidDate) return helpers.error('date.format');
+    return value;
+  })
+  .messages({
+    'string.pattern.base': 'Date must use YYYY-MM-DD format',
+    'date.format': 'Date must be a real calendar date',
   });
 
 /**
@@ -46,40 +71,35 @@ const bodyMeasureCm = Joi.number()
   .min(MEASUREMENT_LIMITS.BODY_MEASURE_MIN)
   .max(MEASUREMENT_LIMITS.BODY_MEASURE_MAX);
 
+const bodyFatPct = Joi.number()
+  .precision(2)
+  .min(MEASUREMENT_LIMITS.BODY_FAT_MIN)
+  .max(MEASUREMENT_LIMITS.BODY_FAT_MAX);
+
 /**
  * Fields that can be stored on a fitness record.
  */
 const recordFields = {
-  recorded_at: Joi.date().iso().optional().messages({
-    'date.format': 'recorded_at must be a valid ISO datetime',
-  }),
+  recorded_date: dateOnly.optional(),
+  recorded_at: dateOnly.optional(),
   weight_kg: weightKg,
   height_cm: heightCm,
-  body_fat_percent: Joi.number()
-    .precision(2)
-    .min(MEASUREMENT_LIMITS.BODY_FAT_MIN)
-    .max(MEASUREMENT_LIMITS.BODY_FAT_MAX),
-  muscle_mass_kg: Joi.number()
-    .precision(2)
-    .min(MEASUREMENT_LIMITS.MUSCLE_MASS_MIN)
-    .max(MEASUREMENT_LIMITS.MUSCLE_MASS_MAX),
-  waist_cm: bodyMeasureCm,
-  chest_cm: bodyMeasureCm,
-  hip_cm: bodyMeasureCm,
-  neck_cm: bodyMeasureCm,
-  arm_cm: bodyMeasureCm,
-  thigh_cm: bodyMeasureCm,
+  body_fat_pct: bodyFatPct,
+  body_fat_percent: bodyFatPct,
   notes: Joi.string().trim().max(500).allow('', null),
 };
 
 /**
  * Transient calculator-only fields.
  *
- * sex is not stored by the repository. It only tells the body fat calculator
- * which formula to use when body_fat_percent is not provided.
+ * These fields are not stored in gym.sql; they only allow the service to
+ * estimate body_fat_pct when no measured value is supplied.
  */
 const calculatorFields = {
   sex: Joi.string().valid(...Object.values(SEX)).optional(),
+  waist_cm: bodyMeasureCm,
+  neck_cm: bodyMeasureCm,
+  hip_cm: bodyMeasureCm,
 };
 
 /**
@@ -119,10 +139,15 @@ const listRecordsQuerySchema = Joi.object({
     .min(1)
     .max(FITNESS_RECORD_LIMITS.MAX_LIMIT)
     .default(FITNESS_RECORD_LIMITS.DEFAULT_LIMIT),
-  from_date: Joi.date().iso().optional(),
-  to_date: Joi.date().iso().min(Joi.ref('from_date')).optional().messages({
-    'date.min': 'to_date must be after from_date',
-  }),
+  from_date: dateOnly.optional(),
+  to_date: dateOnly.optional(),
+}).custom((value, helpers) => {
+  if (value.from_date && value.to_date && value.to_date < value.from_date) {
+    return helpers.error('date.range');
+  }
+  return value;
+}).messages({
+  'date.range': 'to_date must be after or equal to from_date',
 });
 
 /**
@@ -130,10 +155,8 @@ const listRecordsQuerySchema = Joi.object({
  * Query params for progress analysis.
  */
 const progressQuerySchema = Joi.object({
-  from_date: Joi.date().iso().optional(),
-  to_date: Joi.date().iso().min(Joi.ref('from_date')).optional().messages({
-    'date.min': 'to_date must be after from_date',
-  }),
+  from_date: dateOnly.optional(),
+  to_date: dateOnly.optional(),
   limit: Joi.number()
     .integer()
     .min(2)
@@ -142,6 +165,13 @@ const progressQuerySchema = Joi.object({
   goal: Joi.string()
     .valid(...Object.values(FITNESS_GOAL))
     .default(FITNESS_GOAL.GENERAL_FITNESS),
+}).custom((value, helpers) => {
+  if (value.from_date && value.to_date && value.to_date < value.from_date) {
+    return helpers.error('date.range');
+  }
+  return value;
+}).messages({
+  'date.range': 'to_date must be after or equal to from_date',
 });
 
 /**
