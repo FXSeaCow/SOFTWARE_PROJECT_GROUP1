@@ -34,6 +34,9 @@ const {
   resetOpenSessionsSchema,
 } = require('./occupancy.validation');
 
+router.get('/branches', ctrl.listBranches); // Public route — no auth required, show in home page
+
+
 // Every occupancy endpoint requires authentication.
 router.use(authenticate);
 
@@ -41,7 +44,6 @@ router.use(authenticate);
 // Member/authenticated routes
 // ---------------------------------------------------------------------------
 
-router.get('/branches', ctrl.listBranches);
 
 router.get(
   '/current',
