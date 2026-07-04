@@ -106,6 +106,28 @@ const createFromTemplate = async (
 };
 
 /**
+ * Broadcast a templated notification to all users or users matching a role.
+ *
+ * @param {string} templateKey
+ * @param {object} context
+ * @param {{ role?, announcement_id? }} extraData
+ * @returns {Promise<{ audience_count: number, created_count: number, notifications: object[] }>}
+ */
+const broadcastFromTemplate = async (
+  templateKey,
+  context = {},
+  extraData = {}
+) => {
+  const rendered = renderTemplate(templateKey, context);
+
+  return broadcastNotification({
+    ...rendered,
+    role: extraData.role,
+    announcement_id: extraData.announcement_id || null,
+  });
+};
+
+/**
  * List notifications for the authenticated member.
  *
  * @param {string} userId
@@ -341,7 +363,10 @@ const sendMembershipExpiryWarnings = async (
  * @returns {Promise<object>}
  */
 const sendStreakRiskWarnings = async () => {
-  const streaks = await repo.findStreaksAtRisk();
+  const resetStreaks = await repo.resetStreaksPastThreshold(
+    NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS
+  );
+  const streaks = await repo.findStreaksAtRisk(1);
   const since = hoursAgo(24);
   const created = [];
   let skipped = 0;
@@ -370,12 +395,15 @@ const sendStreakRiskWarnings = async () => {
   }
 
   logger.info('Streak risk notification job completed', {
+    reset: resetStreaks.length,
     scanned: streaks.length,
     created: created.length,
     skipped,
   });
 
   return {
+    reset_count: resetStreaks.length,
+    reset_streaks: resetStreaks,
     scanned_count: streaks.length,
     created_count: created.length,
     skipped_count: skipped,
@@ -435,6 +463,7 @@ const runNotificationJobs = async (options = {}) => {
 module.exports = {
   createNotification,
   createFromTemplate,
+  broadcastFromTemplate,
   listMyNotifications,
   listAllNotifications,
   getMyNotificationById,

@@ -97,6 +97,25 @@ const findUserByQrToken = async (qrCodeToken, client) => {
 };
 
 /**
+ * Find users that have a QR token.
+ *
+ * Used when an admin scans a QR image data URL instead of receiving the raw
+ * qr_code_token from the frontend.
+ *
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object[]>}
+ */
+const findUsersWithQrTokens = async (client) => {
+  const runner = getRunner(client);
+  const { rows } = await runner.query(
+    `SELECT id, email, full_name, role, qr_code_token
+     FROM users
+     WHERE qr_code_token IS NOT NULL`
+  );
+  return rows;
+};
+
+/**
  * Find a user by ID.
  *
  * @param {string} userId
@@ -106,7 +125,7 @@ const findUserByQrToken = async (qrCodeToken, client) => {
 const findUserById = async (userId, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `SELECT id, email, full_name, role
+    `SELECT id, email, full_name, role, qr_code_token
      FROM users
      WHERE id = $1`,
     [userId]
@@ -492,7 +511,8 @@ const updateWorkoutStreak = async (userId, stats, client) => {
     `UPDATE workout_streaks
      SET current_streak = $1,
          longest_streak = $2,
-         last_active_date = $3
+         last_active_date = $3,
+         updated_at = now()
      WHERE user_id = $4
      RETURNING id, user_id, current_streak, longest_streak, last_active_date::TEXT AS last_active_date`,
     [stats.current_streak, stats.longest_streak, stats.last_active_date, userId]
@@ -505,6 +525,7 @@ module.exports = {
   findBranchById,
   findCurrentOccupancy,
   findUserByQrToken,
+  findUsersWithQrTokens,
   findUserById,
   findActiveMembership,
   countOpenSessions,

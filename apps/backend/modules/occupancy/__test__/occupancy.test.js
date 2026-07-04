@@ -11,6 +11,7 @@ jest.mock('../occupancy.repository', () => ({
   findBranchById: jest.fn(),
   findCurrentOccupancy: jest.fn(),
   findUserByQrToken: jest.fn(),
+  findUsersWithQrTokens: jest.fn(),
   findUserById: jest.fn(),
   findActiveMembership: jest.fn(),
   countOpenSessions: jest.fn(),
@@ -29,6 +30,7 @@ jest.mock('../occupancy.repository', () => ({
 
 jest.mock('../../notifications/notifications.service', () => ({
   createFromTemplate: jest.fn(),
+  broadcastFromTemplate: jest.fn(),
 }));
 
 jest.mock('../../../utils/Transaction', () => ({
@@ -206,9 +208,7 @@ describe('occupancy module', () => {
     repo.findActiveMembership.mockResolvedValue(membership);
     repo.findBranchById.mockResolvedValue(branch);
     repo.findOpenSessionByUser.mockResolvedValue(null);
-    repo.countOpenSessions
-      .mockResolvedValueOnce(10)
-      .mockResolvedValueOnce(11);
+    repo.countOpenSessions.mockResolvedValueOnce(11);
     repo.createSession.mockResolvedValue({
       id: 'session-1',
       user_id: 'user-1',
@@ -251,17 +251,17 @@ describe('occupancy module', () => {
     expect(result.branch.branch_id).toBe(branch.id);
     expect(result.occupancy.current_occupancy).toBe(11);
     expect(result.workout_checkin_created).toBe(true);
-    expect(notificationsService.createFromTemplate).not.toHaveBeenCalled();
+    expect(notificationsService.broadcastFromTemplate).not.toHaveBeenCalled();
   });
 
-  it('creates an occupancy alert when check-in makes a branch crowded', async () => {
+  it('broadcasts an occupancy alert when check-in makes a branch crowded', async () => {
+    const today = dateOnly();
+
     repo.findUserById.mockResolvedValue(member);
     repo.findActiveMembership.mockResolvedValue(membership);
     repo.findBranchById.mockResolvedValue({ ...branch, capacity: 10 });
     repo.findOpenSessionByUser.mockResolvedValue(null);
-    repo.countOpenSessions
-      .mockResolvedValueOnce(8)
-      .mockResolvedValueOnce(9);
+    repo.countOpenSessions.mockResolvedValueOnce(9);
     repo.createSession.mockResolvedValue({
       id: 'session-1',
       user_id: 'user-1',
@@ -270,18 +270,23 @@ describe('occupancy module', () => {
       checked_out_at: null,
     });
     repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
-    repo.findWorkoutCheckinByUserAndDate.mockResolvedValue({ id: 'checkin-1' });
-    repo.findWorkoutCheckinDatesByUser.mockResolvedValue([dateOnly()]);
+    repo.createWorkoutCheckin.mockResolvedValue({
+      id: 'checkin-1',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checkin_date: today,
+    });
+    repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
-    notificationsService.createFromTemplate.mockResolvedValue({
-      id: 'alert-1',
-      type: 'occupancy_alert',
+    notificationsService.broadcastFromTemplate.mockResolvedValue({
+      audience_count: 2,
+      created_count: 2,
+      notifications: [{ id: 'alert-1' }, { id: 'alert-2' }],
     });
 
     const result = await service.checkIn(member, { branch_id: branch.id });
 
-    expect(notificationsService.createFromTemplate).toHaveBeenCalledWith(
-      'user-1',
+    expect(notificationsService.broadcastFromTemplate).toHaveBeenCalledWith(
       NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
       expect.objectContaining({
         branch_name: branch.name,
@@ -289,36 +294,64 @@ describe('occupancy module', () => {
         current_occupancy: 9,
         capacity: 10,
         reason: 'crowded',
-      })
+      }),
+      { role: 'member' }
     );
-    expect(result.crowding_alert).toMatchObject({ id: 'alert-1' });
+    expect(result.crowding_alert).toMatchObject({
+      audience_count: 2,
+      created_count: 2,
+    });
   });
 
-  it('rejects check-in and notifies the member when the branch is full', async () => {
+  it('allows check-in and broadcasts when the branch is full', async () => {
+    const today = dateOnly();
+
     repo.findUserById.mockResolvedValue(member);
     repo.findActiveMembership.mockResolvedValue(membership);
     repo.findBranchById.mockResolvedValue({ ...branch, capacity: 10 });
     repo.findOpenSessionByUser.mockResolvedValue(null);
-    repo.countOpenSessions.mockResolvedValueOnce(10);
-    notificationsService.createFromTemplate.mockResolvedValue({
-      id: 'alert-full',
-      type: 'occupancy_alert',
+    repo.countOpenSessions.mockResolvedValueOnce(11);
+    repo.createSession.mockResolvedValue({
+      id: 'session-full',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checked_in_at: new Date(),
+      checked_out_at: null,
+    });
+    repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    repo.createWorkoutCheckin.mockResolvedValue({
+      id: 'checkin-full',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checkin_date: today,
+    });
+    repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
+    repo.updateWorkoutStreak.mockResolvedValue({
+      id: 'streak-1',
+      user_id: 'user-1',
+      current_streak: 1,
+      longest_streak: 1,
+      last_active_date: today,
+    });
+    notificationsService.broadcastFromTemplate.mockResolvedValue({
+      audience_count: 3,
+      created_count: 3,
+      notifications: [],
     });
 
-    await expect(
-      service.checkIn(member, { branch_id: branch.id })
-    ).rejects.toMatchObject({ statusCode: 409 });
+    const result = await service.checkIn(member, { branch_id: branch.id });
 
-    expect(repo.createSession).not.toHaveBeenCalled();
-    expect(notificationsService.createFromTemplate).toHaveBeenCalledWith(
-      'user-1',
+    expect(repo.createSession).toHaveBeenCalled();
+    expect(notificationsService.broadcastFromTemplate).toHaveBeenCalledWith(
       NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
       expect.objectContaining({
         reason: 'full',
-        current_occupancy: 10,
+        current_occupancy: 11,
         capacity: 10,
-      })
+      }),
+      { role: 'member' }
     );
+    expect(result.occupancy.is_full).toBe(true);
   });
 
   it('rejects check-in when the member already has an open session', async () => {

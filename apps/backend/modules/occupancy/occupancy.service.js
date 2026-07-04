@@ -4,8 +4,8 @@
  *
  * Main responsibilities:
  *   - Check members into and out of a specific gym branch.
- *   - Keep each branch occupancy below its own database capacity.
- *   - Notify members when a selected branch is crowded or full.
+ *   - Report when each branch is crowded or over its database capacity.
+ *   - Notify members when a branch is crowded or full.
  *   - Produce current and daily occupancy analytics per branch or globally.
  *   - Maintain workout check-in and streak data when a member checks in.
  *
@@ -29,6 +29,7 @@ const {
 } = require('../notifications/notifications.constants');
 const { withTransaction } = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
+const { qrDataURLMatchesToken } = require('../../utils/Qrcode');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
 
@@ -119,6 +120,15 @@ const formatBranchOccupancy = (branch, activeCount = 0) => {
 };
 
 /**
+ * Read the QR data URL field accepted from multiple frontend payload names.
+ *
+ * @param {object} data
+ * @returns {string|null}
+ */
+const getQRCodeDataURL = (data = {}) =>
+  data.qr_code_data_url || data.qr_data_url || data.dataURL || null;
+
+/**
  * Calculate current and longest streaks from sorted unique check-in dates.
  *
  * @param {string[]} dates
@@ -159,14 +169,15 @@ const calculateStreakStats = (dates) => {
 /**
  * Resolve the member affected by a check-in/check-out action.
  *
- * If qr_code_token is present, the request targets the owner of that token.
- * Non-admin members may only use their own QR token.
+ * If qr_code_token or a QR data URL is present, the request targets the owner
+ * of that QR code. Non-admin members may only use their own QR code.
  *
  * @param {object} actor - req.user from auth middleware.
  * @param {string|undefined} qrCodeToken
+ * @param {string|undefined} qrCodeDataUrl
  * @returns {Promise<object>}
  */
-const resolveTargetUser = async (actor, qrCodeToken) => {
+const resolveTargetUser = async (actor, qrCodeToken, qrCodeDataUrl) => {
   if (qrCodeToken) {
     const user = await repo.findUserByQrToken(qrCodeToken);
     if (!user) throw ApiError.badRequest('Invalid QR code token');
@@ -178,8 +189,37 @@ const resolveTargetUser = async (actor, qrCodeToken) => {
     return user;
   }
 
+  if (qrCodeDataUrl) {
+    if (actor.role !== 'admin') {
+      const user = await repo.findUserById(actor.id);
+      if (!user) throw ApiError.notFound('User');
+
+      const matchesOwnQr = await qrDataURLMatchesToken(
+        user.qr_code_token,
+        qrCodeDataUrl
+      );
+
+      if (!matchesOwnQr) {
+        throw ApiError.forbidden('You can only use your own QR code');
+      }
+
+      return user;
+    }
+
+    const users = await repo.findUsersWithQrTokens();
+
+    for (const user of users) {
+      const matches = await qrDataURLMatchesToken(user.qr_code_token, qrCodeDataUrl);
+      if (matches) return user;
+    }
+
+    throw ApiError.badRequest('Invalid QR code data URL');
+  }
+
   if (actor.role === 'admin') {
-    throw ApiError.badRequest('qr_code_token is required for admin occupancy actions');
+    throw ApiError.badRequest(
+      'qr_code_token or QR code data URL is required for admin occupancy actions'
+    );
   }
 
   const user = await repo.findUserById(actor.id);
@@ -222,22 +262,20 @@ const requireBranch = async (branchId, client) => {
 };
 
 /**
- * Send a non-blocking crowded-branch notification.
+ * Broadcast a non-blocking crowded-branch notification to all members.
  *
  * Occupancy should still work if the notification subsystem is temporarily
  * unavailable, so this helper logs failures and returns null instead of
  * breaking check-in/check-out flows.
  *
- * @param {string} userId
  * @param {object} branch
  * @param {object} occupancy
  * @param {'crowded'|'full'} reason
  * @returns {Promise<object|null>}
  */
-const notifyBranchCrowding = async (userId, branch, occupancy, reason = 'crowded') => {
+const broadcastBranchCrowding = async (branch, occupancy, reason = 'crowded') => {
   try {
-    return await notificationsService.createFromTemplate(
-      userId,
+    return await notificationsService.broadcastFromTemplate(
       NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
       {
         branch_name: branch.name || branch.branch_name || occupancy.branch_name,
@@ -245,11 +283,13 @@ const notifyBranchCrowding = async (userId, branch, occupancy, reason = 'crowded
         current_occupancy: occupancy.current_occupancy,
         capacity: occupancy.capacity,
         reason,
+      },
+      {
+        role: 'member',
       }
     );
   } catch (err) {
-    logger.error('Failed to create occupancy alert notification', {
-      userId,
+    logger.error('Failed to broadcast occupancy alert notification', {
       branchId: branch.id || branch.branch_id,
       error: err.message,
     });
@@ -276,25 +316,13 @@ const syncWorkoutCheckinAndStreak = async (
 ) => {
   await repo.ensureWorkoutStreak(userId, client);
 
-  const existing = await repo.findWorkoutCheckinByUserAndDate(
+  const workoutCheckin = await repo.createWorkoutCheckin(
     userId,
+    branchId,
     checkinDate,
+    checkedInAt,
     client
   );
-
-  let workoutCheckin = existing;
-  let created = false;
-
-  if (!existing) {
-    workoutCheckin = await repo.createWorkoutCheckin(
-      userId,
-      branchId,
-      checkinDate,
-      checkedInAt,
-      client
-    );
-    created = true;
-  }
 
   const dates = await repo.findWorkoutCheckinDatesByUser(userId, client);
   const stats = calculateStreakStats(dates);
@@ -302,7 +330,7 @@ const syncWorkoutCheckinAndStreak = async (
 
   return {
     workout_checkin: workoutCheckin,
-    workout_checkin_created: created,
+    workout_checkin_created: true,
     streak,
   };
 };
@@ -368,12 +396,19 @@ const getCurrentOccupancy = async (query = {}) => {
  * Check a member into a specific gym branch.
  *
  * @param {object} actor - authenticated user.
- * @param {{ branch_id: string, qr_code_token?: string, source?: string, notes?: string }} data
+ * @param {{ branch_id: string, qr_code_token?: string, qr_code_data_url?: string, qr_data_url?: string, dataURL?: string, source?: string, notes?: string }} data
  * @returns {Promise<object>}
  */
 const checkIn = async (actor, data = {}) => {
-  const source = data.source || (data.qr_code_token ? CHECKIN_SOURCE.QR : CHECKIN_SOURCE.SELF);
-  const targetUser = await resolveTargetUser(actor, data.qr_code_token);
+  const qrCodeDataUrl = getQRCodeDataURL(data);
+  const source =
+    data.source ||
+    (data.qr_code_token || qrCodeDataUrl ? CHECKIN_SOURCE.QR : CHECKIN_SOURCE.SELF);
+  const targetUser = await resolveTargetUser(
+    actor,
+    data.qr_code_token,
+    qrCodeDataUrl
+  );
   const membership = await requireTargetActiveMembership(targetUser);
   const branch = await requireBranch(data.branch_id);
   const checkInAt = new Date();
@@ -381,69 +416,50 @@ const checkIn = async (actor, data = {}) => {
 
   let result;
 
-  try {
-    result = await withTransaction(async (client) => {
-      const branchInTx = await requireBranch(branch.id, client);
-      const existingOpenSession = await repo.findOpenSessionByUser(targetUser.id, client);
+  result = await withTransaction(async (client) => {
+    const branchInTx = await requireBranch(branch.id, client);
+    const existingOpenSession = await repo.findOpenSessionByUser(targetUser.id, client);
 
-      if (existingOpenSession) {
-        throw ApiError.conflict(
-          `This member is already checked in at ${existingOpenSession.branch_name || 'another branch'}`
-        );
-      }
-
-      const currentCount = await repo.countOpenSessions(branchInTx.id, client);
-      const currentOccupancy = formatBranchOccupancy(branchInTx, currentCount);
-
-      if (currentOccupancy.is_full) {
-        const error = ApiError.conflict(
-          `${branchInTx.name} is currently full. Please choose another branch or try again later.`
-        );
-        error.occupancy = currentOccupancy;
-        throw error;
-      }
-
-      const session = await repo.createSession(
-        targetUser.id,
-        branchInTx.id,
-        checkInAt,
-        client
+    if (existingOpenSession) {
+      throw ApiError.conflict(
+        `This member is already checked in at ${existingOpenSession.branch_name || 'another branch'}`
       );
-      const streakSync = await syncWorkoutCheckinAndStreak(
-        targetUser.id,
-        branchInTx.id,
-        checkinDate,
-        checkInAt,
-        client
-      );
-      const updatedCount = await repo.countOpenSessions(branchInTx.id, client);
-      const occupancy = formatBranchOccupancy(branchInTx, updatedCount);
-
-      return {
-        session,
-        member: {
-          id: targetUser.id,
-          full_name: targetUser.full_name,
-          email: targetUser.email,
-        },
-        membership,
-        branch: formatBranchMetadata(branchInTx),
-        source,
-        ...streakSync,
-        occupancy,
-        crowding_alert: null,
-      };
-    });
-  } catch (err) {
-    if (err.statusCode === 409 && err.occupancy && err.occupancy.is_full) {
-      await notifyBranchCrowding(targetUser.id, branch, err.occupancy, 'full');
     }
-    throw err;
-  }
+
+    const session = await repo.createSession(
+      targetUser.id,
+      branchInTx.id,
+      checkInAt,
+      client
+    );
+    const streakSync = await syncWorkoutCheckinAndStreak(
+      targetUser.id,
+      branchInTx.id,
+      checkinDate,
+      checkInAt,
+      client
+    );
+    const updatedCount = await repo.countOpenSessions(branchInTx.id, client);
+    const occupancy = formatBranchOccupancy(branchInTx, updatedCount);
+
+    return {
+      session,
+      member: {
+        id: targetUser.id,
+        full_name: targetUser.full_name,
+        email: targetUser.email,
+      },
+      membership,
+      branch: formatBranchMetadata(branchInTx),
+      source,
+      ...streakSync,
+      occupancy,
+      crowding_alert: null,
+    };
+  });
 
   if (result.occupancy.is_crowded) {
-    result.crowding_alert = await notifyBranchCrowding(
-      targetUser.id,
+    result.crowding_alert = await broadcastBranchCrowding(
       branch,
       result.occupancy,
       result.occupancy.is_full ? 'full' : 'crowded'
@@ -464,11 +480,15 @@ const checkIn = async (actor, data = {}) => {
  * Check a member out of the gym.
  *
  * @param {object} actor - authenticated user.
- * @param {{ qr_code_token?: string, notes?: string }} data
+ * @param {{ qr_code_token?: string, qr_code_data_url?: string, qr_data_url?: string, dataURL?: string, notes?: string }} data
  * @returns {Promise<object>}
  */
 const checkOut = async (actor, data = {}) => {
-  const targetUser = await resolveTargetUser(actor, data.qr_code_token);
+  const targetUser = await resolveTargetUser(
+    actor,
+    data.qr_code_token,
+    getQRCodeDataURL(data)
+  );
   const checkOutAt = new Date();
 
   const result = await withTransaction(async (client) => {
@@ -652,6 +672,7 @@ module.exports = {
   // Exported for focused unit tests without needing database access.
   calculateStreakStats,
   formatBranchOccupancy,
-  notifyBranchCrowding,
+  broadcastBranchCrowding,
+  getQRCodeDataURL,
   toDateOnlyString,
 };

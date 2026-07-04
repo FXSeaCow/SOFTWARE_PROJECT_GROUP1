@@ -50,6 +50,16 @@ const dateOnly = Joi.string()
     'date.format': 'Date must be a real calendar date',
   });
 
+const qrCodeDataUrl = Joi.string()
+  .trim()
+  .max(200000)
+  .pattern(/^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/)
+  .optional()
+  .messages({
+    'string.pattern.base': 'QR code data URL must be a PNG data:image/png;base64 value',
+    'string.max': 'QR code data URL is too large',
+  });
+
 /**
  * POST /api/occupancy/checkin
  * A member can check in without qr_code_token. Admin/staff can pass a QR token
@@ -63,9 +73,12 @@ const checkInSchema = Joi.object({
   qr_code_token: Joi.string().uuid().optional().messages({
     'string.uuid': 'qr_code_token must be a valid UUID',
   }),
+  qr_code_data_url: qrCodeDataUrl,
+  qr_data_url: qrCodeDataUrl,
+  dataURL: qrCodeDataUrl,
   source: Joi.string()
     .valid(...Object.values(CHECKIN_SOURCE))
-    .default(CHECKIN_SOURCE.SELF),
+    .optional(),
   notes: Joi.string().trim().max(250).allow('', null).optional(),
 });
 
@@ -77,6 +90,9 @@ const checkOutSchema = Joi.object({
   qr_code_token: Joi.string().uuid().optional().messages({
     'string.uuid': 'qr_code_token must be a valid UUID',
   }),
+  qr_code_data_url: qrCodeDataUrl,
+  qr_data_url: qrCodeDataUrl,
+  dataURL: qrCodeDataUrl,
   notes: Joi.string().trim().max(250).allow('', null).optional(),
 });
 

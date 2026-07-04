@@ -22,6 +22,7 @@ jest.mock('../notifications.repository', () => ({
   findRecentByType: jest.fn(),
   findMembershipsExpiringSoon: jest.fn(),
   findStreaksAtRisk: jest.fn(),
+  resetStreaksPastThreshold: jest.fn(),
   deleteOldReadNotifications: jest.fn(),
 }));
 
@@ -44,6 +45,7 @@ const {
   NOTIFICATION_TYPE,
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_SEVERITY,
+  NOTIFICATION_SCHEDULER,
 } = require('../notifications.constants');
 
 const user = {
@@ -317,6 +319,33 @@ describe('notifications module', () => {
     });
   });
 
+  it('broadcasts a notification from a template', async () => {
+    repo.findUsers.mockResolvedValue([{ id: 'user-1' }]);
+    repo.createBulkNotifications.mockResolvedValue([{ id: 'notification-1' }]);
+
+    const result = await service.broadcastFromTemplate(
+      NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT,
+      {
+        branch_name: 'Central Branch',
+        occupancy_rate: 100,
+        current_occupancy: 20,
+        capacity: 20,
+        reason: 'full',
+      },
+      { role: 'member' }
+    );
+
+    expect(repo.findUsers).toHaveBeenCalledWith({ role: 'member' });
+    expect(repo.createBulkNotifications).toHaveBeenCalledWith(
+      ['user-1'],
+      expect.objectContaining({
+        type: NOTIFICATION_TYPE.OCCUPANCY_ALERT,
+        title: 'Central Branch is crowded',
+      })
+    );
+    expect(result.created_count).toBe(1);
+  });
+
   it('sends membership expiry warnings while skipping recent duplicates', async () => {
     repo.findMembershipsExpiringSoon.mockResolvedValue([
       {
@@ -359,6 +388,7 @@ describe('notifications module', () => {
   });
 
   it('sends streak risk warnings', async () => {
+    repo.resetStreaksPastThreshold.mockResolvedValue([{ user_id: 'reset-1' }]);
     repo.findStreaksAtRisk.mockResolvedValue([
       {
         user_id: 'user-1',
@@ -376,12 +406,16 @@ describe('notifications module', () => {
 
     const result = await service.sendStreakRiskWarnings();
 
-    expect(repo.findStreaksAtRisk).toHaveBeenCalled();
+    expect(repo.resetStreaksPastThreshold).toHaveBeenCalledWith(
+      NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS
+    );
+    expect(repo.findStreaksAtRisk).toHaveBeenCalledWith(1);
     expect(repo.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         type: NOTIFICATION_TYPE.STREAK_WARNING,
       })
     );
+    expect(result.reset_count).toBe(1);
     expect(result.created_count).toBe(1);
   });
 

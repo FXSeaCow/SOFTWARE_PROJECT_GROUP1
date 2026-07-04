@@ -16,6 +16,7 @@
  */
 
 const QRCode = require('qrcode');
+const crypto = require('crypto');
 
 const QR_OPTIONS = {
   errorCorrectionLevel: 'H', // High — can recover from up to 30% damage
@@ -55,7 +56,43 @@ const generateQRBuffer = async (token) => {
   return QRCode.toBuffer(token, QR_OPTIONS);
 };
 
+/**
+ * Convert a PNG data URL sent by the frontend into a raw Buffer.
+ *
+ * @param {string} dataUrl - data:image/png;base64,... string
+ * @returns {Buffer|null}
+ */
+const bufferFromQRDataURL = (dataUrl) => {
+  if (typeof dataUrl !== 'string') return null;
+
+  const match = dataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return null;
+
+  return Buffer.from(match[1].replace(/\s/g, ''), 'base64');
+};
+
+/**
+ * Compare a frontend QR data URL with the QR image generated from a token.
+ *
+ * @param {string} token - user.qr_code_token (UUID)
+ * @param {string} dataUrl - data:image/png;base64,... string
+ * @returns {Promise<boolean>}
+ */
+const qrDataURLMatchesToken = async (token, dataUrl) => {
+  if (!token) return false;
+
+  const receivedBuffer = bufferFromQRDataURL(dataUrl);
+  if (!receivedBuffer) return false;
+
+  const expectedBuffer = await generateQRBuffer(token);
+  if (expectedBuffer.length !== receivedBuffer.length) return false;
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+};
+
 module.exports = {
   generateQRDataURL,
   generateQRBuffer,
+  bufferFromQRDataURL,
+  qrDataURLMatchesToken,
 };

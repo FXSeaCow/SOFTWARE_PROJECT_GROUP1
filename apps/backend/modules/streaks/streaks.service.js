@@ -3,7 +3,7 @@
  * Business logic for workout streaks.
  *
  * Responsibilities:
- *   - Record one workout check-in per member per calendar date.
+ *   - Record every workout check-in for a member.
  *   - Recalculate current and longest streaks from check-in history.
  *   - Return status metadata such as active, at_risk, and broken.
  *
@@ -223,6 +223,9 @@ const listMyCheckins = async (userId, query) => {
 /**
  * Record a workout check-in and update the user's streak atomically.
  *
+ * Multiple check-ins on the same date are stored as separate visits, while the
+ * streak counters are calculated from distinct calendar dates.
+ *
  * @param {string} userId
  * @param {{ branch_id: string, checkin_date?: string }} data
  * @returns {Promise<{ checkin: object, streak: object, already_checked_in: boolean }>}
@@ -235,29 +238,6 @@ const recordCheckin = async (userId, data = {}) => {
     await ensureStreakRecord(userId, client);
     const branch = await requireBranch(data.branch_id, client);
 
-    const existingCheckin = await repo.findCheckinByUserAndDate(
-      userId,
-      checkinDate,
-      client
-    );
-
-    if (existingCheckin) {
-      const streak = await repo.findStreakByUserId(userId, client);
-      const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
-
-      const existingBranch = {
-        id: existingCheckin.branch_id,
-        name: existingCheckin.branch_name,
-      };
-
-      return {
-        checkin: existingCheckin,
-        branch: existingBranch,
-        streak: decorateStreak(streak, totalCheckins),
-        already_checked_in: true,
-      };
-    }
-
     const checkin = await repo.createCheckin(
       userId,
       branch.id,
@@ -268,11 +248,12 @@ const recordCheckin = async (userId, data = {}) => {
     const dates = await repo.findCheckinDatesByUser(userId, client);
     const stats = calculateStreakStats(dates);
     const updatedStreak = await repo.updateStreak(userId, stats, client);
+    const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
 
     return {
       checkin,
       branch,
-      streak: decorateStreak(updatedStreak, dates.length),
+      streak: decorateStreak(updatedStreak, totalCheckins),
       already_checked_in: false,
     };
   });
@@ -341,10 +322,11 @@ const recalculateUserStreak = async (userId) => {
     const dates = await repo.findCheckinDatesByUser(userId, client);
     const stats = calculateStreakStats(dates);
     const updatedStreak = await repo.updateStreak(userId, stats, client);
+    const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
 
     return {
       user,
-      streak: decorateStreak(updatedStreak, dates.length),
+      streak: decorateStreak(updatedStreak, totalCheckins),
     };
   });
 

@@ -148,7 +148,6 @@ describe('streaks module', () => {
       last_active_date: null,
     });
     repo.findBranchById.mockResolvedValue(branch);
-    repo.findCheckinByUserAndDate.mockResolvedValue(null);
     repo.createCheckin.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
@@ -163,6 +162,7 @@ describe('streaks module', () => {
       longest_streak: 1,
       last_active_date: today,
     });
+    repo.countCheckinsByUser.mockResolvedValue(1);
 
     const result = await service.recordCheckin('user-1', {
       branch_id: branch.id,
@@ -187,7 +187,7 @@ describe('streaks module', () => {
     expect(result.streak.current_streak).toBe(1);
   });
 
-  it('returns the existing check-in instead of creating a duplicate', async () => {
+  it('records another same-day check-in without increasing the streak', async () => {
     const today = dateOnly(0);
 
     repo.findStreakByUserId.mockResolvedValue({
@@ -198,24 +198,42 @@ describe('streaks module', () => {
       last_active_date: today,
     });
     repo.findBranchById.mockResolvedValue(branch);
-    repo.findCheckinByUserAndDate.mockResolvedValue({
-      id: 'checkin-1',
+    repo.createCheckin.mockResolvedValue({
+      id: 'checkin-2',
       user_id: 'user-1',
       branch_id: branch.id,
-      branch_name: branch.name,
       checkin_date: today,
     });
-    repo.countCheckinsByUser.mockResolvedValue(4);
+    repo.findCheckinDatesByUser.mockResolvedValue([today]);
+    repo.updateStreak.mockResolvedValue({
+      id: 'streak-1',
+      user_id: 'user-1',
+      current_streak: 1,
+      longest_streak: 4,
+      last_active_date: today,
+    });
+    repo.countCheckinsByUser.mockResolvedValue(5);
 
     const result = await service.recordCheckin('user-1', {
       branch_id: branch.id,
       checkin_date: today,
     });
 
-    expect(repo.createCheckin).not.toHaveBeenCalled();
-    expect(repo.updateStreak).not.toHaveBeenCalled();
-    expect(result.already_checked_in).toBe(true);
-    expect(result.branch).toEqual({ id: branch.id, name: branch.name });
+    expect(repo.createCheckin).toHaveBeenCalledWith(
+      'user-1',
+      branch.id,
+      today,
+      expect.any(Date),
+      expect.any(Object)
+    );
+    expect(repo.updateStreak).toHaveBeenCalledWith(
+      'user-1',
+      { current_streak: 1, longest_streak: 1, last_active_date: today },
+      expect.any(Object)
+    );
+    expect(result.already_checked_in).toBe(false);
+    expect(result.streak.current_streak).toBe(1);
+    expect(result.streak.total_checkins).toBe(5);
   });
 
   it('rejects future check-in dates', async () => {

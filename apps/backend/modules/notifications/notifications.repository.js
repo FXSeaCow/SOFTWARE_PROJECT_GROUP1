@@ -354,7 +354,7 @@ const findMembershipsExpiringSoon = async (warningDays) => {
  *
  * @returns {Promise<object[]>}
  */
-const findStreaksAtRisk = async () => {
+const findStreaksAtRisk = async (warningAfterDays = 1) => {
   const { rows } = await db.query(
     `SELECT ws.user_id,
             ws.last_active_date::TEXT AS last_active_date,
@@ -363,7 +363,32 @@ const findStreaksAtRisk = async () => {
             u.email
      FROM workout_streaks ws
      JOIN users u ON u.id = ws.user_id
-     WHERE ws.last_active_date = (CURRENT_DATE - interval '1 day')::date`
+     WHERE ws.current_streak > 0
+       AND ws.last_active_date = (CURRENT_DATE - $1::INT)::date`,
+    [warningAfterDays]
+  );
+  return rows;
+};
+
+/**
+ * Reset streaks that have been inactive past the configured threshold.
+ *
+ * @param {number} thresholdDays
+ * @returns {Promise<object[]>}
+ */
+const resetStreaksPastThreshold = async (thresholdDays) => {
+  const { rows } = await db.query(
+    `UPDATE workout_streaks
+     SET current_streak = 0,
+         updated_at = now()
+     WHERE current_streak > 0
+       AND last_active_date IS NOT NULL
+       AND last_active_date <= (CURRENT_DATE - $1::INT)::date
+     RETURNING user_id,
+               current_streak::INT AS current_streak,
+               longest_streak::INT AS longest_streak,
+               last_active_date::TEXT AS last_active_date`,
+    [thresholdDays]
   );
   return rows;
 };
@@ -400,5 +425,6 @@ module.exports = {
   findRecentByType,
   findMembershipsExpiringSoon,
   findStreaksAtRisk,
+  resetStreaksPastThreshold,
   deleteOldReadNotifications,
 };
