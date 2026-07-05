@@ -11,7 +11,7 @@ const workoutsRoutes = require('./modules/workouts/workouts.routes');
 const paymentsRoutes = require('./modules/payments/payments.routes');
 const announcementsRoutes = require('./modules/announcements/announcements.routes');
 
-const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
+const { generalLimiter } = require('./middlewares/rateLimiter.middleware');
 
 const cors = require('cors');
 const app = express();

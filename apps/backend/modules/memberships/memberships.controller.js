@@ -55,7 +55,18 @@ const getMyMembershipHistory = asyncHandler(async (req, res) => {
 const renewMembership = asyncHandler(async (req, res) => {
   const membership = await service.renewMembership(req.user.id, req.body.plan_id);
   res.status(201).json(
-    ApiResponse.created(membership, 'Membership renewed successfully')
+    ApiResponse.created(membership, 'Membership created. Complete payment to receive your activation code.')
+  );
+});
+
+/**
+ * POST /api/memberships/activate
+ * Member activates a paid membership using the issued code.
+ */
+const activateMembershipByCode = asyncHandler(async (req, res) => {
+  const membership = await service.activateMembershipByCode(req.user.id, req.body.activation_code);
+  res.json(
+    ApiResponse.success(membership, 'Membership activated successfully')
   );
 });
 
@@ -140,6 +151,7 @@ module.exports = {
   getMyMembership,
   getMyMembershipHistory,
   renewMembership,
+  activateMembershipByCode,
   getAllPlans,
   createPlan,
   updatePlan,

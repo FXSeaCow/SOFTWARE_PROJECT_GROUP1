@@ -174,7 +174,7 @@ export function MainMenuPage() {
                     type="button"
                     onClick={() => {
                       setIsProfileMenuOpen(false);
-                      navigate("/admin/users");
+                      navigate("/admin");
                     }}
                     style={{
                       width: "100%",
@@ -235,7 +235,7 @@ export function MainMenuPage() {
         }}
         onAdminClick={() => {
           setIsProfileMenuOpen(false);
-          navigate("/admin/users");
+          navigate("/admin");
         }}
         showAdminEntry={isAdmin}
         onLogoutClick={() => {
@@ -266,7 +266,10 @@ export function MainMenuPage() {
         ))}
       </section>
 
-      <MainMenuHeroCard startHref={currentUser ? "/" : "/login"} />
+      <MainMenuHeroCard
+        startHref={currentUser ? "/" : "/login"}
+        membershipHref={currentUser ? "/membership" : "/login"}
+      />
 
       <MainMenuWeeklyGoal
         goalDays="5 / 6 days"

@@ -273,7 +273,7 @@ export function AccountPage() {
         }}
         onAdminClick={() => {
           setIsProfileMenuOpen(false);
-          navigate("/admin/users");
+          navigate("/admin");
         }}
         showAdminEntry={isAdmin}
         onLogoutClick={() => {
@@ -585,7 +585,7 @@ export function AccountPage() {
               {isAdmin ? (
                 <button
                   type="button"
-                  onClick={() => navigate("/admin/users")}
+                  onClick={() => navigate("/admin")}
                   style={{
                     padding: 16,
                     borderRadius: 16,

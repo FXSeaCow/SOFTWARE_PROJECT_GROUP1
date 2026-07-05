@@ -11,7 +11,7 @@ import {
   Trash2,
   Unlock,
   Users,
-} from "lucide-react";
+} from "lucide-react"; 
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
@@ -311,7 +311,7 @@ export function AdminUsersPage() {
         }}
         onAdminClick={() => {
           setIsProfileMenuOpen(false);
-          navigate("/admin/users");
+          navigate("/admin");
         }}
         showAdminEntry
         onLogoutClick={() => {

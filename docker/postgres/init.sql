@@ -49,7 +49,23 @@ CREATE TABLE IF NOT EXISTS memberships (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'suspended', 'cancelled')),
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
+  activation_code TEXT UNIQUE,
+  activation_code_issued_at TIMESTAMPTZ,
+  activated_at TIMESTAMPTZ,
   updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  membership_id UUID NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount NUMERIC(12, 2) NOT NULL,
+  provider TEXT NOT NULL CHECK (provider IN ('banking', 'cash')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+  provider_tx_id TEXT,
+  paid_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

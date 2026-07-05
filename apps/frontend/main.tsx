@@ -17,6 +17,8 @@ import { getCurrentUser } from "./src/services/authService";
 import { AdminUsersPage } from "./src/pages/AdminUsersPage";
 import { WorkoutPage } from "./src/pages/WorkoutPage";
 import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
+import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
+import { AdminConsolePage } from "./src/pages/AdminConsolePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -77,6 +79,14 @@ function AppRouter() {
           }
         />
         <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminConsolePage />
+            </AdminRoute>
+          }
+        />
+        <Route
           path="/admin/users"
           element={
             <AdminRoute>
@@ -89,6 +99,14 @@ function AppRouter() {
           element={
             <AdminRoute>
               <AdminAnnouncementsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/payments"
+          element={
+            <AdminRoute>
+              <AdminPaymentsPage />
             </AdminRoute>
           }
         />

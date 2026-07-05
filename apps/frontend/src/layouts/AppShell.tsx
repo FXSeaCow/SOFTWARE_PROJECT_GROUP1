@@ -39,6 +39,7 @@ export function AppShell({
             activeItem={
               activeItem === "home" ||
               activeItem === "train" ||
+              activeItem === "membership" ||
               activeItem === "progress" ||
               activeItem === "schedule"
                 ? activeItem
@@ -62,6 +63,7 @@ export function AppShell({
             rightSlot={topBarRightSlot}
             onHomeClick={() => navigate("/")}
             onTrainClick={() => navigate("/exercises")}
+            onMembershipClick={() => navigate("/membership")}
           />
         ) : null}
 

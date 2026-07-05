@@ -71,6 +71,12 @@ const renewSchema = Joi.object({
   }),
 });
 
+const activateMembershipSchema = Joi.object({
+  activation_code: Joi.string().trim().min(6).max(32).required().messages({
+    'any.required': 'activation_code is required',
+  }),
+});
+
 // ─── Admin Membership management schemas (FR-06) ──────────────────────────────
 
 /**
@@ -125,6 +131,7 @@ module.exports = {
   createPlanSchema,
   updatePlanSchema,
   renewSchema,
+  activateMembershipSchema,
   adminCreateMembershipSchema,
   updateStatusSchema,
   listMembershipsQuerySchema,

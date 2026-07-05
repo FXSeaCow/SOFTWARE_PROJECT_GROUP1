@@ -1,12 +1,13 @@
 import React from "react";
 import {
   CalendarDays,
+  CreditCard,
   Dumbbell,
   Home,
   LineChart,
 } from "lucide-react";
 
-export type SidebarItemId = "home" | "train" | "progress" | "schedule" | "none";
+export type SidebarItemId = "home" | "train" | "membership" | "progress" | "schedule" | "none";
 
 type SidebarNavItem = {
   id: SidebarItemId;
@@ -21,6 +22,7 @@ export function Sidebar({
   rightSlot,
   onHomeClick,
   onTrainClick,
+  onMembershipClick,
   onProgressClick,
   onScheduleClick,
 }: {
@@ -28,12 +30,14 @@ export function Sidebar({
   rightSlot?: React.ReactNode;
   onHomeClick: () => void;
   onTrainClick?: () => void;
+  onMembershipClick?: () => void;
   onProgressClick?: () => void;
   onScheduleClick?: () => void;
 }) {
   const navItems: SidebarNavItem[] = [
     { id: "home", label: "Home", icon: <Home size={18} />, onClick: onHomeClick },
     { id: "train", label: "Train", icon: <Dumbbell size={18} />, onClick: onTrainClick },
+    { id: "membership", label: "Membership", icon: <CreditCard size={18} />, onClick: onMembershipClick },
     { id: "progress", label: "Progress", icon: <LineChart size={18} />, onClick: onProgressClick },
     { id: "schedule", label: "Schedule", icon: <CalendarDays size={18} />, onClick: onScheduleClick },
   ];

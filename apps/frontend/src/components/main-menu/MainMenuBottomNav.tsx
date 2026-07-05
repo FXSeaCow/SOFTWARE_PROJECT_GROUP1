@@ -1,18 +1,20 @@
 import React from "react";
-import { CalendarDays, Dumbbell, Home, LineChart, User } from "lucide-react";
+import { CalendarDays, CreditCard, Dumbbell, Home, LineChart, User } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { bottomNavItemStyle } from "./styles";
 
-type NavItem = "home" | "train" | "progress" | "schedule" | "profile" | "none";
+type NavItem = "home" | "train" | "membership" | "schedule" | "profile" | "none";
 
 export function MainMenuBottomNav({
   profileHref,
   trainHref = "/exercises",
+  membershipHref = "/membership",
   activeItem = "home",
 }: {
   profileHref: string;
   trainHref?: string;
+  membershipHref?: string;
   activeItem?: NavItem;
 }) {
   return (
@@ -52,20 +54,21 @@ export function MainMenuBottomNav({
           active={activeItem === "train"}
         />
         <MainMenuBottomNavButton
-          label="Progress"
-          icon={<LineChart size={21} />}
-          active={activeItem === "progress"}
-        />
-        <MainMenuBottomNavButton
-          label="Schedule"
-          icon={<CalendarDays size={21} />}
-          active={activeItem === "schedule"}
+          label="Membership"
+          icon={<CreditCard size={21} />}
+          to={membershipHref}
+          active={activeItem === "membership"}
         />
         <MainMenuBottomNavLink
           label="Profile"
           icon={<User size={21} />}
           to={profileHref}
           active={activeItem === "profile"}
+        />
+        <MainMenuBottomNavButton
+          label="Schedule"
+          icon={<CalendarDays size={21} />}
+          active={activeItem === "schedule"}
         />
       </div>
     </nav>
@@ -102,14 +105,33 @@ function MainMenuBottomNavLink({
 export function MainMenuBottomNavButton({
   label,
   icon,
+  to,
   onClick,
   active = false,
 }: {
   label: string;
   icon: React.ReactNode;
+  to?: string;
   onClick?: () => void;
   active?: boolean;
 }) {
+  if (to) {
+    return (
+      <Link
+        to={to}
+        style={{
+          textDecoration: "none",
+          color: active ? "#ff7a1a" : "rgba(255,255,255,0.28)",
+        }}
+      >
+        <div style={bottomNavItemStyle(active)}>
+          {icon}
+          <span>{label}</span>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <button
       type="button"

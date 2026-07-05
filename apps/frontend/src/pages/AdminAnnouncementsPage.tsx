@@ -189,7 +189,7 @@ export function AdminAnnouncementsPage() {
         }}
         onAdminClick={() => {
           setIsProfileMenuOpen(false);
-          navigate("/admin/users");
+          navigate("/admin");
         }}
         showAdminEntry
         onLogoutClick={() => {
@@ -236,7 +236,7 @@ export function AdminAnnouncementsPage() {
 
         <Button
           type="button"
-          onClick={() => navigate("/admin/users")}
+          onClick={() => navigate("/admin")}
           style={{
             width: "auto",
             height: 46,

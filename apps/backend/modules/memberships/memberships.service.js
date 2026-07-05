@@ -10,12 +10,49 @@
 
 const repo                       = require('./memberships.repository');
 const { withTransaction }        = require('../../utils/Transaction');
+const { generateQRDataURL }      = require('../../utils/Qrcode');
 const { computeEndDate,
         daysUntilExpiry,
         isExpiringSoon }         = require('../../utils/Date');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError                   = require('../../utils/Apierror');
 const logger                     = require('../../utils/Logger');
+
+const ACTIVATION_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const generateActivationCode = () => {
+  let code = 'GYM-';
+
+  for (let index = 0; index < 8; index += 1) {
+    const randomIndex = Math.floor(Math.random() * ACTIVATION_CODE_ALPHABET.length);
+    code += ACTIVATION_CODE_ALPHABET[randomIndex];
+  }
+
+  return code;
+};
+
+const BANK_ACCOUNT_NAME = process.env.GYM_BANK_ACCOUNT_NAME || 'IRONCORE GYM';
+const BANK_ACCOUNT_NUMBER = process.env.GYM_BANK_ACCOUNT_NUMBER || '0901234567';
+const BANK_NAME = process.env.GYM_BANK_NAME || 'Vietcombank';
+
+const buildPaymentInstructions = async (membership, plan) => {
+  const transfer_note = `GYM-${membership.id.slice(0, 8).toUpperCase()}`;
+  const qrPayload = [
+    `BANK:${BANK_NAME}`,
+    `ACCOUNT_NAME:${BANK_ACCOUNT_NAME}`,
+    `ACCOUNT_NUMBER:${BANK_ACCOUNT_NUMBER}`,
+    `AMOUNT:${Number(plan.price)}`,
+    `CONTENT:${transfer_note}`,
+  ].join('|');
+
+  return {
+    transfer_note,
+    bank_name: BANK_NAME,
+    bank_account_name: BANK_ACCOUNT_NAME,
+    bank_account_number: BANK_ACCOUNT_NUMBER,
+    payment_qr_code: await generateQRDataURL(qrPayload),
+  };
+};
 
 /**
  * Format a Date or date-like value as YYYY-MM-DD using local calendar parts.
@@ -191,6 +228,7 @@ const renewMembership = async (userId, planId) => {
         plan_id:    planId,
         start_date: formatDateOnly(startDate),
         end_date:   formatDateOnly(endDate),
+        status:     'suspended',
       },
       client
     );
@@ -203,7 +241,59 @@ const renewMembership = async (userId, planId) => {
     endDate: membership.end_date,
   });
 
-  return { ...normalizeMembershipDates(membership), plan_name: plan.name, price: plan.price };
+  return {
+    ...normalizeMembershipDates(membership),
+    plan_name: plan.name,
+    price: plan.price,
+    ...(await buildPaymentInstructions(membership, plan)),
+  };
+};
+
+const issueMembershipActivationCode = async (membershipId, adminId, client) => {
+  const membership = await repo.findById(membershipId);
+  if (!membership) throw ApiError.notFound('Membership');
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const activationCode = generateActivationCode();
+
+    try {
+      const updated = await repo.issueActivationCode(membershipId, activationCode, adminId, client);
+      logger.info('Membership activation code issued', { membershipId, adminId });
+      return normalizeMembershipDates(updated);
+    } catch (error) {
+      if (error && error.code === '23505') {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw ApiError.internal('Unable to generate a unique activation code');
+};
+
+const activateMembershipByCode = async (userId, activationCode) => {
+  const membership = await repo.findByActivationCode(userId, activationCode);
+  if (!membership) {
+    throw ApiError.badRequest('Activation code is invalid or no longer available');
+  }
+
+  if (membership.status !== 'suspended') {
+    throw ApiError.badRequest('This membership is not waiting for activation');
+  }
+
+  const activated = await repo.activateByCode(membership.id, userId);
+
+  logger.info('Membership activated by code', {
+    membershipId: membership.id,
+    userId,
+  });
+
+  return {
+    ...normalizeMembershipDates(activated),
+    plan_name: membership.plan_name,
+    price: membership.price,
+    duration_days: membership.duration_days,
+  };
 };
 
 // ─── Admin: manage memberships (FR-06) ───────────────────────────────────────
@@ -312,6 +402,8 @@ module.exports = {
   getMyMembership,
   getMyMembershipHistory,
   renewMembership,
+  issueMembershipActivationCode,
+  activateMembershipByCode,
   adminCreateMembership,
   updateMembershipStatus,
   listAllMemberships,

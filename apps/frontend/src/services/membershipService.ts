@@ -39,6 +39,9 @@ export type MembershipRecord = {
   status: "active" | "expired" | "suspended" | "cancelled";
   start_date: string;
   end_date: string;
+  activation_code?: string | null;
+  activation_code_issued_at?: string | null;
+  activated_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -46,6 +49,14 @@ export type MembershipRecord = {
 export type CurrentMembership = MembershipRecord & {
   days_remaining: number;
   expiring_soon: boolean;
+};
+
+export type PendingMembershipCheckout = MembershipRecord & {
+  transfer_note: string;
+  bank_name: string;
+  bank_account_name: string;
+  bank_account_number: string;
+  payment_qr_code: string;
 };
 
 export type AdminMembershipRecord = MembershipRecord & {
@@ -68,11 +79,22 @@ export async function getMyMembershipHistory(): Promise<MembershipRecord[]> {
   return response.data;
 }
 
-export async function renewMembership(planId: string): Promise<MembershipRecord> {
-  const response = await apiClient<ApiResponse<MembershipRecord>>("/memberships/renew", {
+export async function renewMembership(planId: string): Promise<PendingMembershipCheckout> {
+  const response = await apiClient<ApiResponse<PendingMembershipCheckout>>("/memberships/renew", {
     method: "POST",
     body: {
       plan_id: planId,
+    },
+  });
+
+  return response.data;
+}
+
+export async function activateMembership(activationCode: string): Promise<MembershipRecord> {
+  const response = await apiClient<ApiResponse<MembershipRecord>>("/memberships/activate", {
+    method: "POST",
+    body: {
+      activation_code: activationCode,
     },
   });
 

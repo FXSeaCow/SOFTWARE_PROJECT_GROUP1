@@ -66,7 +66,7 @@ const getRevenueSummary = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/payments/admin/:paymentId/confirm  (FR-27)
- * Admin confirms a pending payment → 'completed' + activates membership.
+ * Admin confirms a pending payment → 'completed' + issues activation code.
  */
 const confirmPayment = asyncHandler(async (req, res) => {
   const payment = await service.confirmPayment(
@@ -74,7 +74,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
     req.user.id,
     req.body.note || null
   );
-  res.json(ApiResponse.success(payment, 'Payment confirmed. Membership activated.'));
+  res.json(ApiResponse.success(payment, 'Payment confirmed. Activation code issued.'));
 });
 
 /**

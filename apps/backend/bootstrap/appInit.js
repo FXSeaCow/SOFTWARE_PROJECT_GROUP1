@@ -90,8 +90,47 @@ async function ensureDevelopmentAdmin() {
   logger.info('Development admin account ensured', { email });
 }
 
+async function ensureMembershipsAndPaymentsSchema() {
+  await db.query(`
+    ALTER TABLE memberships
+    ADD COLUMN IF NOT EXISTS activation_code TEXT
+  `);
+
+  await db.query(`
+    ALTER TABLE memberships
+    ADD COLUMN IF NOT EXISTS activation_code_issued_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
+    ALTER TABLE memberships
+    ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_activation_code
+    ON memberships (activation_code)
+    WHERE activation_code IS NOT NULL
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      membership_id UUID NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount NUMERIC(12, 2) NOT NULL,
+      provider TEXT NOT NULL CHECK (provider IN ('banking', 'cash')),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+      provider_tx_id TEXT,
+      paid_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
 async function initializeApp() {
   await ensureUsersSchema();
+  await ensureMembershipsAndPaymentsSchema();
   await ensureDevelopmentAdmin();
 }
 

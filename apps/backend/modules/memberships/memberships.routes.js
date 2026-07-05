@@ -32,6 +32,7 @@ const {
   createPlanSchema,
   updatePlanSchema,
   renewSchema,
+  activateMembershipSchema,
   adminCreateMembershipSchema,
   updateStatusSchema,
   listMembershipsQuerySchema,
@@ -56,6 +57,12 @@ router.post(
   '/renew',
   validate(renewSchema),
   ctrl.renewMembership
+);
+
+router.post(
+  '/activate',
+  validate(activateMembershipSchema),
+  ctrl.activateMembershipByCode
 );
 
 // ── Admin: membership management ─────────────────────────────────────────────

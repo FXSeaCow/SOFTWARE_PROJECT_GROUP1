@@ -156,7 +156,7 @@ export function WorkoutPage() {
         }}
         onAdminClick={() => {
           setIsProfileMenuOpen(false);
-          navigate("/admin/users");
+          navigate("/admin");
         }}
         showAdminEntry={isAdmin}
         onLogoutClick={() => {

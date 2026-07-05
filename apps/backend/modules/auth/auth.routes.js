@@ -21,7 +21,7 @@ const ctrl    = require('./auth.controller');
 const { validate }            = require('../../middlewares/Validate.middleware');
 const { authenticate }        = require('../../middlewares/Auth.middleware');
 const { authLimiter,
-        passwordLimiter }     = require('../../middlewares/RateLimiter.middleware');
+        passwordLimiter }     = require('../../middlewares/rateLimiter.middleware');
 const {
   registerSchema,
   loginSchema,

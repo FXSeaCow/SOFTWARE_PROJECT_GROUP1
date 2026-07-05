@@ -109,7 +109,8 @@ const updatePlan = async (planId, fields) => {
 const findActiveMembership = async (userId) => {
   const { rows } = await db.query(
     `SELECT m.id, m.user_id, m.plan_id, m.status,
-            m.start_date, m.end_date, m.created_at, m.updated_at,
+            m.start_date, m.end_date, m.activation_code, m.activation_code_issued_at,
+            m.activated_at, m.created_at, m.updated_at,
             mp.name AS plan_name, mp.price, mp.duration_days
      FROM memberships m
      JOIN membership_plans mp ON mp.id = m.plan_id
@@ -130,7 +131,9 @@ const findActiveMembership = async (userId) => {
  */
 const findAllByUser = async (userId) => {
   const { rows } = await db.query(
-    `SELECT m.id, m.status, m.start_date, m.end_date, m.created_at,
+    `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
+            m.activation_code, m.activation_code_issued_at, m.activated_at,
+            m.created_at, m.updated_at,
             mp.name AS plan_name, mp.price, mp.duration_days
      FROM memberships m
      JOIN membership_plans mp ON mp.id = m.plan_id
@@ -166,17 +169,63 @@ const findById = async (membershipId) => {
  * @returns {Promise<object>}
  */
 const createMembership = async (
-  { user_id, plan_id, start_date, end_date, updated_by },
+  { user_id, plan_id, start_date, end_date, updated_by, status },
   client
 ) => {
   const runner = client || db;
   const { rows } = await runner.query(
-    `INSERT INTO memberships (user_id, plan_id, start_date, end_date, updated_by)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO memberships (user_id, plan_id, start_date, end_date, updated_by, status)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [user_id, plan_id, start_date, end_date, updated_by || null]
+    [user_id, plan_id, start_date, end_date, updated_by || null, status || 'active']
   );
   return rows[0];
+};
+
+const findByActivationCode = async (userId, activationCode) => {
+  const { rows } = await db.query(
+    `SELECT m.*, mp.name AS plan_name, mp.price, mp.duration_days
+     FROM memberships m
+     JOIN membership_plans mp ON mp.id = m.plan_id
+     WHERE m.user_id = $1
+       AND m.activation_code = $2
+     LIMIT 1`,
+    [userId, activationCode]
+  );
+  return rows[0] || null;
+};
+
+const issueActivationCode = async (membershipId, activationCode, adminId, client) => {
+  const runner = client || db;
+  const { rows } = await runner.query(
+    `UPDATE memberships
+     SET status = 'suspended',
+         activation_code = $1,
+         activation_code_issued_at = now(),
+         activated_at = NULL,
+         updated_by = $2,
+         updated_at = now()
+     WHERE id = $3
+     RETURNING *`,
+    [activationCode, adminId, membershipId]
+  );
+  return rows[0] || null;
+};
+
+const activateByCode = async (membershipId, userId, client) => {
+  const runner = client || db;
+  const { rows } = await runner.query(
+    `UPDATE memberships
+     SET status = 'active',
+         activated_at = now(),
+         activation_code = NULL,
+         updated_by = $1,
+         updated_at = now()
+     WHERE id = $2
+     RETURNING *`,
+    [userId, membershipId]
+  );
+  return rows[0] || null;
 };
 
 /**
@@ -281,6 +330,9 @@ module.exports = {
   findAllByUser,
   findById,
   createMembership,
+  findByActivationCode,
+  issueActivationCode,
+  activateByCode,
   updateStatus,
   findAll,
   expireOverdueMemberships,

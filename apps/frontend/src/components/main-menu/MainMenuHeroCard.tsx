@@ -4,7 +4,13 @@ import { Link } from "react-router-dom";
 
 import { heroMetaStyle, panelStyle, startButtonStyle } from "./styles";
 
-export function MainMenuHeroCard({ startHref }: { startHref: string }) {
+export function MainMenuHeroCard({
+  startHref,
+  membershipHref = "/membership",
+}: {
+  startHref: string;
+  membershipHref?: string;
+}) {
   return (
     <section
       style={{
@@ -111,15 +117,43 @@ export function MainMenuHeroCard({ startHref }: { startHref: string }) {
           </div>
         </div>
 
-        <Link
-          to={startHref}
-          style={{ textDecoration: "none", display: "inline-block", marginTop: 18 }}
-        >
-          <button type="button" style={{ ...startButtonStyle, minHeight: 46, padding: "0 24px" }}>
-            <Play size={18} fill="currentColor" />
-            <span>Start workout</span>
-          </button>
-        </Link>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 18 }}>
+          <Link
+            to={startHref}
+            style={{ textDecoration: "none", display: "inline-block" }}
+          >
+            <button type="button" style={{ ...startButtonStyle, minHeight: 46, padding: "0 24px" }}>
+              <Play size={18} fill="currentColor" />
+              <span>Start workout</span>
+            </button>
+          </Link>
+
+          <Link
+            to={membershipHref}
+            style={{ textDecoration: "none", display: "inline-block" }}
+          >
+            <button
+              type="button"
+              style={{
+                minHeight: 46,
+                padding: "0 24px",
+                borderRadius: 999,
+                border: "1px solid rgba(255,122,26,0.32)",
+                background: "rgba(255,255,255,0.04)",
+                color: "#f8fafc",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: 14,
+                fontWeight: 900,
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              <span>View membership plans</span>
+            </button>
+          </Link>
+        </div>
       </div>
     </section>
   );
