@@ -50,18 +50,35 @@ const dateOnly = Joi.string()
     'date.format': 'Date must be a real calendar date',
   });
 
+const qrCodeDataUrl = Joi.string()
+  .trim()
+  .max(200000)
+  .pattern(/^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/)
+  .optional()
+  .messages({
+    'string.pattern.base': 'QR code data URL must be a PNG data:image/png;base64 value',
+    'string.max': 'QR code data URL is too large',
+  });
+
 /**
  * POST /api/occupancy/checkin
  * A member can check in without qr_code_token. Admin/staff can pass a QR token
  * to check in the scanned member.
  */
 const checkInSchema = Joi.object({
+  branch_id: Joi.string().uuid().required().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+    'any.required': 'branch_id is required',
+  }),
   qr_code_token: Joi.string().uuid().optional().messages({
     'string.uuid': 'qr_code_token must be a valid UUID',
   }),
+  qr_code_data_url: qrCodeDataUrl,
+  qr_data_url: qrCodeDataUrl,
+  dataURL: qrCodeDataUrl,
   source: Joi.string()
     .valid(...Object.values(CHECKIN_SOURCE))
-    .default(CHECKIN_SOURCE.SELF),
+    .optional(),
   notes: Joi.string().trim().max(250).allow('', null).optional(),
 });
 
@@ -73,6 +90,9 @@ const checkOutSchema = Joi.object({
   qr_code_token: Joi.string().uuid().optional().messages({
     'string.uuid': 'qr_code_token must be a valid UUID',
   }),
+  qr_code_data_url: qrCodeDataUrl,
+  qr_data_url: qrCodeDataUrl,
+  dataURL: qrCodeDataUrl,
   notes: Joi.string().trim().max(250).allow('', null).optional(),
 });
 
@@ -89,6 +109,9 @@ const sessionsQuerySchema = Joi.object({
   status: Joi.string()
     .valid(SESSION_STATUS.OPEN, SESSION_STATUS.CLOSED, SESSION_STATUS.ALL)
     .default(SESSION_STATUS.ALL),
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   from_date: dateOnly.optional(),
   to_date: dateOnly.optional(),
 }).custom((value, helpers) => {
@@ -114,7 +137,20 @@ const adminSessionsQuerySchema = sessionsQuerySchema.keys({
  * GET /api/occupancy/daily-report
  */
 const dailyReportQuerySchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   date: dateOnly.optional(),
+});
+
+/**
+ * GET /api/occupancy/current
+ * Optional branch filter. Without branch_id, the endpoint returns all branches.
+ */
+const currentOccupancyQuerySchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
 });
 
 /**
@@ -122,6 +158,9 @@ const dailyReportQuerySchema = Joi.object({
  * Allows admin/scheduler to close stale open sessions at a specific time.
  */
 const resetOpenSessionsSchema = Joi.object({
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   checkout_at: Joi.date().iso().optional().messages({
     'date.format': 'checkout_at must be a valid ISO datetime',
   }),
@@ -134,5 +173,6 @@ module.exports = {
   sessionsQuerySchema,
   adminSessionsQuerySchema,
   dailyReportQuerySchema,
+  currentOccupancyQuerySchema,
   resetOpenSessionsSchema,
 };

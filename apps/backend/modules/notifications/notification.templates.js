@@ -9,7 +9,7 @@
 const {
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_TYPE,
-  NOTIFICATION_PRIORITY,
+  NOTIFICATION_SEVERITY,
 } = require('./notifications.constants');
 
 /**
@@ -26,65 +26,55 @@ const value = (context, key, fallback = '') =>
     : fallback;
 
 /**
+ * Build user-facing guidance for an occupancy alert.
+ *
+ * @param {object} context
+ * @returns {string}
+ */
+const occupancyAdvice = (context = {}) =>
+  value(context, 'reason', 'crowded') === 'full'
+    ? 'It has reached full capacity. Please choose another branch or visit later.'
+    : 'It is above the crowding threshold. You may want to choose another branch or visit later.';
+
+/**
  * Template definitions.
  *
  * Each template returns a normalized notification payload.
  */
 const TEMPLATES = {
-  [NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRING]: (context = {}) => ({
-    type: NOTIFICATION_TYPE.MEMBERSHIP_EXPIRING,
-    priority: NOTIFICATION_PRIORITY.HIGH,
+  [NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRY]: (context = {}) => ({
+    type: NOTIFICATION_TYPE.MEMBERSHIP_EXPIRY,
+    severity: NOTIFICATION_SEVERITY.WARNING,
     title: 'Membership expiring soon',
-    message: `Your membership expires in ${value(context, 'days_remaining', '?')} day(s). Please renew to keep training without interruption.`,
+    body: `Your membership expires in ${value(context, 'days_remaining', '?')} day(s). Please renew to keep training without interruption.`,
   }),
 
-  [NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRED]: () => ({
-    type: NOTIFICATION_TYPE.MEMBERSHIP_EXPIRED,
-    priority: NOTIFICATION_PRIORITY.HIGH,
-    title: 'Membership expired',
-    message: 'Your membership has expired. Renew your plan to continue using member features.',
-  }),
-
-  [NOTIFICATION_TEMPLATE.STREAK_AT_RISK]: (context = {}) => ({
-    type: NOTIFICATION_TYPE.STREAK_AT_RISK,
-    priority: NOTIFICATION_PRIORITY.NORMAL,
+  [NOTIFICATION_TEMPLATE.STREAK_WARNING]: (context = {}) => ({
+    type: NOTIFICATION_TYPE.STREAK_WARNING,
+    severity: NOTIFICATION_SEVERITY.WARNING,
     title: 'Your workout streak needs attention',
-    message: `Your last workout check-in was on ${value(context, 'last_active_date', 'yesterday')}. Check in today to keep the streak alive.`,
+    body: `Your last workout check-in was on ${value(context, 'last_active_date', 'yesterday')}. Check in today to keep the streak alive.`,
   }),
 
-  [NOTIFICATION_TEMPLATE.GYM_CAPACITY_ALERT]: (context = {}) => ({
-    type: NOTIFICATION_TYPE.GYM_CAPACITY_ALERT,
-    priority: NOTIFICATION_PRIORITY.URGENT,
-    title: 'Gym capacity alert',
-    message: `Gym occupancy is currently ${value(context, 'occupancy_rate', '?')}%. Capacity is getting tight.`,
-  }),
-
-  [NOTIFICATION_TEMPLATE.PAYMENT_CONFIRMED]: (context = {}) => ({
-    type: NOTIFICATION_TYPE.PAYMENT_CONFIRMED,
-    priority: NOTIFICATION_PRIORITY.NORMAL,
-    title: 'Payment confirmed',
-    message: `Your payment for ${value(context, 'plan_name', 'your membership')} has been confirmed.`,
-  }),
-
-  [NOTIFICATION_TEMPLATE.PAYMENT_REJECTED]: (context = {}) => ({
-    type: NOTIFICATION_TYPE.PAYMENT_REJECTED,
-    priority: NOTIFICATION_PRIORITY.HIGH,
-    title: 'Payment rejected',
-    message: `Your payment could not be confirmed. Reason: ${value(context, 'reason', 'not provided')}.`,
+  [NOTIFICATION_TEMPLATE.OCCUPANCY_ALERT]: (context = {}) => ({
+    type: NOTIFICATION_TYPE.OCCUPANCY_ALERT,
+    severity: NOTIFICATION_SEVERITY.DANGER,
+    title: `${value(context, 'branch_name', 'This branch')} is crowded`,
+    body: `${value(context, 'branch_name', 'This branch')} is currently at ${value(context, 'occupancy_rate', '?')}% capacity (${value(context, 'current_occupancy', '?')}/${value(context, 'capacity', '?')}). ${occupancyAdvice(context)}`,
   }),
 
   [NOTIFICATION_TEMPLATE.WORKOUT_REMINDER]: (context = {}) => ({
     type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
-    priority: NOTIFICATION_PRIORITY.LOW,
+    severity: NOTIFICATION_SEVERITY.INFO,
     title: 'Workout reminder',
-    message: value(context, 'message', 'Remember to complete your workout today.'),
+    body: value(context, 'body', 'Remember to complete your workout today.'),
   }),
 
   [NOTIFICATION_TEMPLATE.ANNOUNCEMENT]: (context = {}) => ({
     type: NOTIFICATION_TYPE.ANNOUNCEMENT,
-    priority: value(context, 'priority', NOTIFICATION_PRIORITY.NORMAL),
+    severity: value(context, 'severity', NOTIFICATION_SEVERITY.INFO),
     title: value(context, 'title', 'Announcement'),
-    message: value(context, 'message', 'Please check the latest gym announcement.'),
+    body: value(context, 'body', 'Please check the latest gym announcement.'),
   }),
 };
 
@@ -93,17 +83,17 @@ const TEMPLATES = {
  *
  * @param {string} templateKey
  * @param {object} context
- * @returns {{ type: string, priority: string, title: string, message: string }}
+ * @returns {{ type: string, severity: string, title: string, body: string }}
  */
 const renderTemplate = (templateKey, context = {}) => {
   const renderer = TEMPLATES[templateKey];
 
   if (!renderer) {
     return {
-      type: NOTIFICATION_TYPE.SYSTEM,
-      priority: NOTIFICATION_PRIORITY.NORMAL,
+      type: NOTIFICATION_TYPE.ANNOUNCEMENT,
+      severity: NOTIFICATION_SEVERITY.INFO,
       title: value(context, 'title', 'Notification'),
-      message: value(context, 'message', 'You have a new notification.'),
+      body: value(context, 'body', 'You have a new notification.'),
     };
   }
 

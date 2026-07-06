@@ -80,6 +80,7 @@ const OCCUPANCY_SCHEDULER = {
  * Response messages used by controllers.
  */
 const OCCUPANCY_MESSAGES = {
+  BRANCHES_FETCHED: 'Gym branches fetched successfully',
   CURRENT_FETCHED: 'Current occupancy fetched successfully',
   CHECKED_IN: 'Check-in completed successfully',
   CHECKED_OUT: 'Check-out completed successfully',

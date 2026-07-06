@@ -59,6 +59,10 @@ const dateOnly = Joi.string()
  * record today, while tests or admin tools can pass a specific date.
  */
 const recordCheckinSchema = Joi.object({
+  branch_id: Joi.string().uuid().required().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+    'any.required': 'branch_id is required',
+  }),
   checkin_date: dateOnly.optional(),
 });
 
@@ -73,6 +77,9 @@ const checkinsQuerySchema = Joi.object({
     .min(1)
     .max(STREAK_LIMITS.MAX_LIMIT)
     .default(STREAK_LIMITS.DEFAULT_LIMIT),
+  branch_id: Joi.string().uuid().optional().messages({
+    'string.uuid': 'branch_id must be a valid UUID',
+  }),
   from_date: dateOnly.optional(),
   to_date: dateOnly.optional(),
 }).custom((value, helpers) => {

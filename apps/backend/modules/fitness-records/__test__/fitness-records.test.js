@@ -29,6 +29,8 @@ const bodyFatCalculator = require('../bodyFatCalculator');
 const progressAnalyzer = require('../progressAnalyzer');
 const service = require('../fitness-records.service');
 const routes = require('../fitness-records.routes');
+const request = require('supertest');
+const app = require('../../../app');
 const {
   createRecordSchema,
   updateRecordSchema,
@@ -37,21 +39,15 @@ const {
 const baseRecord = {
   id: 'record-1',
   user_id: 'user-1',
-  recorded_at: '2026-07-01T00:00:00.000Z',
+  recorded_date: '2026-07-01',
+  recorded_at: '2026-07-01',
   weight_kg: 70,
   height_cm: 175,
   bmi: 22.86,
+  body_fat_pct: 18,
   body_fat_percent: 18,
-  muscle_mass_kg: 35,
-  waist_cm: 82,
-  chest_cm: null,
-  hip_cm: 95,
-  neck_cm: 38,
-  arm_cm: null,
-  thigh_cm: null,
   notes: null,
   created_at: '2026-07-01T00:00:00.000Z',
-  updated_at: null,
 };
 
 describe('fitness-records module', () => {
@@ -61,6 +57,13 @@ describe('fitness-records module', () => {
 
   it('loads the Express router', () => {
     expect(routes).toBeDefined();
+  });
+
+  it('mounts fitness-record routes in the app', async () => {
+    const res = await request(app).get('/api/fitness-records/me');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/access token missing/i);
   });
 
   it('calculates BMI, BMI category, and healthy weight range', () => {
@@ -104,21 +107,17 @@ describe('fitness-records module', () => {
     const records = [
       {
         id: 'record-1',
-        recorded_at: '2026-07-01',
+        recorded_date: '2026-07-01',
         weight_kg: 70,
         bmi: 22.86,
-        body_fat_percent: 18,
-        muscle_mass_kg: 35,
-        waist_cm: 82,
+        body_fat_pct: 18,
       },
       {
         id: 'record-2',
-        recorded_at: '2026-07-08',
+        recorded_date: '2026-07-08',
         weight_kg: 68.5,
         bmi: 22.37,
-        body_fat_percent: 17,
-        muscle_mass_kg: 35.2,
-        waist_cm: 80,
+        body_fat_pct: 17,
       },
     ];
 
@@ -132,13 +131,14 @@ describe('fitness-records module', () => {
     });
     expect(analysis.record_count).toBe(2);
     expect(analysis.latest_change.weight.change).toBe(-1.5);
+    expect(analysis.latest_change.body_fat.change).toBe(-1);
     expect(analysis.trend).toHaveLength(2);
     expect(analysis.message).toBe('Weight is trending down');
   });
 
   it('validates required create fields and allows partial update fields', () => {
     const invalidCreate = createRecordSchema.validate({ weight_kg: 70 });
-    const validUpdate = updateRecordSchema.validate({ waist_cm: 80 });
+    const validUpdate = updateRecordSchema.validate({ body_fat_pct: 19 });
 
     expect(invalidCreate.error).toBeDefined();
     expect(
@@ -149,30 +149,33 @@ describe('fitness-records module', () => {
     expect(validUpdate.error).toBeUndefined();
   });
 
-  it('builds derived fields before creating a record', async () => {
+  it('builds DB-safe fields before creating a record', async () => {
     repo.createRecord.mockImplementation(async (payload) => ({
       ...baseRecord,
       ...payload,
       id: 'record-created',
+      bmi: 22.86,
     }));
 
     const result = await service.createRecord('user-1', {
+      recorded_date: '2026-07-01',
       weight_kg: 70,
       height_cm: 175,
       sex: 'male',
       waist_cm: 82,
       neck_cm: 38,
-      muscle_mass_kg: 35,
     });
 
     expect(repo.createRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: 'user-1',
+        recorded_date: '2026-07-01',
         weight_kg: 70,
         height_cm: 175,
-        bmi: 22.86,
+        body_fat_pct: expect.any(Number),
       })
     );
+    expect(repo.createRecord.mock.calls[0][0]).not.toHaveProperty('bmi');
     expect(result).toMatchObject({
       id: 'record-created',
       bmi: 22.86,
@@ -199,7 +202,11 @@ describe('fitness-records module', () => {
       offset: 5,
     });
     expect(result).toMatchObject({ total: 1, page: 2, limit: 5 });
-    expect(result.records[0].bmi_category).toBe('normal');
+    expect(result.records[0]).toMatchObject({
+      bmi_category: 'normal',
+      body_fat_pct: 18,
+      body_fat_percent: 18,
+    });
   });
 
   it('gets latest, owned, and admin records by ID', async () => {
@@ -218,12 +225,13 @@ describe('fitness-records module', () => {
     });
   });
 
-  it('recalculates BMI when updating a record', async () => {
+  it('updates DB columns without trying to write generated BMI', async () => {
     repo.findByIdAndUser.mockResolvedValue(baseRecord);
     repo.updateRecord.mockImplementation(async (_recordId, userId, fields) => ({
       ...baseRecord,
       ...fields,
       user_id: userId,
+      bmi: 23.51,
     }));
 
     const result = await service.updateRecord('record-1', 'user-1', {
@@ -235,9 +243,9 @@ describe('fitness-records module', () => {
       'user-1',
       expect.objectContaining({
         weight_kg: 72,
-        bmi: 23.51,
       })
     );
+    expect(repo.updateRecord.mock.calls[0][2]).not.toHaveProperty('bmi');
     expect(result.bmi).toBe(23.51);
   });
 
@@ -260,9 +268,11 @@ describe('fitness-records module', () => {
       {
         ...baseRecord,
         id: 'record-2',
-        recorded_at: '2026-07-08T00:00:00.000Z',
+        recorded_date: '2026-07-08',
+        recorded_at: '2026-07-08',
         weight_kg: 72,
         bmi: 23.51,
+        body_fat_pct: 17.5,
         body_fat_percent: 17.5,
       },
     ]);
@@ -281,5 +291,9 @@ describe('fitness-records module', () => {
     expect(result.record_count).toBe(2);
     expect(result.overall_change.weight.change).toBe(2);
     expect(result.trend).toHaveLength(2);
+    expect(result.trend[1]).toMatchObject({
+      recorded_date: '2026-07-08',
+      body_fat_pct: 17.5,
+    });
   });
 });

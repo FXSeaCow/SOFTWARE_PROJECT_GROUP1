@@ -2,8 +2,11 @@
  * fitness-records.repository.js
  * Raw PostgreSQL queries for fitness_records.
  *
- * This file contains data access only. BMI, body fat, and progress rules live
- * in calculators and services.
+ * This file mirrors gym.sql:
+ *   fitness_records(
+ *     id, user_id, weight_kg, height_cm, body_fat_pct,
+ *     bmi GENERATED, notes, recorded_date, created_at
+ *   )
  */
 
 const db = require('../../config/db');
@@ -11,27 +14,24 @@ const db = require('../../config/db');
 /**
  * Return a common SELECT projection for fitness records.
  *
+ * The API keeps body_fat_percent and recorded_at aliases for older callers,
+ * but all storage uses the gym.sql column names.
+ *
  * @param {string} alias
  * @returns {string}
  */
 const recordSelect = (alias = 'fr') => `
   ${alias}.id,
   ${alias}.user_id,
-  ${alias}.recorded_at,
+  ${alias}.recorded_date::TEXT AS recorded_date,
+  ${alias}.recorded_date::TEXT AS recorded_at,
   ${alias}.weight_kg,
   ${alias}.height_cm,
   ${alias}.bmi,
-  ${alias}.body_fat_percent,
-  ${alias}.muscle_mass_kg,
-  ${alias}.waist_cm,
-  ${alias}.chest_cm,
-  ${alias}.hip_cm,
-  ${alias}.neck_cm,
-  ${alias}.arm_cm,
-  ${alias}.thigh_cm,
+  ${alias}.body_fat_pct,
+  ${alias}.body_fat_pct AS body_fat_percent,
   ${alias}.notes,
-  ${alias}.created_at,
-  ${alias}.updated_at
+  ${alias}.created_at
 `;
 
 /**
@@ -51,12 +51,12 @@ const buildRecordFilters = (filters = {}) => {
   }
 
   if (filters.from_date) {
-    conditions.push(`fr.recorded_at >= $${idx++}`);
+    conditions.push(`fr.recorded_date >= $${idx++}::date`);
     values.push(filters.from_date);
   }
 
   if (filters.to_date) {
-    conditions.push(`fr.recorded_at <= $${idx++}`);
+    conditions.push(`fr.recorded_date <= $${idx++}::date`);
     values.push(filters.to_date);
   }
 
@@ -77,39 +77,20 @@ const createRecord = async (data) => {
   const { rows } = await db.query(
     `INSERT INTO fitness_records (
        user_id,
-       recorded_at,
+       recorded_date,
        weight_kg,
        height_cm,
-       bmi,
-       body_fat_percent,
-       muscle_mass_kg,
-       waist_cm,
-       chest_cm,
-       hip_cm,
-       neck_cm,
-       arm_cm,
-       thigh_cm,
+       body_fat_pct,
        notes
      )
-     VALUES (
-       $1, COALESCE($2, now()), $3, $4, $5, $6, $7,
-       $8, $9, $10, $11, $12, $13, $14
-     )
+     VALUES ($1, COALESCE($2::date, CURRENT_DATE), $3, $4, $5, $6)
      RETURNING ${recordSelect('fitness_records')}`,
     [
       data.user_id,
-      data.recorded_at || null,
-      data.weight_kg,
-      data.height_cm,
-      data.bmi,
-      data.body_fat_percent,
-      data.muscle_mass_kg || null,
-      data.waist_cm || null,
-      data.chest_cm || null,
-      data.hip_cm || null,
-      data.neck_cm || null,
-      data.arm_cm || null,
-      data.thigh_cm || null,
+      data.recorded_date || null,
+      data.weight_kg ?? null,
+      data.height_cm ?? null,
+      data.body_fat_pct ?? null,
       data.notes || null,
     ]
   );
@@ -164,7 +145,7 @@ const findLatestByUser = async (userId) => {
     `SELECT ${recordSelect('fr')}
      FROM fitness_records fr
      WHERE fr.user_id = $1
-     ORDER BY fr.recorded_at DESC, fr.created_at DESC
+     ORDER BY fr.recorded_date DESC, fr.created_at DESC
      LIMIT 1`,
     [userId]
   );
@@ -194,7 +175,7 @@ const findAll = async (opts) => {
      FROM fitness_records fr
      JOIN users u ON u.id = fr.user_id
      ${where}
-     ORDER BY fr.recorded_at DESC, fr.created_at DESC
+     ORDER BY fr.recorded_date DESC, fr.created_at DESC
      LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
     [...values, opts.limit, opts.offset]
   );
@@ -220,10 +201,10 @@ const findForProgress = async (opts) => {
        SELECT ${recordSelect('fr')}
        FROM fitness_records fr
        ${where}
-       ORDER BY fr.recorded_at DESC, fr.created_at DESC
+       ORDER BY fr.recorded_date DESC, fr.created_at DESC
        LIMIT $${nextIndex}
      ) latest_records
-     ORDER BY latest_records.recorded_at ASC, latest_records.created_at ASC`,
+     ORDER BY latest_records.recorded_date ASC, latest_records.created_at ASC`,
     [...values, opts.limit]
   );
 
@@ -240,18 +221,10 @@ const findForProgress = async (opts) => {
  */
 const updateRecord = async (recordId, userId, fields) => {
   const allowed = [
-    'recorded_at',
+    'recorded_date',
     'weight_kg',
     'height_cm',
-    'bmi',
-    'body_fat_percent',
-    'muscle_mass_kg',
-    'waist_cm',
-    'chest_cm',
-    'hip_cm',
-    'neck_cm',
-    'arm_cm',
-    'thigh_cm',
+    'body_fat_pct',
     'notes',
   ];
 
@@ -268,7 +241,6 @@ const updateRecord = async (recordId, userId, fields) => {
 
   if (setClauses.length === 0) return findByIdAndUser(recordId, userId);
 
-  setClauses.push('updated_at = now()');
   values.push(recordId, userId);
 
   const { rows } = await db.query(

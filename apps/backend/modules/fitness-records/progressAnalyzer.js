@@ -2,7 +2,7 @@
  * progressAnalyzer.js
  * Helper functions for comparing fitness records over time.
  *
- * The analyzer expects records ordered by recorded_at ascending. It returns
+ * The analyzer expects records ordered by recorded_date ascending. It returns
  * human-friendly deltas and chart-ready trend arrays for the frontend.
  */
 
@@ -62,6 +62,10 @@ const compareMetric = (current, previous) => {
   };
 };
 
+const getRecordDate = (record) => record.recorded_date ?? record.recorded_at;
+const getBodyFat = (record) =>
+  record.body_fat_pct ?? record.body_fat_percent ?? null;
+
 /**
  * Compare two fitness records.
  *
@@ -72,19 +76,11 @@ const compareMetric = (current, previous) => {
 const compareRecords = (currentRecord, previousRecord) => ({
   from_record_id: previousRecord.id,
   to_record_id: currentRecord.id,
-  from_date: previousRecord.recorded_at,
-  to_date: currentRecord.recorded_at,
+  from_date: getRecordDate(previousRecord),
+  to_date: getRecordDate(currentRecord),
   weight: compareMetric(currentRecord.weight_kg, previousRecord.weight_kg),
   bmi: compareMetric(currentRecord.bmi, previousRecord.bmi),
-  body_fat: compareMetric(
-    currentRecord.body_fat_percent,
-    previousRecord.body_fat_percent
-  ),
-  muscle_mass: compareMetric(
-    currentRecord.muscle_mass_kg,
-    previousRecord.muscle_mass_kg
-  ),
-  waist: compareMetric(currentRecord.waist_cm, previousRecord.waist_cm),
+  body_fat: compareMetric(getBodyFat(currentRecord), getBodyFat(previousRecord)),
 });
 
 /**
@@ -94,15 +90,20 @@ const compareRecords = (currentRecord, previousRecord) => ({
  * @returns {object[]}
  */
 const buildTrendSeries = (records = []) =>
-  records.map((record) => ({
-    record_id: record.id,
-    recorded_at: record.recorded_at,
-    weight_kg: record.weight_kg ?? null,
-    bmi: record.bmi ?? null,
-    body_fat_percent: record.body_fat_percent ?? null,
-    muscle_mass_kg: record.muscle_mass_kg ?? null,
-    waist_cm: record.waist_cm ?? null,
-  }));
+  records.map((record) => {
+    const recordedDate = getRecordDate(record);
+    const bodyFat = getBodyFat(record);
+
+    return {
+      record_id: record.id,
+      recorded_date: recordedDate,
+      recorded_at: recordedDate,
+      weight_kg: record.weight_kg ?? null,
+      bmi: record.bmi ?? null,
+      body_fat_pct: bodyFat,
+      body_fat_percent: bodyFat,
+    };
+  });
 
 /**
  * Build a simple goal-aware interpretation for the latest progress.
@@ -118,7 +119,6 @@ const buildProgressMessage = (comparison, goal = FITNESS_GOAL.GENERAL_FITNESS) =
 
   const weightChange = comparison.weight.change;
   const bodyFatChange = comparison.body_fat.change;
-  const muscleChange = comparison.muscle_mass.change;
 
   if (goal === FITNESS_GOAL.WEIGHT_LOSS) {
     if (weightChange < 0) return 'Weight is trending down';
@@ -127,7 +127,6 @@ const buildProgressMessage = (comparison, goal = FITNESS_GOAL.GENERAL_FITNESS) =
   }
 
   if (goal === FITNESS_GOAL.MUSCLE_GAIN) {
-    if (muscleChange !== null && muscleChange > 0) return 'Muscle mass is trending up';
     if (weightChange > 0) return 'Body weight is trending up';
     return 'Muscle gain progress is stable';
   }
@@ -142,7 +141,7 @@ const buildProgressMessage = (comparison, goal = FITNESS_GOAL.GENERAL_FITNESS) =
 /**
  * Analyze a list of records and return summary plus trends.
  *
- * @param {object[]} records - Ordered by recorded_at ascending.
+ * @param {object[]} records - Ordered by recorded_date ascending.
  * @param {{ goal?: string }} options
  * @returns {object}
  */

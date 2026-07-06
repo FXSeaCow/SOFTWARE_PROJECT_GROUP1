@@ -7,7 +7,7 @@
  *
  * Supported jobs:
  *   - Refresh an in-process occupancy cache.
- *   - Warn logs when the gym is near/full capacity.
+ *   - Warn logs when any branch is near/full capacity.
  *   - Run daily maintenance: close stale open sessions and build a report.
  */
 
@@ -58,29 +58,35 @@ const refreshCacheJob = async () => {
   logger.info('Occupancy cache refreshed', {
     occupancyRate: cache.data.occupancy_rate,
     currentOccupancy: cache.data.current_occupancy,
+    totalBranches: cache.data.total_branches,
   });
   return cache;
 };
 
 /**
- * Check whether occupancy is above the alert threshold.
+ * Check whether any branch occupancy is above the alert threshold.
  *
- * This job currently logs a warning. A notifications module can call this same
- * result later to push admin alerts, emails, or websocket messages.
+ * Member-facing alerts are created during check-in attempts. This scheduler is
+ * intentionally focused on operational logs and cache-friendly snapshots.
  *
  * @returns {Promise<object>}
  */
 const capacityAlertJob = async () => {
   const occupancy = await service.getCurrentOccupancy();
+  const branches = occupancy.branches || [occupancy];
 
-  if (occupancy.occupancy_rate >= OCCUPANCY_THRESHOLDS.ALERT) {
-    logger.warn('Gym occupancy alert threshold reached', {
-      currentOccupancy: occupancy.current_occupancy,
-      capacity: occupancy.capacity,
-      occupancyRate: occupancy.occupancy_rate,
-      threshold: OCCUPANCY_THRESHOLDS.ALERT,
+  branches
+    .filter((branch) => branch.occupancy_rate >= OCCUPANCY_THRESHOLDS.ALERT)
+    .forEach((branch) => {
+      logger.warn('Branch occupancy alert threshold reached', {
+        branchId: branch.branch_id,
+        branchName: branch.branch_name,
+        currentOccupancy: branch.current_occupancy,
+        capacity: branch.capacity,
+        occupancyRate: branch.occupancy_rate,
+        threshold: OCCUPANCY_THRESHOLDS.ALERT,
+      });
     });
-  }
 
   return occupancy;
 };

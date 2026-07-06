@@ -16,6 +16,27 @@ process.env.NODE_ENV = 'test';
 
 const db = require('../config/db');
 
+/**
+ * Keep older local/test databases compatible with the current gym.sql schema.
+ * The project schema now stores goal tags on exercises for goal-aware workout
+ * generation; some existing databases were created before that column existed.
+ */
+const ensureTestSchema = async () => {
+  await db.query(`
+    ALTER TABLE exercises
+    ADD COLUMN IF NOT EXISTS goal_tags TEXT[] NOT NULL DEFAULT '{}'
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_exercises_goal_tags
+    ON exercises USING GIN (goal_tags)
+  `);
+};
+
+beforeAll(async () => {
+  await ensureTestSchema();
+});
+
 // ─── Global helpers available in every test file ──────────────────────────────
 
 /**

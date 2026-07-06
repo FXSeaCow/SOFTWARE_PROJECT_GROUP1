@@ -12,11 +12,20 @@ const ApiResponse = require('../../utils/Apiresponse');
 const { OCCUPANCY_MESSAGES } = require('./occupancy.constants');
 
 /**
+ * GET /api/occupancy/branches
+ * Return active branches with current occupancy snapshots.
+ */
+const listBranches = asyncHandler(async (req, res) => {
+  const branches = await service.listBranches();
+  res.json(ApiResponse.success(branches, OCCUPANCY_MESSAGES.BRANCHES_FETCHED));
+});
+
+/**
  * GET /api/occupancy/current
- * Return current gym occupancy.
+ * Return current gym occupancy for all branches or one branch.
  */
 const getCurrentOccupancy = asyncHandler(async (req, res) => {
-  const occupancy = await service.getCurrentOccupancy();
+  const occupancy = await service.getCurrentOccupancy(req.query);
   res.json(ApiResponse.success(occupancy, OCCUPANCY_MESSAGES.CURRENT_FETCHED));
 });
 
@@ -96,6 +105,7 @@ const resetOpenSessions = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  listBranches,
   getCurrentOccupancy,
   checkIn,
   checkOut,

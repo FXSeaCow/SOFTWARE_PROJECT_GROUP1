@@ -16,7 +16,6 @@ const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
 const {
   NOTIFICATION_TYPE,
-  NOTIFICATION_PRIORITY,
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_LIMITS,
   NOTIFICATION_SCHEDULER,
@@ -41,11 +40,10 @@ const hoursAgo = (hours) => {
  * @returns {object}
  */
 const normalizeNotification = (data) => ({
-  type: data.type || NOTIFICATION_TYPE.SYSTEM,
-  priority: data.priority || NOTIFICATION_PRIORITY.NORMAL,
+  type: data.type || NOTIFICATION_TYPE.ANNOUNCEMENT,
+  announcement_id: data.announcement_id || null,
   title: data.title,
-  message: data.message,
-  data: data.data || {},
+  body: data.body || data.message || null,
 });
 
 /**
@@ -64,7 +62,7 @@ const requireUser = async (userId) => {
  * Create one notification for one user.
  *
  * @param {string} userId
- * @param {{ type?, priority?, title, message, data? }} data
+ * @param {{ type?, title, body, announcement_id? }} data
  * @returns {Promise<object>}
  */
 const createNotification = async (userId, data) => {
@@ -103,11 +101,29 @@ const createFromTemplate = async (
 
   return createNotification(userId, {
     ...rendered,
-    data: {
-      template: templateKey,
-      context,
-      ...extraData,
-    },
+    announcement_id: extraData.announcement_id || null,
+  });
+};
+
+/**
+ * Broadcast a templated notification to all users or users matching a role.
+ *
+ * @param {string} templateKey
+ * @param {object} context
+ * @param {{ role?, announcement_id? }} extraData
+ * @returns {Promise<{ audience_count: number, created_count: number, notifications: object[] }>}
+ */
+const broadcastFromTemplate = async (
+  templateKey,
+  context = {},
+  extraData = {}
+) => {
+  const rendered = renderTemplate(templateKey, context);
+
+  return broadcastNotification({
+    ...rendered,
+    role: extraData.role,
+    announcement_id: extraData.announcement_id || null,
   });
 };
 
@@ -258,7 +274,7 @@ const deleteNotification = async (notificationId) => {
 /**
  * Broadcast a notification to all users or users matching a role.
  *
- * @param {{ role?, type?, priority?, title, message, data? }} data
+ * @param {{ role?, type?, title, body, announcement_id? }} data
  * @returns {Promise<{ audience_count: number, created_count: number, notifications: object[] }>}
  */
 const broadcastNotification = async (data) => {
@@ -303,7 +319,7 @@ const sendMembershipExpiryWarnings = async (
   for (const membership of memberships) {
     const recent = await repo.findRecentByType(
       membership.user_id,
-      NOTIFICATION_TYPE.MEMBERSHIP_EXPIRING,
+      NOTIFICATION_TYPE.MEMBERSHIP_EXPIRY,
       since
     );
 
@@ -314,7 +330,7 @@ const sendMembershipExpiryWarnings = async (
 
     const notification = await createFromTemplate(
       membership.user_id,
-      NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRING,
+      NOTIFICATION_TEMPLATE.MEMBERSHIP_EXPIRY,
       {
         days_remaining: membership.days_remaining,
         plan_name: membership.plan_name,
@@ -347,7 +363,10 @@ const sendMembershipExpiryWarnings = async (
  * @returns {Promise<object>}
  */
 const sendStreakRiskWarnings = async () => {
-  const streaks = await repo.findStreaksAtRisk();
+  const resetStreaks = await repo.resetStreaksPastThreshold(
+    NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS
+  );
+  const streaks = await repo.findStreaksAtRisk(1);
   const since = hoursAgo(24);
   const created = [];
   let skipped = 0;
@@ -355,7 +374,7 @@ const sendStreakRiskWarnings = async () => {
   for (const streak of streaks) {
     const recent = await repo.findRecentByType(
       streak.user_id,
-      NOTIFICATION_TYPE.STREAK_AT_RISK,
+      NOTIFICATION_TYPE.STREAK_WARNING,
       since
     );
 
@@ -366,7 +385,7 @@ const sendStreakRiskWarnings = async () => {
 
     const notification = await createFromTemplate(
       streak.user_id,
-      NOTIFICATION_TEMPLATE.STREAK_AT_RISK,
+      NOTIFICATION_TEMPLATE.STREAK_WARNING,
       {
         last_active_date: streak.last_active_date,
         current_streak: streak.current_streak,
@@ -376,12 +395,15 @@ const sendStreakRiskWarnings = async () => {
   }
 
   logger.info('Streak risk notification job completed', {
+    reset: resetStreaks.length,
     scanned: streaks.length,
     created: created.length,
     skipped,
   });
 
   return {
+    reset_count: resetStreaks.length,
+    reset_streaks: resetStreaks,
     scanned_count: streaks.length,
     created_count: created.length,
     skipped_count: skipped,
@@ -441,6 +463,7 @@ const runNotificationJobs = async (options = {}) => {
 module.exports = {
   createNotification,
   createFromTemplate,
+  broadcastFromTemplate,
   listMyNotifications,
   listAllNotifications,
   getMyNotificationById,

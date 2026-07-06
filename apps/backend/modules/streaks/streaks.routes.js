@@ -20,6 +20,7 @@ const ctrl = require('./streaks.controller');
 
 const { authenticate } = require('../../middlewares/Auth.middleware');
 const { requireRole } = require('../../middlewares/Role.middleware');
+const { requireActiveMembership } = require('../../middlewares/Membership.middleware');
 const { validate } = require('../../middlewares/Validate.middleware');
 const {
   uuidParam,
@@ -35,16 +36,18 @@ router.use(authenticate);
 // Member routes
 // ---------------------------------------------------------------------------
 
-router.get('/me', ctrl.getMyStreak);
+router.get('/me', requireActiveMembership, ctrl.getMyStreak);
 
 router.get(
   '/me/checkins',
+  requireActiveMembership,
   validate(null, null, checkinsQuerySchema),
   ctrl.listMyCheckins
 );
 
 router.post(
   '/checkins',
+  requireActiveMembership,
   validate(recordCheckinSchema),
   ctrl.recordCheckin
 );

@@ -1,9 +1,11 @@
 /**
  * occupancy.repository.js
- * Raw PostgreSQL queries for gym occupancy.
+ * Raw PostgreSQL queries for branch-aware gym occupancy.
  *
- * No business logic should live here. The service layer decides whether a
- * member may check in/out; this file only reads and writes rows.
+ * This file matches gym.sql:
+ *   - gym_branches(id, name, capacity, is_active, ...)
+ *   - gym_sessions(user_id, branch_id, checked_in_at, checked_out_at, duration_minutes)
+ *   - workout_checkins(user_id, branch_id, checkin_date, checked_in_at)
  */
 
 const db = require('../../config/db');
@@ -16,6 +18,65 @@ const { SESSION_STATUS } = require('./occupancy.constants');
  * @returns {import('pg').Pool|import('pg').PoolClient}
  */
 const getRunner = (client) => client || db;
+
+/**
+ * Find all active branches.
+ *
+ * @returns {Promise<object[]>}
+ */
+const findActiveBranches = async () => {
+  const { rows } = await db.query(
+    `SELECT id, name, address, city, phone, opening_time, closing_time,
+            capacity, is_active, created_at, updated_at
+     FROM gym_branches
+     WHERE is_active = true
+     ORDER BY name ASC`
+  );
+  return rows;
+};
+
+/**
+ * Find one active branch by ID.
+ *
+ * @param {string} branchId
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object|null>}
+ */
+const findBranchById = async (branchId, client) => {
+  const runner = getRunner(client);
+  const lockClause = client ? 'FOR UPDATE' : '';
+  const { rows } = await runner.query(
+    `SELECT id, name, address, city, phone, opening_time, closing_time,
+            capacity, is_active, created_at, updated_at
+     FROM gym_branches
+     WHERE id = $1
+       AND is_active = true
+     ${lockClause}`,
+    [branchId]
+  );
+  return rows[0] || null;
+};
+
+/**
+ * Find current occupancy from the reporting view.
+ *
+ * @param {string|null} branchId
+ * @returns {Promise<object[]>}
+ */
+const findCurrentOccupancy = async (branchId = null) => {
+  const values = [];
+  const where = branchId ? 'WHERE branch_id = $1' : '';
+  if (branchId) values.push(branchId);
+
+  const { rows } = await db.query(
+    `SELECT branch_id, branch_name, active_members_in_gym::INT, capacity
+     FROM current_occupancy
+     ${where}
+     ORDER BY branch_name ASC`,
+    values
+  );
+  return rows;
+};
 
 /**
  * Find a user by QR token.
@@ -36,6 +97,25 @@ const findUserByQrToken = async (qrCodeToken, client) => {
 };
 
 /**
+ * Find users that have a QR token.
+ *
+ * Used when an admin scans a QR image data URL instead of receiving the raw
+ * qr_code_token from the frontend.
+ *
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object[]>}
+ */
+const findUsersWithQrTokens = async (client) => {
+  const runner = getRunner(client);
+  const { rows } = await runner.query(
+    `SELECT id, email, full_name, role, qr_code_token
+     FROM users
+     WHERE qr_code_token IS NOT NULL`
+  );
+  return rows;
+};
+
+/**
  * Find a user by ID.
  *
  * @param {string} userId
@@ -45,7 +125,7 @@ const findUserByQrToken = async (qrCodeToken, client) => {
 const findUserById = async (userId, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `SELECT id, email, full_name, role
+    `SELECT id, email, full_name, role, qr_code_token
      FROM users
      WHERE id = $1`,
     [userId]
@@ -76,23 +156,26 @@ const findActiveMembership = async (userId, client) => {
 };
 
 /**
- * Count members currently inside the gym.
+ * Count members currently inside a branch.
  *
+ * @param {string} branchId
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<number>}
  */
-const countOpenSessions = async (client) => {
+const countOpenSessions = async (branchId, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
     `SELECT COUNT(*)::INT AS total
      FROM gym_sessions
-     WHERE check_out_at IS NULL`
+     WHERE branch_id = $1
+       AND checked_out_at IS NULL`,
+    [branchId]
   );
   return rows[0].total;
 };
 
 /**
- * Find the latest open session for a user.
+ * Find the latest open session for a user across all branches.
  *
  * @param {string} userId
  * @param {import('pg').PoolClient} [client]
@@ -103,16 +186,19 @@ const findOpenSessionByUser = async (userId, client) => {
   const { rows } = await runner.query(
     `SELECT gs.id,
             gs.user_id,
-            gs.check_in_at,
-            gs.check_out_at,
-            gs.created_at,
+            gs.branch_id,
+            b.name AS branch_name,
+            gs.checked_in_at,
+            gs.checked_out_at,
+            gs.duration_minutes,
             u.full_name AS user_name,
             u.email AS user_email
      FROM gym_sessions gs
      JOIN users u ON u.id = gs.user_id
+     JOIN gym_branches b ON b.id = gs.branch_id
      WHERE gs.user_id = $1
-       AND gs.check_out_at IS NULL
-     ORDER BY gs.check_in_at DESC
+       AND gs.checked_out_at IS NULL
+     ORDER BY gs.checked_in_at DESC
      LIMIT 1`,
     [userId]
   );
@@ -123,68 +209,119 @@ const findOpenSessionByUser = async (userId, client) => {
  * Create a gym session.
  *
  * @param {string} userId
- * @param {Date} checkInAt
+ * @param {string} branchId
+ * @param {Date} checkedInAt
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const createSession = async (userId, checkInAt, client) => {
+const createSession = async (userId, branchId, checkedInAt, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `INSERT INTO gym_sessions (user_id, check_in_at)
-     VALUES ($1, $2)
-     RETURNING id, user_id, check_in_at, check_out_at, created_at`,
-    [userId, checkInAt]
+    `INSERT INTO gym_sessions (user_id, branch_id, checked_in_at)
+     VALUES ($1, $2, $3)
+     RETURNING id, user_id, branch_id, checked_in_at, checked_out_at, duration_minutes`,
+    [userId, branchId, checkedInAt]
   );
   return rows[0];
 };
 
 /**
- * Close a gym session by setting check_out_at.
+ * Close a gym session by setting checked_out_at.
  *
  * @param {string} sessionId
- * @param {Date} checkOutAt
+ * @param {Date} checkedOutAt
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object|null>}
  */
-const closeSession = async (sessionId, checkOutAt, client) => {
+const closeSession = async (sessionId, checkedOutAt, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
     `UPDATE gym_sessions
-     SET check_out_at = $1
+     SET checked_out_at = $1
      WHERE id = $2
-       AND check_out_at IS NULL
-     RETURNING id, user_id, check_in_at, check_out_at, created_at`,
-    [checkOutAt, sessionId]
+       AND checked_out_at IS NULL
+     RETURNING id, user_id, branch_id, checked_in_at, checked_out_at, duration_minutes`,
+    [checkedOutAt, sessionId]
   );
   return rows[0] || null;
 };
 
 /**
- * Close all currently open sessions.
+ * Close open sessions, optionally for one branch.
  *
- * Used by admin reset and by the scheduler's end-of-day maintenance.
- *
- * @param {Date} checkOutAt
+ * @param {Date} checkedOutAt
+ * @param {string|null} branchId
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object[]>}
  */
-const closeOpenSessions = async (checkOutAt, client) => {
+const closeOpenSessions = async (checkedOutAt, branchId = null, client) => {
   const runner = getRunner(client);
+  const values = [checkedOutAt];
+  const branchFilter = branchId ? 'AND branch_id = $2' : '';
+  if (branchId) values.push(branchId);
+
   const { rows } = await runner.query(
     `UPDATE gym_sessions
-     SET check_out_at = $1
-     WHERE check_out_at IS NULL
-       AND check_in_at <= $1
-     RETURNING id, user_id, check_in_at, check_out_at, created_at`,
-    [checkOutAt]
+     SET checked_out_at = $1
+     WHERE checked_out_at IS NULL
+       AND checked_in_at <= $1
+       ${branchFilter}
+     RETURNING id, user_id, branch_id, checked_in_at, checked_out_at, duration_minutes`,
+    values
   );
   return rows;
 };
 
 /**
+ * Build dynamic WHERE clauses for gym session queries.
+ *
+ * @param {object} filters
+ * @returns {{ where: string, values: Array, nextIndex: number }}
+ */
+const buildSessionFilters = (filters = {}) => {
+  const conditions = [];
+  const values = [];
+  let idx = 1;
+
+  if (filters.user_id) {
+    conditions.push(`gs.user_id = $${idx++}`);
+    values.push(filters.user_id);
+  }
+
+  if (filters.branch_id) {
+    conditions.push(`gs.branch_id = $${idx++}`);
+    values.push(filters.branch_id);
+  }
+
+  if (filters.status === SESSION_STATUS.OPEN) {
+    conditions.push('gs.checked_out_at IS NULL');
+  }
+
+  if (filters.status === SESSION_STATUS.CLOSED) {
+    conditions.push('gs.checked_out_at IS NOT NULL');
+  }
+
+  if (filters.from_date) {
+    conditions.push(`gs.checked_in_at >= $${idx++}::date`);
+    values.push(filters.from_date);
+  }
+
+  if (filters.to_date) {
+    conditions.push(`gs.checked_in_at < ($${idx++}::date + interval '1 day')`);
+    values.push(filters.to_date);
+  }
+
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    values,
+    nextIndex: idx,
+  };
+};
+
+/**
  * Count sessions using optional filters.
  *
- * @param {{ user_id?: string, status?: string, from_date?: string, to_date?: string }} filters
+ * @param {object} filters
  * @returns {Promise<number>}
  */
 const countSessions = async (filters = {}) => {
@@ -201,7 +338,7 @@ const countSessions = async (filters = {}) => {
 /**
  * List gym sessions using optional filters and pagination.
  *
- * @param {{ user_id?: string, status?: string, from_date?: string, to_date?: string, limit: number, offset: number }} opts
+ * @param {{ user_id?: string, branch_id?: string, status?: string, from_date?: string, to_date?: string, limit: number, offset: number }} opts
  * @returns {Promise<{ rows: object[], total: number }>}
  */
 const findSessions = async (opts) => {
@@ -213,15 +350,16 @@ const findSessions = async (opts) => {
             gs.user_id,
             u.full_name AS user_name,
             u.email AS user_email,
-            gs.check_in_at,
-            gs.check_out_at,
-            gs.created_at,
-            EXTRACT(EPOCH FROM (COALESCE(gs.check_out_at, now()) - gs.check_in_at))::INT
-              AS duration_seconds
+            gs.branch_id,
+            b.name AS branch_name,
+            gs.checked_in_at,
+            gs.checked_out_at,
+            gs.duration_minutes
      FROM gym_sessions gs
      JOIN users u ON u.id = gs.user_id
+     JOIN gym_branches b ON b.id = gs.branch_id
      ${where}
-     ORDER BY gs.check_in_at DESC
+     ORDER BY gs.checked_in_at DESC
      LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
     [...values, opts.limit, opts.offset]
   );
@@ -233,23 +371,32 @@ const findSessions = async (opts) => {
  * Find sessions that started on a given calendar date.
  *
  * @param {string} date - YYYY-MM-DD
+ * @param {string|null} branchId
  * @returns {Promise<object[]>}
  */
-const findSessionsByDate = async (date) => {
+const findSessionsByDate = async (date, branchId = null) => {
+  const values = [date];
+  const branchFilter = branchId ? 'AND gs.branch_id = $2' : '';
+  if (branchId) values.push(branchId);
+
   const { rows } = await db.query(
     `SELECT gs.id,
             gs.user_id,
             u.full_name AS user_name,
             u.email AS user_email,
-            gs.check_in_at,
-            gs.check_out_at,
-            gs.created_at
+            gs.branch_id,
+            b.name AS branch_name,
+            gs.checked_in_at,
+            gs.checked_out_at,
+            gs.duration_minutes
      FROM gym_sessions gs
      JOIN users u ON u.id = gs.user_id
-     WHERE gs.check_in_at >= $1::date
-       AND gs.check_in_at < ($1::date + interval '1 day')
-     ORDER BY gs.check_in_at ASC`,
-    [date]
+     JOIN gym_branches b ON b.id = gs.branch_id
+     WHERE gs.checked_in_at >= $1::date
+       AND gs.checked_in_at < ($1::date + interval '1 day')
+       ${branchFilter}
+     ORDER BY gs.checked_in_at ASC`,
+    values
   );
   return rows;
 };
@@ -265,7 +412,8 @@ const findSessionsByDate = async (date) => {
 const findWorkoutCheckinByUserAndDate = async (userId, checkinDate, client) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `SELECT id, user_id, checkin_date::TEXT AS checkin_date, created_at
+    `SELECT id, user_id, branch_id, checkin_date::TEXT AS checkin_date,
+            checked_in_at, counted_for_streak
      FROM workout_checkins
      WHERE user_id = $1
        AND checkin_date = $2`,
@@ -278,23 +426,32 @@ const findWorkoutCheckinByUserAndDate = async (userId, checkinDate, client) => {
  * Create a workout check-in for streak tracking.
  *
  * @param {string} userId
+ * @param {string} branchId
  * @param {string} checkinDate - YYYY-MM-DD
+ * @param {Date} checkedInAt
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const createWorkoutCheckin = async (userId, checkinDate, client) => {
+const createWorkoutCheckin = async (
+  userId,
+  branchId,
+  checkinDate,
+  checkedInAt,
+  client
+) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `INSERT INTO workout_checkins (user_id, checkin_date)
-     VALUES ($1, $2)
-     RETURNING id, user_id, checkin_date::TEXT AS checkin_date, created_at`,
-    [userId, checkinDate]
+    `INSERT INTO workout_checkins (user_id, branch_id, checkin_date, checked_in_at)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, user_id, branch_id, checkin_date::TEXT AS checkin_date,
+               checked_in_at, counted_for_streak`,
+    [userId, branchId, checkinDate, checkedInAt]
   );
   return rows[0];
 };
 
 /**
- * Find all distinct workout check-in dates for a user.
+ * Find all distinct counted workout check-in dates for a user.
  *
  * @param {string} userId
  * @param {import('pg').PoolClient} [client]
@@ -306,6 +463,7 @@ const findWorkoutCheckinDatesByUser = async (userId, client) => {
     `SELECT DISTINCT checkin_date::TEXT AS checkin_date
      FROM workout_checkins
      WHERE user_id = $1
+       AND counted_for_streak = true
      ORDER BY checkin_date ASC`,
     [userId]
   );
@@ -353,7 +511,8 @@ const updateWorkoutStreak = async (userId, stats, client) => {
     `UPDATE workout_streaks
      SET current_streak = $1,
          longest_streak = $2,
-         last_active_date = $3
+         last_active_date = $3,
+         updated_at = now()
      WHERE user_id = $4
      RETURNING id, user_id, current_streak, longest_streak, last_active_date::TEXT AS last_active_date`,
     [stats.current_streak, stats.longest_streak, stats.last_active_date, userId]
@@ -361,49 +520,12 @@ const updateWorkoutStreak = async (userId, stats, client) => {
   return rows[0];
 };
 
-/**
- * Build dynamic WHERE clauses for gym session queries.
- *
- * @param {object} filters
- * @returns {{ where: string, values: Array, nextIndex: number }}
- */
-const buildSessionFilters = (filters = {}) => {
-  const conditions = [];
-  const values = [];
-  let idx = 1;
-
-  if (filters.user_id) {
-    conditions.push(`gs.user_id = $${idx++}`);
-    values.push(filters.user_id);
-  }
-
-  if (filters.status === SESSION_STATUS.OPEN) {
-    conditions.push('gs.check_out_at IS NULL');
-  }
-
-  if (filters.status === SESSION_STATUS.CLOSED) {
-    conditions.push('gs.check_out_at IS NOT NULL');
-  }
-
-  if (filters.from_date) {
-    conditions.push(`gs.check_in_at >= $${idx++}::date`);
-    values.push(filters.from_date);
-  }
-
-  if (filters.to_date) {
-    conditions.push(`gs.check_in_at < ($${idx++}::date + interval '1 day')`);
-    values.push(filters.to_date);
-  }
-
-  return {
-    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
-    values,
-    nextIndex: idx,
-  };
-};
-
 module.exports = {
+  findActiveBranches,
+  findBranchById,
+  findCurrentOccupancy,
   findUserByQrToken,
+  findUsersWithQrTokens,
   findUserById,
   findActiveMembership,
   countOpenSessions,

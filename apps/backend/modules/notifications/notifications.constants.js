@@ -10,37 +10,32 @@
  * In-app notification types.
  */
 const NOTIFICATION_TYPE = {
-  SYSTEM: 'system',
-  MEMBERSHIP_EXPIRING: 'membership_expiring',
-  MEMBERSHIP_EXPIRED: 'membership_expired',
-  STREAK_AT_RISK: 'streak_at_risk',
-  GYM_CAPACITY_ALERT: 'gym_capacity_alert',
-  PAYMENT_CONFIRMED: 'payment_confirmed',
-  PAYMENT_REJECTED: 'payment_rejected',
   WORKOUT_REMINDER: 'workout_reminder',
+  MEMBERSHIP_EXPIRY: 'membership_expiry',
+  OCCUPANCY_ALERT: 'occupancy_alert',
   ANNOUNCEMENT: 'announcement',
+  STREAK_WARNING: 'streak_warning',
 };
 
 /**
- * Notification priority levels.
+ * Optional client-side severity labels.
+ *
+ * The current database schema does not store severity. Templates return it so
+ * the frontend can style notification cards consistently.
  */
-const NOTIFICATION_PRIORITY = {
-  LOW: 'low',
-  NORMAL: 'normal',
-  HIGH: 'high',
-  URGENT: 'urgent',
+const NOTIFICATION_SEVERITY = {
+  INFO: 'info',
+  WARNING: 'warning',
+  DANGER: 'danger',
 };
 
 /**
  * Template keys supported by notification.templates.js.
  */
 const NOTIFICATION_TEMPLATE = {
-  MEMBERSHIP_EXPIRING: 'membership_expiring',
-  MEMBERSHIP_EXPIRED: 'membership_expired',
-  STREAK_AT_RISK: 'streak_at_risk',
-  GYM_CAPACITY_ALERT: 'gym_capacity_alert',
-  PAYMENT_CONFIRMED: 'payment_confirmed',
-  PAYMENT_REJECTED: 'payment_rejected',
+  MEMBERSHIP_EXPIRY: 'membership_expiry',
+  OCCUPANCY_ALERT: 'occupancy_alert',
+  STREAK_WARNING: 'streak_warning',
   WORKOUT_REMINDER: 'workout_reminder',
   ANNOUNCEMENT: 'announcement',
 };
@@ -62,6 +57,7 @@ const NOTIFICATION_LIMITS = {
  */
 const NOTIFICATION_SCHEDULER = {
   MEMBERSHIP_WARNING_DAYS: Number.parseInt(process.env.MEMBERSHIP_WARNING_DAYS, 10) || 7,
+  STREAK_RESET_THRESHOLD_DAYS: Number.parseInt(process.env.STREAK_RESET_THRESHOLD_DAYS, 10) || 4,
   MEMBERSHIP_JOB_MS: Number.parseInt(process.env.NOTIFICATION_MEMBERSHIP_JOB_MS, 10) || 3600000,
   STREAK_JOB_MS: Number.parseInt(process.env.NOTIFICATION_STREAK_JOB_MS, 10) || 3600000,
   CLEANUP_JOB_MS: Number.parseInt(process.env.NOTIFICATION_CLEANUP_JOB_MS, 10) || 86400000,
@@ -84,7 +80,7 @@ const NOTIFICATION_MESSAGES = {
 
 module.exports = {
   NOTIFICATION_TYPE,
-  NOTIFICATION_PRIORITY,
+  NOTIFICATION_SEVERITY,
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_LIMITS,
   NOTIFICATION_SCHEDULER,
