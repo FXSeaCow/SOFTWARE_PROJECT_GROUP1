@@ -11,7 +11,12 @@
     "test:users": "jest --testPathPatterns=modules/users --runInBand --forceExit",
     "test:memberships": "jest --testPathPatterns=modules/memberships --runInBand --forceExit",
     "test:workouts": "jest --testPathPatterns=modules/workouts --runInBand --forceExit",
-    "test:payments": "jest --testPathPatterns=modules/payments --runInBand --forceExit"
+    "test:payments": "jest --testPathPatterns=modules/payments --runInBand --forceExit",
+    "test:fitness-records": "jest --testPathPatterns=modules/fitness-records --runInBand --forceExit",
+    "test:admin": "jest --testPathPatterns=modules/admin --runInBand --forceExit",
+    "test:notifications": "jest --testPathPatterns=modules/notifications --runInBand --forceExit",
+    "test:occupancy": "jest --testPathPatterns=modules/occupancy --runInBand --forceExit",
+    "test:streaks": "jest --testPathPatterns=modules/streaks --runInBand --forceExit"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +32,9 @@
     "joi": "^18.2.2",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
-    "pg": "^8.22.0",
-    "vite": "8.0.16",
+
+    "pg": "^8.21.0",
+    "qrcode": "^1.5.4",
     "winston": "^3.19.0"
   },
   "jest": {

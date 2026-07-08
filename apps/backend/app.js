@@ -9,8 +9,11 @@ const usersRoutes = require('./modules/users/users.routes');
 const membershipsRoutes = require('./modules/memberships/memberships.routes');
 const workoutsRoutes = require('./modules/workouts/workouts.routes');
 const paymentsRoutes = require('./modules/payments/payments.routes');
-const announcementsRoutes = require('./modules/announcements/announcements.routes');
-
+const occupancyRoutes = require('./modules/occupancy/occupancy.routes');
+const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const fitnessRecordsRoutes = require('./modules/fitness-records/fitness-records.routes');
+const streaksRoutes = require('./modules/streaks/streaks.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 const { generalLimiter } = require('./middlewares/rateLimiter.middleware');
 
 const cors = require('cors');
@@ -55,7 +58,11 @@ app.use('/api/users', usersRoutes);
 app.use('/api/memberships', membershipsRoutes);
 app.use('/api/workouts', workoutsRoutes);
 app.use('/api/payments', paymentsRoutes);
-app.use('/api/announcements', announcementsRoutes);
+app.use('/api/occupancy', occupancyRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/fitness-records', fitnessRecordsRoutes);
+app.use('/api/streaks', streaksRoutes);
+app.use('/api/admin', adminRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
