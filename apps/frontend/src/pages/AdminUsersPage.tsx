@@ -15,10 +15,10 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
-import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
+import { Skeleton } from "../components/Skeleton";
 import { panelStyle } from "../components/main-menu/styles";
-import { AppShell } from "../layouts/AppShell";
-import { getCurrentUser, logout } from "../services/authService";
+import { AdminPageLayout } from "../layouts/AdminPageLayout";
+import { getCurrentUser } from "../services/authService";
 import {
   createAdminMembership,
   getAdminMembershipPlans,
@@ -99,7 +99,6 @@ function initials(name: string) {
 export function AdminUsersPage() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | AdminUserRole>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | AdminUserRecord["account_status"]>("all");
@@ -114,9 +113,6 @@ export function AdminUsersPage() {
   const [isSavingMembership, setIsSavingMembership] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const displayName = currentUser?.name?.trim() ? currentUser.name.toUpperCase() : "SYSTEM ADMIN";
-  const profileInitials = currentUser?.name ? initials(currentUser.name) : "SA";
 
   async function loadUsers(nextSearch = search) {
     setIsLoading(true);
@@ -292,34 +288,7 @@ export function AdminUsersPage() {
   }
 
   return (
-    <AppShell activeItem="none">
-      <MainMenuHeader
-        displayName={displayName}
-        profileInitials={profileInitials}
-        isProfileMenuOpen={isProfileMenuOpen}
-        hideActions
-        onProfileClick={() => {
-          setIsProfileMenuOpen((current) => !current);
-        }}
-        onMembershipClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/membership");
-        }}
-        onAccountClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/account");
-        }}
-        onAdminClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/admin");
-        }}
-        showAdminEntry
-        onLogoutClick={() => {
-          logout();
-          navigate("/login", { replace: true });
-        }}
-      />
-
+    <AdminPageLayout activeItem="users">
       <section
         style={{
           display: "flex",
@@ -331,9 +300,9 @@ export function AdminUsersPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Admin Console</div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Hội viên</div>
           <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-            Manage user accounts, memberships, and outbound announcements.
+            Quản lý tài khoản, phân quyền, trạng thái truy cập và gói thành viên.
           </div>
         </div>
 
@@ -348,7 +317,7 @@ export function AdminUsersPage() {
           }}
           leftIcon={<BellRing size={16} />}
         >
-          Send announcement
+          Tạo thông báo
         </Button>
       </section>
 
@@ -361,12 +330,12 @@ export function AdminUsersPage() {
         }}
       >
         {[
-          { label: "Total users", value: stats.total, icon: <Users size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
-          { label: "Admins", value: stats.admins, icon: <Shield size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
-          { label: "Locked", value: stats.locked, icon: <Lock size={18} />, iconBg: "rgba(239,68,68,0.12)", iconColor: "#f87171" },
-          { label: "Active memberships", value: stats.activeMemberships, icon: <Crown size={18} />, iconBg: "rgba(245,158,11,0.12)", iconColor: "#f59e0b" },
+          { label: "Tổng hội viên", value: stats.total, icon: <Users size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
+          { label: "Quản trị viên", value: stats.admins, icon: <Shield size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
+          { label: "Bị khóa", value: stats.locked, icon: <Lock size={18} />, iconBg: "rgba(239,68,68,0.12)", iconColor: "#f87171" },
+          { label: "Gói đang hoạt động", value: stats.activeMemberships, icon: <Crown size={18} />, iconBg: "rgba(245,158,11,0.12)", iconColor: "#f59e0b" },
         ].map((item) => (
-          <div key={item.label} style={{ ...panelStyle, padding: 18 }}>
+          <div key={item.label} className="interactive-card dashboard-card-enter" style={{ ...panelStyle, padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div
                 style={{
@@ -398,8 +367,8 @@ export function AdminUsersPage() {
           alignItems: "start",
         }}
       >
-        <div style={panelStyle}>
-          <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>User Management</div>
+        <div className="dashboard-card-enter" style={panelStyle}>
+          <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Quản lý hội viên</div>
 
           <form
             onSubmit={handleSearchSubmit}
@@ -426,7 +395,7 @@ export function AdminUsersPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name or email"
+                placeholder="Tìm theo tên hoặc email"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -455,7 +424,7 @@ export function AdminUsersPage() {
                   fontSize: 14,
                 }}
               >
-                <option value="all">Role</option>
+                <option value="all">Vai trò</option>
                 <option value="admin">Admin</option>
                 <option value="member">Member</option>
               </select>
@@ -483,9 +452,9 @@ export function AdminUsersPage() {
                   fontSize: 14,
                 }}
               >
-                <option value="all">Status</option>
-                <option value="active">Active</option>
-                <option value="locked">Locked</option>
+                <option value="all">Trạng thái</option>
+                <option value="active">Hoạt động</option>
+                <option value="locked">Khóa</option>
               </select>
               <ChevronDown
                 size={16}
@@ -494,7 +463,7 @@ export function AdminUsersPage() {
             </label>
 
             <Button type="submit" style={{ background: "#ff7a1a", color: "#111111", minHeight: 46 }}>
-              Search
+              Tìm
             </Button>
           </form>
 
@@ -540,17 +509,49 @@ export function AdminUsersPage() {
               borderBottom: "1px solid rgba(255,255,255,0.06)",
             }}
           >
-            <span>User</span>
-            <span>Role</span>
-            <span>Status</span>
-            <span>Membership</span>
-            <span>Last updated</span>
-            <span>Actions</span>
+            <span>Hội viên</span>
+            <span>Vai trò</span>
+            <span>Trạng thái</span>
+            <span>Gói</span>
+            <span>Cập nhật</span>
+            <span>Thao tác</span>
             <span />
           </div>
 
           <div>
-            {filteredUsers.map((user) => {
+            {isLoading ? (
+              <div style={{ display: "grid" }}>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`user-skeleton-${index}`}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
+                      gap: 12,
+                      alignItems: "center",
+                      padding: "14px 12px",
+                      borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Skeleton height={36} width={36} radius={999} />
+                      <div style={{ display: "grid", gap: 8, flex: 1 }}>
+                        <Skeleton height={16} width="44%" radius={8} />
+                        <Skeleton height={14} width="64%" radius={8} />
+                      </div>
+                    </div>
+                    <Skeleton height={26} width="74%" radius={999} />
+                    <Skeleton height={26} width="70%" radius={999} />
+                    <Skeleton height={26} width="78%" radius={999} />
+                    <Skeleton height={14} width="88%" radius={8} />
+                    <Skeleton height={34} width="82%" radius={10} />
+                    <Skeleton height={16} width={16} radius={8} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {!isLoading && filteredUsers.map((user) => {
               const isSelected = selectedUser?.id === user.id;
               return (
                 <button
@@ -601,7 +602,7 @@ export function AdminUsersPage() {
                     <span style={pillStyle(roleAccent(user.role))}>{user.role}</span>
                     <span style={pillStyle(statusAccent(user.account_status))}>{user.account_status}</span>
                     <span style={pillStyle(membershipAccent(user.membership_status))}>
-                      {user.membership_status === "none" ? "No membership" : `Membership ${user.membership_status}`}
+                      {user.membership_status === "none" ? "Chưa có gói" : `Gói ${user.membership_status}`}
                     </span>
                     <span style={{ color: "#b4bac4", fontSize: 13 }}>
                       {formatDate(user.updated_at || user.created_at)}
@@ -618,7 +619,7 @@ export function AdminUsersPage() {
                         fontWeight: 700,
                       }}
                     >
-                      Manage
+                      Quản lý
                     </span>
                     <EllipsisVertical size={16} color="#9ca8b7" />
                   </div>
@@ -637,7 +638,7 @@ export function AdminUsersPage() {
                   marginTop: 14,
                 }}
               >
-                No user matched this search.
+                Không có hội viên phù hợp.
               </div>
             ) : null}
           </div>
@@ -654,7 +655,7 @@ export function AdminUsersPage() {
             }}
           >
             <span>
-              Showing 1 to {filteredUsers.length} of {filteredUsers.length} users
+              Hiển thị {filteredUsers.length} / {filteredUsers.length} hội viên
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -701,7 +702,7 @@ export function AdminUsersPage() {
           </div>
         </div>
 
-        <aside style={panelStyle}>
+        <aside className="dashboard-card-enter" style={panelStyle}>
           {selectedUser ? (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
@@ -773,9 +774,9 @@ export function AdminUsersPage() {
                   borderTop: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                <span>Created</span>
+                    <span>Tạo lúc</span>
                 <span>{formatDate(selectedUser.created_at)}</span>
-                <span>Updated</span>
+                    <span>Cập nhật</span>
                 <span>{formatDate(selectedUser.updated_at || selectedUser.created_at)}</span>
               </div>
 
@@ -788,7 +789,7 @@ export function AdminUsersPage() {
                   disabled={!selectedPlanId || selectedPlanId === currentMembershipPlanId}
                   style={{ background: "#ff7a1a", color: "#111111", minHeight: 46 }}
                 >
-                  Save changes
+                  Lưu thay đổi
                 </Button>
                 <Button
                   type="button"
@@ -802,7 +803,7 @@ export function AdminUsersPage() {
                     selectedUser.account_status === "active" ? <Ban size={16} /> : <Unlock size={16} />
                   }
                 >
-                  {selectedUser.account_status === "active" ? "Lock account" : "Unlock account"}
+                  {selectedUser.account_status === "active" ? "Khóa tài khoản" : "Mở khóa tài khoản"}
                 </Button>
                 <Button
                   type="button"
@@ -816,16 +817,16 @@ export function AdminUsersPage() {
                   }}
                   leftIcon={<Trash2 size={16} />}
                 >
-                  Delete user
+                  Xóa hội viên
                 </Button>
               </div>
             </>
           ) : (
-            <div style={{ color: "#9ca8b7" }}>No user selected.</div>
+            <div style={{ color: "#9ca8b7" }}>Chưa chọn hội viên.</div>
           )}
         </aside>
       </section>
-    </AppShell>
+    </AdminPageLayout>
   );
 }
 

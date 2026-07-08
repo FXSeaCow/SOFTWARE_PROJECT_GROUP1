@@ -32,6 +32,7 @@ export function Button({
   isLoading = false,
   disabled,
   style,
+  className,
   variant = "primary",
   leftIcon,
   loadingText = "Signing in...",
@@ -42,6 +43,7 @@ export function Button({
   return (
     <button
       {...props}
+      className={className}
       disabled={isDisabled}
       style={{
         width: "100%",

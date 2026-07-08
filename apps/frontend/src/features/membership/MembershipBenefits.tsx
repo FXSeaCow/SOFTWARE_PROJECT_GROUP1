@@ -21,6 +21,7 @@ export function MembershipBenefits({
       {benefits.map((benefit) => (
         <div
           key={benefit.title}
+          className="interactive-card dashboard-card-enter"
           style={{
             minHeight: 104,
             borderRadius: 18,

@@ -196,6 +196,7 @@ export function MembershipPage() {
       <MembershipHeader
         initials={initials}
         isProfileMenuOpen={isProfileMenuOpen}
+        hideActions
         onProfileClick={() => {
           setIsProfileMenuOpen((current) => !current);
         }}
@@ -220,11 +221,11 @@ export function MembershipPage() {
 
       <MembershipHero />
 
-      {errorMessage ? <div style={statusCardStyle("rgba(127,29,29,0.32)", "#fecaca")}>{errorMessage}</div> : null}
-      {feedbackMessage ? <div style={statusCardStyle("rgba(6,95,70,0.32)", "#bbf7d0")}>{feedbackMessage}</div> : null}
+      {errorMessage ? <div className="dashboard-card-enter" style={statusCardStyle("rgba(127,29,29,0.32)", "#fecaca")}>{errorMessage}</div> : null}
+      {feedbackMessage ? <div className="dashboard-card-enter" style={statusCardStyle("rgba(6,95,70,0.32)", "#bbf7d0")}>{feedbackMessage}</div> : null}
 
       {pendingCheckout ? (
-        <section style={statusCardStyle("rgba(17,24,39,0.94)", "#f8fafc")}>
+        <section className="interactive-card dashboard-card-enter" style={statusCardStyle("rgba(17,24,39,0.94)", "#f8fafc")}>
           <div style={{ display: "grid", gap: 18, gridTemplateColumns: "minmax(0, 280px) minmax(0, 1fr)" }}>
             <div
               style={{
@@ -295,13 +296,13 @@ export function MembershipPage() {
       ) : null}
 
       {!pendingCheckout && pendingPayment ? (
-        <section style={statusCardStyle("rgba(120,53,15,0.32)", "#fde68a")}>
+        <section className="interactive-card dashboard-card-enter pending-badge" style={statusCardStyle("rgba(120,53,15,0.32)", "#fde68a")}>
           Payment for <strong>{pendingPayment.plan_name ?? "your membership"}</strong> is waiting for admin approval.
         </section>
       ) : null}
 
       {activationMembership ? (
-        <section style={statusCardStyle("rgba(30,41,59,0.92)", "#f8fafc")}>
+        <section className="interactive-card dashboard-card-enter" style={statusCardStyle("rgba(30,41,59,0.92)", "#f8fafc")}>
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ color: "#93c5fd", fontSize: 13, fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Activation ready

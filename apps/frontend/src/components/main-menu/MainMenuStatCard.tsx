@@ -14,7 +14,7 @@ export function MainMenuStatCard({
   note: string;
 }) {
   return (
-    <div style={{ ...panelStyle, minHeight: 132, padding: 20 }}>
+    <div className="interactive-card dashboard-card-enter" style={{ ...panelStyle, minHeight: 132, padding: 20 }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
         <div
           style={{

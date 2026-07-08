@@ -57,6 +57,7 @@ export function MembershipComparePlans({
               key={plan.id}
               type="button"
               onClick={() => onSelectPlan(plan.id)}
+              className="interactive-card dashboard-card-enter"
               style={{
                 minHeight: 180,
                 borderRadius: 20,

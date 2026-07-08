@@ -10,10 +10,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
-import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { panelStyle, searchBarStyle } from "../components/main-menu/styles";
-import { AppShell } from "../layouts/AppShell";
-import { getCurrentUser, logout } from "../services/authService";
+import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   AdminAnnouncementRecord,
   AnnouncementTarget,
@@ -74,8 +72,6 @@ function darkOptionStyle(): React.CSSProperties {
 
 export function AdminAnnouncementsPage() {
   const navigate = useNavigate();
-  const currentUser = getCurrentUser();
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
   const [announcements, setAnnouncements] = useState<AdminAnnouncementRecord[]>([]);
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
@@ -85,16 +81,6 @@ export function AdminAnnouncementsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const displayName = currentUser?.name?.trim() ? currentUser.name.toUpperCase() : "SYSTEM ADMIN";
-  const profileInitials = currentUser?.name
-    ? currentUser.name
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? "")
-        .join("")
-    : "SA";
 
   async function loadAnnouncements() {
     setIsLoadingHistory(true);
@@ -170,34 +156,7 @@ export function AdminAnnouncementsPage() {
   }
 
   return (
-    <AppShell activeItem="none">
-      <MainMenuHeader
-        displayName={displayName}
-        profileInitials={profileInitials}
-        isProfileMenuOpen={isProfileMenuOpen}
-        hideActions
-        onProfileClick={() => {
-          setIsProfileMenuOpen((current) => !current);
-        }}
-        onMembershipClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/membership");
-        }}
-        onAccountClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/account");
-        }}
-        onAdminClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/admin");
-        }}
-        showAdminEntry
-        onLogoutClick={() => {
-          logout();
-          navigate("/login", { replace: true });
-        }}
-      />
-
+    <AdminPageLayout activeItem="announcements">
       <section
         style={{
           display: "flex",
@@ -218,7 +177,7 @@ export function AdminAnnouncementsPage() {
               marginBottom: 8,
             }}
           >
-            Admin communication
+            Trung tâm thông báo
           </div>
           <h2
             style={{
@@ -230,7 +189,7 @@ export function AdminAnnouncementsPage() {
               textTransform: "uppercase",
             }}
           >
-            Send announcements to users
+            Gửi thông báo cho hội viên
           </h2>
         </div>
 
@@ -246,7 +205,7 @@ export function AdminAnnouncementsPage() {
           }}
           leftIcon={<ChevronLeft size={16} />}
         >
-          Back to users
+          Quay lại tổng quan
         </Button>
       </section>
 
@@ -274,7 +233,7 @@ export function AdminAnnouncementsPage() {
               <Megaphone size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Announcements sent</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Đã gửi</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>{announcements.length}</div>
             </div>
           </div>
@@ -295,7 +254,7 @@ export function AdminAnnouncementsPage() {
               <Users size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Active users</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Hội viên hoạt động</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>{users.length}</div>
             </div>
           </div>
@@ -316,7 +275,7 @@ export function AdminAnnouncementsPage() {
               <BellRing size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Selected recipients</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Người nhận</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>
                 {form.send_to === "all" ? users.length : form.user_ids.length}
               </div>
@@ -335,9 +294,9 @@ export function AdminAnnouncementsPage() {
       >
         <form onSubmit={handleSubmit} style={{ ...panelStyle, display: "grid", gap: 16 }}>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Compose announcement</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Soạn thông báo</div>
             <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-              Create one announcement record and generate notifications for the chosen users.
+              Tạo bản ghi thông báo và phát cho các hội viên được chọn.
             </div>
           </div>
 
@@ -370,7 +329,7 @@ export function AdminAnnouncementsPage() {
           ) : null}
 
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Title</span>
+            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Tiêu đề</span>
             <input
               value={form.title}
               onChange={(event) =>
@@ -379,7 +338,7 @@ export function AdminAnnouncementsPage() {
                   title: event.target.value,
                 }))
               }
-              placeholder="Gym maintenance notice, new class update..."
+              placeholder="Thông báo bảo trì, lịch tập mới..."
               style={{
                 minHeight: 50,
                 borderRadius: 14,
@@ -400,7 +359,7 @@ export function AdminAnnouncementsPage() {
             }}
           >
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Type</span>
+              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Loại</span>
               <select
                 value={form.type}
                 onChange={(event) =>
@@ -421,22 +380,22 @@ export function AdminAnnouncementsPage() {
                 }}
               >
                 <option value="announcement" style={darkOptionStyle()}>
-                  Announcement
+                  Thông báo
                 </option>
                 <option value="system" style={darkOptionStyle()}>
-                  System
+                  Hệ thống
                 </option>
                 <option value="membership" style={darkOptionStyle()}>
-                  Membership
+                  Thành viên
                 </option>
                 <option value="schedule" style={darkOptionStyle()}>
-                  Schedule
+                  Lịch tập
                 </option>
               </select>
             </label>
 
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Recipients</span>
+              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Người nhận</span>
               <select
                 value={form.send_to}
                 onChange={(event) =>
@@ -458,17 +417,17 @@ export function AdminAnnouncementsPage() {
                 }}
               >
                 <option value="all" style={darkOptionStyle()}>
-                  All active users
+                  Toàn bộ hội viên hoạt động
                 </option>
                 <option value="selected" style={darkOptionStyle()}>
-                  Selected users
+                  Chọn thủ công
                 </option>
               </select>
             </label>
           </div>
 
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Body</span>
+            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Nội dung</span>
             <textarea
               value={form.body}
               onChange={(event) =>
@@ -478,7 +437,7 @@ export function AdminAnnouncementsPage() {
                 }))
               }
               rows={7}
-              placeholder="Write the message that will be copied into each notification."
+              placeholder="Nhập nội dung sẽ được sao chép vào từng thông báo."
               style={{
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -495,14 +454,14 @@ export function AdminAnnouncementsPage() {
             <div style={{ display: "grid", gap: 12 }}>
               <div>
                 <div style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-                  Choose users
+                  Chọn hội viên
                 </div>
                 <div style={searchBarStyle}>
                   <Users size={18} color="#9ca8b7" />
                   <input
                     value={userSearch}
                     onChange={(event) => setUserSearch(event.target.value)}
-                    placeholder="Search by name or email"
+                    placeholder="Tìm theo tên hoặc email"
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -578,7 +537,7 @@ export function AdminAnnouncementsPage() {
                       textAlign: "center",
                     }}
                   >
-                    No active users matched this search.
+                    Không có hội viên phù hợp.
                   </div>
                 ) : null}
               </div>
@@ -619,7 +578,7 @@ export function AdminAnnouncementsPage() {
                 lineHeight: 1.6,
               }}
             >
-              The announcement will be duplicated into the `notifications` table for every active user.
+              Thông báo sẽ được tạo cho toàn bộ hội viên đang hoạt động.
             </div>
           )}
 
@@ -630,20 +589,20 @@ export function AdminAnnouncementsPage() {
             style={{ background: "#ff7a1a", color: "#111111", minHeight: 48 }}
             leftIcon={<Send size={16} />}
           >
-            Publish announcement
+            Gửi thông báo
           </Button>
         </form>
 
         <aside style={{ ...panelStyle, display: "grid", gap: 14 }}>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>History</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Lịch sử</div>
             <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-              Recently published announcements and how many notifications were created.
+              Danh sách thông báo gần đây và số lượng thông báo đã phát sinh.
             </div>
           </div>
 
           {isLoadingHistory ? (
-            <div style={{ color: "#9ca8b7", fontSize: 14 }}>Loading announcement history...</div>
+            <div style={{ color: "#9ca8b7", fontSize: 14 }}>Đang tải lịch sử thông báo...</div>
           ) : null}
 
           {!isLoadingHistory && announcements.length === 0 ? (
@@ -655,7 +614,7 @@ export function AdminAnnouncementsPage() {
                 color: "#9ca8b7",
               }}
             >
-              No announcements have been sent yet.
+              Chưa có thông báo nào được gửi.
             </div>
           ) : null}
 
@@ -698,7 +657,7 @@ export function AdminAnnouncementsPage() {
                       ...notificationAccent("announcement"),
                     }}
                   >
-                    Sent
+                    Đã gửi
                   </span>
                 </div>
 
@@ -721,7 +680,7 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Recipients
+                      Người nhận
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{announcement.recipient_count}</div>
                   </div>
@@ -733,7 +692,7 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Read
+                      Đã đọc
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{announcement.read_count}</div>
                   </div>
@@ -745,10 +704,10 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Sender
+                      Người gửi
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>
-                      {announcement.created_by_name || "Unknown admin"}
+                      {announcement.created_by_name || "Không rõ quản trị viên"}
                     </div>
                   </div>
                 </div>
@@ -769,12 +728,12 @@ export function AdminAnnouncementsPage() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontWeight: 800 }}>
               <ShieldAlert size={16} />
-              <span>Current behavior</span>
+              <span>Ghi chú</span>
             </div>
-            Every publish creates one row in `announcements` and one row per recipient in `notifications`.
+            Mỗi lần gửi sẽ tạo một bản ghi ở `announcements` và một thông báo cho từng người nhận.
           </div>
         </aside>
       </section>
-    </AppShell>
+    </AdminPageLayout>
   );
 }

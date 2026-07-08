@@ -7,6 +7,8 @@ export const panelStyle: React.CSSProperties = {
   borderRadius: 18,
   padding: 20,
   boxShadow: "0 18px 40px rgba(0,0,0,0.22)",
+  transition:
+    "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, border-color 220ms ease, background 220ms ease",
 };
 
 export const searchBarStyle: React.CSSProperties = {

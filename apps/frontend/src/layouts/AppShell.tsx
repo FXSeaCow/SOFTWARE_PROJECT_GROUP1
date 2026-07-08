@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { MainMenuBottomNav } from "../components/main-menu/MainMenuBottomNav";
 import { Sidebar, SidebarItemId } from "../components/Sidebar";
+import { TopBarActions } from "../components/TopBarActions";
 import { DashboardLayout } from "./DashboardLayout";
 import { getCurrentUser } from "../services/authService";
 
@@ -40,7 +41,6 @@ export function AppShell({
               activeItem === "home" ||
               activeItem === "train" ||
               activeItem === "membership" ||
-              activeItem === "progress" ||
               activeItem === "schedule"
                 ? activeItem
                 : "none"
@@ -60,10 +60,12 @@ export function AppShell({
         {isDesktopLayout ? (
           <Sidebar
             activeItem={activeItem}
-            rightSlot={topBarRightSlot}
+            rightSlot={topBarRightSlot ?? <TopBarActions />}
             onHomeClick={() => navigate("/")}
             onTrainClick={() => navigate("/exercises")}
             onMembershipClick={() => navigate("/membership")}
+            onAdminClick={() => navigate("/admin")}
+            showAdminEntry={currentUser?.role === "admin"}
           />
         ) : null}
 

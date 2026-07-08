@@ -3,6 +3,7 @@ import React from "react";
 export function MembershipHero() {
   return (
     <section
+      className="dashboard-card-enter"
       style={{
         marginLeft: -12,
         marginRight: -12,

@@ -1,7 +1,7 @@
 const env = require('./config/env');
 const app = require('./app');
 
-const PORT = env.PORT || 3000;
+const PORT = env.PORT || 4000;
 
 if (require.main === module) {
   app.listen(PORT, () => {

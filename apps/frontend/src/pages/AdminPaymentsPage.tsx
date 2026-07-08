@@ -11,15 +11,15 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
-import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
+import { Skeleton } from "../components/Skeleton";
+import { Toast } from "../components/Toast";
 import { panelStyle } from "../components/main-menu/styles";
-import { AppShell } from "../layouts/AppShell";
-import { getCurrentUser, logout } from "../services/authService";
+import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   confirmAdminPayment,
   listAdminPayments,
-  PaymentRecord,
   rejectAdminPayment,
+  type PaymentRecord,
 } from "../services/paymentService";
 
 function formatCurrency(value: number) {
@@ -31,9 +31,9 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -52,7 +52,6 @@ function statusPillStyle(): React.CSSProperties {
     fontWeight: 900,
     background: "rgba(250,204,21,0.16)",
     color: "#fde68a",
-    textTransform: "uppercase",
     letterSpacing: "0.04em",
     whiteSpace: "nowrap",
   };
@@ -60,24 +59,13 @@ function statusPillStyle(): React.CSSProperties {
 
 export function AdminPaymentsPage() {
   const navigate = useNavigate();
-  const currentUser = getCurrentUser();
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [search, setSearch] = useState("");
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const displayName = currentUser?.name?.trim() ? currentUser.name.toUpperCase() : "SYSTEM ADMIN";
-  const profileInitials = currentUser?.name
-    ? currentUser.name
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? "")
-        .join("")
-    : "SA";
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   async function loadPayments() {
     setIsLoading(true);
@@ -86,7 +74,9 @@ export function AdminPaymentsPage() {
     try {
       setPayments(await listAdminPayments("pending"));
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to load payments");
+      setError(
+        nextError instanceof Error ? nextError.message : "Không thể tải danh sách thanh toán.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +86,15 @@ export function AdminPaymentsPage() {
     void loadPayments();
   }, []);
 
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToastMessage(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
+
   const filteredPayments = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
@@ -103,8 +102,8 @@ export function AdminPaymentsPage() {
       return payments;
     }
 
-    return payments.filter((payment) => {
-      return [
+    return payments.filter((payment) =>
+      [
         payment.user_name,
         payment.user_email,
         payment.plan_name,
@@ -112,8 +111,8 @@ export function AdminPaymentsPage() {
         payment.provider_tx_id,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword));
-    });
+        .some((value) => String(value).toLowerCase().includes(keyword)),
+    );
   }, [payments, search]);
 
   const stats = useMemo(() => {
@@ -131,15 +130,16 @@ export function AdminPaymentsPage() {
     setFeedback(null);
 
     try {
-      const approved = await confirmAdminPayment(paymentId, "Bank transfer verified");
-      setFeedback(
-        approved.activation_code
-          ? `Approved. Activation code issued: ${approved.activation_code}`
-          : "Approved successfully.",
-      );
+      const approved = await confirmAdminPayment(paymentId, "Đã xác minh chuyển khoản");
+      const nextMessage = approved.activation_code
+        ? `Đã duyệt. Mã kích hoạt: ${approved.activation_code}`
+        : "Đã duyệt thanh toán.";
+
+      setFeedback(nextMessage);
+      setToastMessage(nextMessage);
       await loadPayments();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to approve payment");
+      setError(nextError instanceof Error ? nextError.message : "Không thể duyệt thanh toán.");
     } finally {
       setActivePaymentId(null);
     }
@@ -151,45 +151,18 @@ export function AdminPaymentsPage() {
     setFeedback(null);
 
     try {
-      await rejectAdminPayment(paymentId, "Transfer information did not match");
-      setFeedback("Payment rejected.");
+      await rejectAdminPayment(paymentId, "Thông tin chuyển khoản không khớp");
+      setFeedback("Đã từ chối thanh toán.");
       await loadPayments();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to reject payment");
+      setError(nextError instanceof Error ? nextError.message : "Không thể từ chối thanh toán.");
     } finally {
       setActivePaymentId(null);
     }
   }
 
   return (
-    <AppShell activeItem="none">
-      <MainMenuHeader
-        displayName={displayName}
-        profileInitials={profileInitials}
-        isProfileMenuOpen={isProfileMenuOpen}
-        hideActions
-        onProfileClick={() => {
-          setIsProfileMenuOpen((current) => !current);
-        }}
-        onMembershipClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/membership");
-        }}
-        onAccountClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/account");
-        }}
-        onAdminClick={() => {
-          setIsProfileMenuOpen(false);
-          navigate("/admin");
-        }}
-        showAdminEntry
-        onLogoutClick={() => {
-          logout();
-          navigate("/login", { replace: true });
-        }}
-      />
-
+    <AdminPageLayout activeItem="payments">
       <section
         style={{
           display: "flex",
@@ -201,9 +174,9 @@ export function AdminPaymentsPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Approval Management</div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Thanh toán</div>
           <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-            Review member transfers, approve payments, and issue activation codes.
+            Kiểm tra giao dịch đang chờ, xác nhận thanh toán và phát hành mã kích hoạt.
           </div>
         </div>
 
@@ -218,49 +191,53 @@ export function AdminPaymentsPage() {
           }}
           leftIcon={<ShieldCheck size={16} />}
         >
-          Back to admin hub
+          Quay lại tổng quan
         </Button>
       </section>
 
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
           gap: 12,
           marginBottom: 16,
         }}
       >
         {[
           {
-            label: "Pending approvals",
+            label: "Đơn chờ duyệt",
             value: stats.totalPending,
             icon: <Clock3 size={18} />,
             iconBg: "rgba(250,204,21,0.12)",
             iconColor: "#fde68a",
           },
           {
-            label: "Pending value",
+            label: "Giá trị chờ duyệt",
             value: formatCurrency(stats.totalAmount),
             icon: <CreditCard size={18} />,
             iconBg: "rgba(255,122,26,0.12)",
             iconColor: "#ff9a3d",
           },
           {
-            label: "Members waiting",
+            label: "Hội viên đang chờ",
             value: stats.uniqueMembers,
             icon: <Users size={18} />,
             iconBg: "rgba(59,130,246,0.12)",
             iconColor: "#93c5fd",
           },
           {
-            label: "Bank transfers",
+            label: "Chuyển khoản",
             value: stats.bankTransfers,
             icon: <CheckCircle2 size={18} />,
             iconBg: "rgba(34,197,94,0.12)",
             iconColor: "#86efac",
           },
         ].map((item) => (
-          <div key={item.label} style={{ ...panelStyle, padding: 18 }}>
+          <div
+            key={item.label}
+            className="interactive-card dashboard-card-enter"
+            style={{ ...panelStyle, padding: 18 }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div
                 style={{
@@ -284,8 +261,8 @@ export function AdminPaymentsPage() {
         ))}
       </section>
 
-      <section style={panelStyle}>
-        <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Payment Approvals</div>
+      <section className="dashboard-card-enter" style={panelStyle}>
+        <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Đơn thanh toán</div>
 
         <div
           style={{
@@ -311,7 +288,7 @@ export function AdminPaymentsPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by member, email, plan, or transfer note"
+              placeholder="Tìm theo hội viên, email, gói hoặc nội dung chuyển khoản"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -325,6 +302,7 @@ export function AdminPaymentsPage() {
           </div>
 
           <div
+            className="pending-badge"
             style={{
               minHeight: 46,
               minWidth: 142,
@@ -339,7 +317,7 @@ export function AdminPaymentsPage() {
               fontWeight: 800,
             }}
           >
-            Pending only
+            Chỉ chờ duyệt
           </div>
 
           <Button
@@ -353,18 +331,34 @@ export function AdminPaymentsPage() {
               padding: "0 28px",
             }}
           >
-            Refresh
+            Tải lại
           </Button>
         </div>
 
         {error ? (
-          <div style={{ borderRadius: 14, padding: 14, marginBottom: 16, background: "rgba(127,29,29,0.28)", color: "#fecaca" }}>
+          <div
+            style={{
+              borderRadius: 14,
+              padding: 14,
+              marginBottom: 16,
+              background: "rgba(127,29,29,0.28)",
+              color: "#fecaca",
+            }}
+          >
             {error}
           </div>
         ) : null}
 
         {feedback ? (
-          <div style={{ borderRadius: 14, padding: 14, marginBottom: 16, background: "rgba(6,95,70,0.28)", color: "#bbf7d0" }}>
+          <div
+            style={{
+              borderRadius: 14,
+              padding: 14,
+              marginBottom: 16,
+              background: "rgba(6,95,70,0.28)",
+              color: "#bbf7d0",
+            }}
+          >
             {feedback}
           </div>
         ) : null}
@@ -380,21 +374,51 @@ export function AdminPaymentsPage() {
             fontSize: 14,
           }}
         >
-          <div>User</div>
-          <div>Plan</div>
-          <div>Amount</div>
-          <div>Transfer note</div>
-          <div>Requested</div>
-          <div>Actions</div>
+          <div>Hội viên</div>
+          <div>Gói</div>
+          <div>Số tiền</div>
+          <div>Nội dung CK</div>
+          <div>Thời gian</div>
+          <div>Thao tác</div>
         </div>
 
         {isLoading ? (
-          <div style={{ padding: "24px 12px", color: "#9ca8b7" }}>Loading pending payments...</div>
+          <div style={{ display: "grid" }}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={`payment-skeleton-${index}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "18px 12px",
+                  borderBottom: index === 4 ? "none" : "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Skeleton height={16} width="48%" radius={8} />
+                  <Skeleton height={14} width="72%" radius={8} />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Skeleton height={16} width="60%" radius={8} />
+                  <Skeleton height={28} width={86} radius={999} />
+                </div>
+                <Skeleton height={16} width="68%" radius={8} />
+                <Skeleton height={16} width="88%" radius={8} />
+                <Skeleton height={16} width="74%" radius={8} />
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Skeleton height={38} width={82} radius={12} />
+                  <Skeleton height={38} width={88} radius={12} />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : null}
 
         {!isLoading && filteredPayments.length === 0 ? (
           <div style={{ padding: "24px 12px", color: "#9ca8b7" }}>
-            No pending payment approvals found.
+            Không có đơn thanh toán chờ duyệt.
           </div>
         ) : null}
 
@@ -414,14 +438,12 @@ export function AdminPaymentsPage() {
                       ? "none"
                       : "1px solid rgba(255,255,255,0.06)",
                   background:
-                    activePaymentId === payment.id
-                      ? "rgba(255,122,26,0.06)"
-                      : "transparent",
+                    activePaymentId === payment.id ? "rgba(255,122,26,0.06)" : "transparent",
                 }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
-                    {payment.user_name ?? "Unknown member"}
+                    {payment.user_name ?? "Không rõ hội viên"}
                   </div>
                   <div style={{ color: "#9ca8b7", fontSize: 14 }}>{payment.user_email}</div>
                 </div>
@@ -429,7 +451,9 @@ export function AdminPaymentsPage() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 800 }}>{payment.plan_name ?? "-"}</div>
                   <div style={{ marginTop: 8 }}>
-                    <span style={statusPillStyle()}>Pending</span>
+                    <span className="pending-badge" style={statusPillStyle()}>
+                      Chờ duyệt
+                    </span>
                   </div>
                 </div>
 
@@ -464,7 +488,7 @@ export function AdminPaymentsPage() {
                       cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
                     }}
                   >
-                    {activePaymentId === payment.id ? "Working..." : "Approve"}
+                    {activePaymentId === payment.id ? "Đang xử lý..." : "Duyệt"}
                   </button>
 
                   <button
@@ -483,7 +507,7 @@ export function AdminPaymentsPage() {
                   >
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <XCircle size={14} />
-                      Reject
+                      Từ chối
                     </span>
                   </button>
                 </div>
@@ -492,6 +516,8 @@ export function AdminPaymentsPage() {
           </div>
         ) : null}
       </section>
-    </AppShell>
+
+      {toastMessage ? <Toast message={toastMessage} /> : null}
+    </AdminPageLayout>
   );
 }

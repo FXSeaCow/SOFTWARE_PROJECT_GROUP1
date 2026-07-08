@@ -14,7 +14,7 @@ export function MainMenuWeeklyGoal({
   progressPercent: number;
 }) {
   return (
-    <section style={{ ...panelStyle, marginBottom: 24 }}>
+    <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>
       <div
         style={{
           display: "flex",

@@ -20,6 +20,7 @@ function menuButtonStyle(primary = false): React.CSSProperties {
 export function MembershipHeader({
   initials,
   isProfileMenuOpen,
+  hideActions = false,
   onProfileClick,
   onMembershipClick,
   onAccountClick,
@@ -29,6 +30,7 @@ export function MembershipHeader({
 }: {
   initials: string;
   isProfileMenuOpen: boolean;
+  hideActions?: boolean;
   onProfileClick: () => void;
   onMembershipClick: () => void;
   onAccountClick: () => void;
@@ -75,77 +77,79 @@ export function MembershipHeader({
         </h1>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-        }}
-      >
-        <NotificationBell />
+      {hideActions ? null : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <NotificationBell />
 
-        <div style={{ position: "relative" }}>
-          <button
-            type="button"
-            onClick={onProfileClick}
-            style={{
-              ...iconButtonStyle,
-              width: 48,
-              borderRadius: "50%",
-              background: "#ff6a13",
-              color: "#050505",
-              fontWeight: 1000,
-              fontSize: 16,
-            }}
-          >
-            {initials}
-          </button>
-
-          {isProfileMenuOpen ? (
-            <div
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={onProfileClick}
               style={{
-                position: "absolute",
-                top: 58,
-                right: 0,
-                minWidth: 180,
-                padding: 10,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                borderRadius: 16,
-                background: "rgba(20,20,20,0.98)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 18px 40px rgba(0,0,0,0.3)",
-                zIndex: 20,
+                ...iconButtonStyle,
+                width: 48,
+                borderRadius: "50%",
+                background: "#ff6a13",
+                color: "#050505",
+                fontWeight: 1000,
+                fontSize: 16,
               }}
             >
-              <button type="button" onClick={onMembershipClick} style={menuButtonStyle()}>
-                Membership
-              </button>
-              <button type="button" onClick={onAccountClick} style={menuButtonStyle()}>
-                Account
-              </button>
-              {showAdminEntry && onAdminClick ? (
-                <button
-                  type="button"
-                  onClick={onAdminClick}
-                  style={{
-                    ...menuButtonStyle(),
-                    border: "1px solid rgba(255,122,26,0.28)",
-                    background: "rgba(255,122,26,0.12)",
-                    color: "#ffb15f",
-                  }}
-                >
-                  Admin Console
+              {initials}
+            </button>
+
+            {isProfileMenuOpen ? (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 58,
+                  right: 0,
+                  minWidth: 180,
+                  padding: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  borderRadius: 16,
+                  background: "rgba(20,20,20,0.98)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 18px 40px rgba(0,0,0,0.3)",
+                  zIndex: 20,
+                }}
+              >
+                <button type="button" onClick={onMembershipClick} style={menuButtonStyle()}>
+                  Membership
                 </button>
-              ) : null}
-              <button type="button" onClick={onLogoutClick} style={menuButtonStyle(true)}>
-                Log out
-              </button>
-            </div>
-          ) : null}
+                <button type="button" onClick={onAccountClick} style={menuButtonStyle()}>
+                  Account
+                </button>
+                {showAdminEntry && onAdminClick ? (
+                  <button
+                    type="button"
+                    onClick={onAdminClick}
+                    style={{
+                      ...menuButtonStyle(),
+                      border: "1px solid rgba(255,122,26,0.28)",
+                      background: "rgba(255,122,26,0.12)",
+                      color: "#ffb15f",
+                    }}
+                  >
+                    Admin Console
+                  </button>
+                ) : null}
+                <button type="button" onClick={onLogoutClick} style={menuButtonStyle(true)}>
+                  Log out
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }

@@ -5,11 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { MainMenuCategoryCard } from "../components/main-menu/MainMenuCategoryCard";
 import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { MainMenuHeroCard } from "../components/main-menu/MainMenuHeroCard";
-import { MainMenuSearchBar } from "../components/main-menu/MainMenuSearchBar";
 import { MainMenuStatCard } from "../components/main-menu/MainMenuStatCard";
 import { MainMenuWeeklyGoal } from "../components/main-menu/MainMenuWeeklyGoal";
-import { NotificationBell } from "../components/NotificationBell";
-import { iconButtonStyle } from "../components/main-menu/styles";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 
@@ -84,139 +81,7 @@ export function MainMenuPage() {
       : "AC";
 
   return (
-    <AppShell
-      activeItem="home"
-      topBarRightSlot={
-        <>
-          <MainMenuSearchBar />
-          <NotificationBell />
-          <div style={{ position: "relative" }}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsProfileMenuOpen((current) => !current);
-              }}
-              aria-label="Open profile menu"
-              title="Open profile menu"
-              style={{
-                ...iconButtonStyle,
-                width: 48,
-                borderRadius: "50%",
-                background: "#ff7a1a",
-                color: "#111111",
-                fontWeight: 900,
-                fontSize: 20,
-              }}
-            >
-              {profileInitials}
-            </button>
-
-            {isProfileMenuOpen ? (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 58,
-                  right: 0,
-                  minWidth: 180,
-                  padding: 10,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  borderRadius: 16,
-                  background: "rgba(20,20,20,0.98)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  boxShadow: "0 18px 40px rgba(0,0,0,0.3)",
-                  zIndex: 20,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    navigate("/membership");
-                  }}
-                  style={{
-                    width: "100%",
-                    minHeight: 44,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.04)",
-                    color: "#f5f5f5",
-                    fontSize: 14,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Membership
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    navigate("/account");
-                  }}
-                  style={{
-                    width: "100%",
-                    minHeight: 44,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.04)",
-                    color: "#f5f5f5",
-                    fontSize: 14,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Account
-                </button>
-                {isAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      navigate("/admin");
-                    }}
-                    style={{
-                      width: "100%",
-                      minHeight: 44,
-                      border: "1px solid rgba(255,122,26,0.28)",
-                      borderRadius: 12,
-                      background: "rgba(255,122,26,0.12)",
-                      color: "#ffb15f",
-                      fontSize: 14,
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Admin Console
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    logout();
-                    navigate("/login", { replace: true });
-                  }}
-                  style={{
-                    width: "100%",
-                    minHeight: 44,
-                    border: "none",
-                    borderRadius: 12,
-                    background: "#ff7a1a",
-                    color: "#111111",
-                    fontSize: 14,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Log out
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </>
-      }
-    >
+    <AppShell activeItem="home">
       <MainMenuHeader
         displayName={displayName}
         profileInitials={profileInitials}

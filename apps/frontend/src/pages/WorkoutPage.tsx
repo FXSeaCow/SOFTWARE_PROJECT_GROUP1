@@ -143,6 +143,7 @@ export function WorkoutPage() {
         displayName={displayName}
         profileInitials={profileInitials || "TR"}
         isProfileMenuOpen={isProfileMenuOpen}
+        hideActions
         onProfileClick={() => {
           setIsProfileMenuOpen((current) => !current);
         }}
@@ -221,19 +222,19 @@ export function WorkoutPage() {
           marginBottom: 18,
         }}
       >
-        <div style={panelStyle}>
+        <div className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div style={{ color: "#9ca8b7", fontSize: 13, textTransform: "uppercase", marginBottom: 8 }}>
             Total exercises
           </div>
           <div style={{ fontSize: 30, fontWeight: 900 }}>{exercises.length}</div>
         </div>
-        <div style={panelStyle}>
+        <div className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div style={{ color: "#9ca8b7", fontSize: 13, textTransform: "uppercase", marginBottom: 8 }}>
             Muscle groups
           </div>
           <div style={{ fontSize: 30, fontWeight: 900 }}>{muscleGroups.length}</div>
         </div>
-        <div style={panelStyle}>
+        <div className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div style={{ color: "#9ca8b7", fontSize: 13, textTransform: "uppercase", marginBottom: 8 }}>
             Visible now
           </div>
@@ -241,7 +242,7 @@ export function WorkoutPage() {
         </div>
       </section>
 
-      <section style={{ ...panelStyle, marginBottom: 18 }}>
+      <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 18 }}>
         <div
           style={{
             display: "grid",
@@ -331,6 +332,7 @@ export function WorkoutPage() {
 
       {errorMessage ? (
         <div
+          className="dashboard-card-enter"
           style={{
             ...panelStyle,
             background: "rgba(127,29,29,0.32)",
@@ -343,7 +345,7 @@ export function WorkoutPage() {
       ) : null}
 
       {isLoading ? (
-        <div style={panelStyle}>Loading exercise catalog...</div>
+        <div className="dashboard-card-enter" style={panelStyle}>Loading exercise catalog...</div>
       ) : (
         <section
           style={{
@@ -358,6 +360,7 @@ export function WorkoutPage() {
             return (
               <article
                 key={exercise.id}
+                className="interactive-card dashboard-card-enter"
                 style={{
                   ...panelStyle,
                   padding: 18,
@@ -510,7 +513,7 @@ export function WorkoutPage() {
       )}
 
       {!isLoading && !errorMessage && visibleExercises.length === 0 ? (
-        <div style={{ ...panelStyle, marginTop: 18, color: "#9ca8b7" }}>
+        <div className="dashboard-card-enter" style={{ ...panelStyle, marginTop: 18, color: "#9ca8b7" }}>
           No exercises match the current filters.
         </div>
       ) : null}

@@ -13,6 +13,7 @@ export function MainMenuHeroCard({
 }) {
   return (
     <section
+      className="interactive-card dashboard-card-enter"
       style={{
         ...panelStyle,
         minHeight: 260,

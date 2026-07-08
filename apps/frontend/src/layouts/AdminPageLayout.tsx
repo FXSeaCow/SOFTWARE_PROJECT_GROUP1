@@ -1,21 +1,33 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
-export function DashboardLayout({
+import { AdminTopBar, type AdminTopBarItem } from "../components/AdminTopBar";
+
+export function AdminPageLayout({
+  activeItem,
   children,
-  bottomNav,
 }: {
+  activeItem: AdminTopBarItem;
   children: React.ReactNode;
-  bottomNav?: React.ReactNode;
 }) {
+  const [isMobileLayout, setIsMobileLayout] = useState(() => window.innerWidth < 960);
+  const location = useLocation();
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobileLayout(window.innerWidth < 960);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <main
+    <div
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top center, rgba(255,122,26,0.12), transparent 22%), linear-gradient(180deg, #090909 0%, #050505 100%)",
-        color: "#f5f5f5",
-        fontFamily:
-          'Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+        background: "#0b0908",
+        color: "#f5efe6",
       }}
     >
       <style>
@@ -48,6 +60,50 @@ export function DashboardLayout({
             }
             100% {
               background-position: -100% 0;
+            }
+          }
+
+          @keyframes modalBackdropIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+
+          @keyframes modalPanelIn {
+            from {
+              opacity: 0;
+              transform: scale(0.96) translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
+
+          @keyframes adminPageEnter {
+            0% {
+              opacity: 0;
+              transform: translateY(12px) scale(0.985);
+              filter: blur(6px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+              filter: blur(0);
+            }
+          }
+
+          @keyframes adminBarEnter {
+            0% {
+              opacity: 0;
+              transform: translateY(-10px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0);
             }
           }
 
@@ -92,6 +148,14 @@ export function DashboardLayout({
             animation: skeletonShimmer 1.35s linear infinite;
           }
 
+          .modal-backdrop {
+            animation: modalBackdropIn 180ms ease both;
+          }
+
+          .modal-panel {
+            animation: modalPanelIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
           button {
             transition:
               transform 160ms ease,
@@ -107,16 +171,18 @@ export function DashboardLayout({
           }
         `}
       </style>
-      <div
+      <AdminTopBar activeItem={activeItem} isMobileLayout={isMobileLayout} />
+      <main
+        key={location.pathname}
         style={{
-          maxWidth: 1440,
-          margin: "0 auto",
-          padding: "18px 12px 112px",
+          padding: isMobileLayout ? "18px 14px 26px" : "18px 26px 30px",
+          animation: "adminPageEnter 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+          transformOrigin: "top center",
+          willChange: "transform, opacity, filter",
         }}
       >
         {children}
-      </div>
-      {bottomNav}
-    </main>
+      </main>
+    </div>
   );
 }

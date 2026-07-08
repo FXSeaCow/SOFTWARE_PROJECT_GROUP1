@@ -45,6 +45,7 @@ export function MembershipFeaturedPlan({
       }}
     >
       <div
+        className="interactive-card dashboard-card-enter"
         style={{
           borderRadius: 24,
           background: "#151515",

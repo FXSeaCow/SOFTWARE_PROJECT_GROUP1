@@ -260,6 +260,7 @@ export function AccountPage() {
         displayName={displayName}
         profileInitials={profileInitials || "AC"}
         isProfileMenuOpen={isProfileMenuOpen}
+        hideActions
         onProfileClick={() => {
           setIsProfileMenuOpen((current) => !current);
         }}
@@ -338,7 +339,7 @@ export function AccountPage() {
           alignItems: "start",
         }}
       >
-        <aside style={panelStyle}>
+        <aside className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div
             style={{
               color: "#9ca8b7",
@@ -584,6 +585,7 @@ export function AccountPage() {
 
               {isAdmin ? (
                 <button
+                  className="interactive-card"
                   type="button"
                   onClick={() => navigate("/admin")}
                   style={{
@@ -620,7 +622,7 @@ export function AccountPage() {
           )}
         </aside>
 
-        <section style={panelStyle}>
+        <section className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div
             style={{
               display: "flex",

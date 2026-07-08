@@ -22,6 +22,7 @@ export function MainMenuCategoryCard({
     <button
       type="button"
       onClick={onClick}
+      className="interactive-card dashboard-card-enter"
       style={{
         ...panelStyle,
         width: "100%",
