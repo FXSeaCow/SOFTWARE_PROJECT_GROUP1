@@ -3,6 +3,7 @@ const express = require('express');
 const requestLogger = require('./middlewares/RequestLogger.middleware');
 const notFound = require('./middlewares/NotFound.middleware');
 const errorHandler = require('./middlewares/ErrorHandler.middleware');
+const authRoutes = require('./modules/auth/auth.routes');
 
 const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
 
@@ -40,6 +41,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.use('/api/auth', authRoutes);
 
 
 app.use(notFound);
