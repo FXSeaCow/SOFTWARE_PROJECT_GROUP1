@@ -57,6 +57,10 @@ const loginSchema = Joi.object({
   }),
 });
 
+const forgotPasswordSchema = Joi.object({
+  email,
+});
+
 const resetPasswordSchema = Joi.object({
   token: Joi.string().required().messages({
     'any.required': 'Reset token is required',

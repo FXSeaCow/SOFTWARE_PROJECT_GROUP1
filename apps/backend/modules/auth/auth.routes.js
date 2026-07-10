@@ -63,6 +63,14 @@ router.post(
 // Logout (clears cookie)
 router.post('/logout', ctrl.logout);
 
+// Forgot password — send reset email (FR-03)
+router.post(
+  '/forgot-password',
+  passwordLimiter,
+  validate(forgotPasswordSchema),
+  ctrl.forgotPassword
+);
+
 // Reset password with token (FR-03)
 router.post(
   '/reset-password',

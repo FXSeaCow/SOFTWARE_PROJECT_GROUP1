@@ -100,6 +100,51 @@ const refreshTokens = async (refreshToken) => {
   return tokens;
 };
 
+// ─── Forgot Password (FR-03) ───────────────────────────────────────────────
+
+/**
+ * Tạo reset token và gửi email (ở production). Trả chung một thông báo
+ * để tránh tiết lộ email tồn tại hay không.
+ */
+const forgotPassword = async (email) => {
+  const GENERIC_MSG = 'If an account with that email exists, a reset link has been sent.';
+
+  const user = await repo.findByEmail(email);
+  if (!user) {
+    return { message: GENERIC_MSG };
+  }
+
+  const plainToken = crypto.randomBytes(32).toString('hex');
+
+  const tokenHash = crypto.createHash('sha256').update(plainToken).digest('hex');
+
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+  await repo.savePasswordResetToken(user.id, tokenHash, expiresAt);
+
+  logger.info('Password reset token generated', { userId: user.id });
+
+  // Gửi email chứa link reset (không làm flow fail nếu gửi lỗi)
+  try {
+    const mailResult = await Mailer.sendPasswordResetEmail({
+      to: user.email,
+      token: plainToken,
+      fullName: user.full_name,
+    });
+
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      return { message: GENERIC_MSG, resetToken: plainToken, mailResult };
+    }
+
+    return { message: GENERIC_MSG };
+  } catch (err) {
+    logger.error('Error sending password reset email', { err: err.message, userId: user.id });
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      return { message: GENERIC_MSG, resetToken: plainToken };
+    }
+    return { message: GENERIC_MSG };
+  }
+};
 
 // ─── Reset Password (FR-03) ────────────────────────────────────────────────
 

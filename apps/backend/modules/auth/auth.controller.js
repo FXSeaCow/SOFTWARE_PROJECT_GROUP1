@@ -116,6 +116,19 @@ const logout = asyncHandler(async (req, res) => {
   );
 });
 
+// ─── POST /api/auth/forgot-password ──────────────────────────────────────────
+
+/**
+ * Gửi email đặt lại mật khẩu (FR-03).
+ * Luôn trả 200 để tránh lộ thông tin (user enumeration).
+ */
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await authService.forgotPassword(email);
+
+  res.status(200).json(ApiResponse.success(result, result.message));
+});
+
 // ─── POST /api/auth/reset-password ───────────────────────────────────────────
 
 /**
@@ -167,5 +180,6 @@ module.exports = {
   refreshToken,
   logout,
   getMe,
+  forgotPassword,
   resetPassword,
 };
