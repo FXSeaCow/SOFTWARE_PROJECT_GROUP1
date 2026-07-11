@@ -1,12 +1,22 @@
+import { apiClient } from "./apiClient";
+
 type LoginPayload = {
   email: string;
   password: string;
 };
 
-type User = {
+type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  confirm_password: string;
+};
+
+export type User = {
   id: string;
   email: string;
   name: string;
+  role?: "member" | "admin";
 };
 
 type AuthSession = {
@@ -14,29 +24,59 @@ type AuthSession = {
   user: User;
 };
 
-const STORAGE_KEY = "gym-web.auth-session";
-
-const demoUser: AuthSession = {
-  accessToken: "demo-token",
-  user: {
-    id: "user-1",
-    email: "member@gym.com",
-    name: "Demo Member",
-  },
+type BackendAuthResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    accessToken: string;
+    user: {
+      id: string;
+      email: string;
+      full_name: string;
+      role: string;
+    };
+  };
 };
 
+const STORAGE_KEY = "gym-web.auth-session";
+
 export async function login(payload: LoginPayload): Promise<AuthSession> {
-  await new Promise((resolve) => window.setTimeout(resolve, 500));
+  const response = await apiClient<BackendAuthResponse>("/auth/login", {
+    method: "POST",
+    body: payload,
+  });
 
-  if (
-    payload.email.toLowerCase() !== demoUser.user.email ||
-    payload.password !== "123456"
-  ) {
-    throw new Error("Email or password is incorrect");
-  }
+  const session: AuthSession = {
+    accessToken: response.data.accessToken,
+    user: {
+      id: response.data.user.id,
+      email: response.data.user.email,
+      name: response.data.user.full_name,
+      role: response.data.user.role as User["role"],
+    },
+  };
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(demoUser));
-  return demoUser;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  return session;
+}
+
+export async function register(payload: RegisterPayload): Promise<User> {
+  const response = await apiClient<BackendAuthResponse>("/auth/register", {
+    method: "POST",
+    body: {
+      full_name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      confirm_password: payload.confirm_password,
+    },
+  });
+
+  return {
+    id: response.data.user.id,
+    email: response.data.user.email,
+    name: response.data.user.full_name,
+    role: response.data.user.role as User["role"],
+  };
 }
 
 export function logout() {
