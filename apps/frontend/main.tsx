@@ -11,6 +11,9 @@ import {
 import { LoginPage } from "./src/pages/LoginPage";
 import { DashboardPage } from "./src/pages/DashboardPage";
 import { RegisterPage } from "./src/pages/RegisterPage";
+import { ForgotPasswordPage } from "./src/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./src/pages/ResetPasswordPage";
+import { ChangePasswordPage } from "./src/pages/ChangePasswordPage";
 import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -31,11 +34,21 @@ function AppRouter() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
             </ProtectedRoute>
           }
         />

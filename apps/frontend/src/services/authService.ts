@@ -12,6 +12,16 @@ type RegisterPayload = {
   confirm_password: string;
 };
 
+type ForgotPasswordPayload = {
+  email: string;
+};
+
+type ResetPasswordPayload = {
+  token: string;
+  password: string;
+  confirm_password: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -36,6 +46,12 @@ type BackendAuthResponse = {
       role: string;
     };
   };
+};
+
+type BackendMessageResponse = {
+  success: boolean;
+  message: string;
+  data: unknown;
 };
 
 const STORAGE_KEY = "gym-web.auth-session";
@@ -77,6 +93,24 @@ export async function register(payload: RegisterPayload): Promise<User> {
     name: response.data.user.full_name,
     role: response.data.user.role as User["role"],
   };
+}
+
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<string> {
+  const response = await apiClient<BackendMessageResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: payload,
+  });
+
+  return response.message;
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<string> {
+  const response = await apiClient<BackendMessageResponse>("/auth/reset-password", {
+    method: "POST",
+    body: payload,
+  });
+
+  return response.message;
 }
 
 export function logout() {
