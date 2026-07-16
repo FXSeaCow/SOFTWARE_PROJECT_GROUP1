@@ -5,6 +5,7 @@ const notFound = require('./middlewares/NotFound.middleware');
 const errorHandler = require('./middlewares/ErrorHandler.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
 const membershipsRoutes = require('./modules/memberships/memberships.routes');
+const paymentsRoutes = require('./modules/payments/payments.routes');
 
 const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
 
@@ -45,6 +46,7 @@ app.use(cors({
 
 app.use('/api/auth', authRoutes);
 app.use('/api/memberships', membershipsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
