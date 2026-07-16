@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
@@ -29,6 +30,11 @@ const initialPasswordForm: PasswordFormState = {
   newPassword: "",
   confirmPassword: "",
 };
+
+const accountSectionOptions = [
+  { value: "profile", label: "Profile & Security" },
+  { value: "access", label: "QR Access" },
+] as const;
 
 function validatePasswordForm(values: PasswordFormState): PasswordFormErrors {
   const errors: PasswordFormErrors = {};
@@ -175,6 +181,7 @@ export function AccountPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [activeSection, setActiveSection] = useState<"profile" | "access">("profile");
 
   const displayName = currentUser?.name?.trim()
     ? currentUser.name.toUpperCase()
@@ -331,14 +338,28 @@ export function AccountPage() {
         </button>
       </section>
 
+      <div style={{ marginBottom: 18 }}>
+        <SegmentedTabs
+          ariaLabel="Switch account section"
+          name="account-section"
+          options={[...accountSectionOptions]}
+          value={activeSection}
+          onChange={(nextValue) => setActiveSection(nextValue as "profile" | "access")}
+        />
+      </div>
+
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(320px, 1.05fr) minmax(300px, 0.95fr)",
+          gridTemplateColumns:
+            activeSection === "profile"
+              ? "minmax(320px, 1fr)"
+              : "minmax(300px, 1fr)",
           gap: 18,
           alignItems: "start",
         }}
       >
+        {activeSection === "profile" ? (
         <aside className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div
             style={{
@@ -621,7 +642,9 @@ export function AccountPage() {
             </div>
           )}
         </aside>
+        ) : null}
 
+        {activeSection === "access" ? (
         <section className="interactive-card dashboard-card-enter" style={panelStyle}>
           <div
             style={{
@@ -724,6 +747,7 @@ export function AccountPage() {
             </div>
           </div>
         </section>
+        ) : null}
       </section>
     </AppShell>
   );

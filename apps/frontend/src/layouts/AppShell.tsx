@@ -41,6 +41,7 @@ export function AppShell({
               activeItem === "home" ||
               activeItem === "train" ||
               activeItem === "membership" ||
+              activeItem === "progress" ||
               activeItem === "schedule"
                 ? activeItem
                 : "none"
@@ -64,6 +65,7 @@ export function AppShell({
             onHomeClick={() => navigate("/")}
             onTrainClick={() => navigate("/exercises")}
             onMembershipClick={() => navigate("/membership")}
+            onProgressClick={() => navigate("/progress")}
             onAdminClick={() => navigate("/admin")}
             showAdminEntry={currentUser?.role === "admin"}
           />

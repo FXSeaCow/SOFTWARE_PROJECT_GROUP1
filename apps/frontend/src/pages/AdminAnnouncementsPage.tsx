@@ -177,7 +177,7 @@ export function AdminAnnouncementsPage() {
               marginBottom: 8,
             }}
           >
-            Trung tâm thông báo
+            Announcement center
           </div>
           <h2
             style={{
@@ -189,7 +189,7 @@ export function AdminAnnouncementsPage() {
               textTransform: "uppercase",
             }}
           >
-            Gửi thông báo cho hội viên
+            Send announcements to members
           </h2>
         </div>
 
@@ -205,7 +205,7 @@ export function AdminAnnouncementsPage() {
           }}
           leftIcon={<ChevronLeft size={16} />}
         >
-          Quay lại tổng quan
+          Back to overview
         </Button>
       </section>
 
@@ -233,7 +233,7 @@ export function AdminAnnouncementsPage() {
               <Megaphone size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Đã gửi</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Sent</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>{announcements.length}</div>
             </div>
           </div>
@@ -254,7 +254,7 @@ export function AdminAnnouncementsPage() {
               <Users size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Hội viên hoạt động</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Active members</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>{users.length}</div>
             </div>
           </div>
@@ -275,7 +275,7 @@ export function AdminAnnouncementsPage() {
               <BellRing size={18} />
             </div>
             <div>
-              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Người nhận</div>
+              <div style={{ color: "#d4d4d8", fontSize: 14, marginBottom: 6 }}>Recipients</div>
               <div style={{ fontSize: 18, fontWeight: 900 }}>
                 {form.send_to === "all" ? users.length : form.user_ids.length}
               </div>
@@ -294,9 +294,9 @@ export function AdminAnnouncementsPage() {
       >
         <form onSubmit={handleSubmit} style={{ ...panelStyle, display: "grid", gap: 16 }}>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Soạn thông báo</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Compose announcement</div>
             <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-              Tạo bản ghi thông báo và phát cho các hội viên được chọn.
+              Create an announcement record and deliver it to the selected members.
             </div>
           </div>
 
@@ -329,7 +329,7 @@ export function AdminAnnouncementsPage() {
           ) : null}
 
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Tiêu đề</span>
+            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Title</span>
             <input
               value={form.title}
               onChange={(event) =>
@@ -338,7 +338,7 @@ export function AdminAnnouncementsPage() {
                   title: event.target.value,
                 }))
               }
-              placeholder="Thông báo bảo trì, lịch tập mới..."
+              placeholder="Maintenance notice, new class schedule..."
               style={{
                 minHeight: 50,
                 borderRadius: 14,
@@ -359,7 +359,7 @@ export function AdminAnnouncementsPage() {
             }}
           >
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Loại</span>
+              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Type</span>
               <select
                 value={form.type}
                 onChange={(event) =>
@@ -380,22 +380,22 @@ export function AdminAnnouncementsPage() {
                 }}
               >
                 <option value="announcement" style={darkOptionStyle()}>
-                  Thông báo
+                  Announcement
                 </option>
                 <option value="system" style={darkOptionStyle()}>
-                  Hệ thống
+                  System
                 </option>
                 <option value="membership" style={darkOptionStyle()}>
-                  Thành viên
+                  Membership
                 </option>
                 <option value="schedule" style={darkOptionStyle()}>
-                  Lịch tập
+                  Schedule
                 </option>
               </select>
             </label>
 
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Người nhận</span>
+              <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Recipients</span>
               <select
                 value={form.send_to}
                 onChange={(event) =>
@@ -417,17 +417,17 @@ export function AdminAnnouncementsPage() {
                 }}
               >
                 <option value="all" style={darkOptionStyle()}>
-                  Toàn bộ hội viên hoạt động
+                  All active members
                 </option>
                 <option value="selected" style={darkOptionStyle()}>
-                  Chọn thủ công
+                  Select manually
                 </option>
               </select>
             </label>
           </div>
 
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Nội dung</span>
+            <span style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700 }}>Message</span>
             <textarea
               value={form.body}
               onChange={(event) =>
@@ -437,7 +437,7 @@ export function AdminAnnouncementsPage() {
                 }))
               }
               rows={7}
-              placeholder="Nhập nội dung sẽ được sao chép vào từng thông báo."
+              placeholder="Enter the content that will be copied into each notification."
               style={{
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -454,14 +454,14 @@ export function AdminAnnouncementsPage() {
             <div style={{ display: "grid", gap: 12 }}>
               <div>
                 <div style={{ color: "#d4d4d8", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-                  Chọn hội viên
+                  Select members
                 </div>
                 <div style={searchBarStyle}>
                   <Users size={18} color="#9ca8b7" />
                   <input
                     value={userSearch}
                     onChange={(event) => setUserSearch(event.target.value)}
-                    placeholder="Tìm theo tên hoặc email"
+                    placeholder="Search by name or email"
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -537,7 +537,7 @@ export function AdminAnnouncementsPage() {
                       textAlign: "center",
                     }}
                   >
-                    Không có hội viên phù hợp.
+                    No matching members found.
                   </div>
                 ) : null}
               </div>
@@ -578,7 +578,7 @@ export function AdminAnnouncementsPage() {
                 lineHeight: 1.6,
               }}
             >
-              Thông báo sẽ được tạo cho toàn bộ hội viên đang hoạt động.
+              This announcement will be created for all active members.
             </div>
           )}
 
@@ -589,20 +589,20 @@ export function AdminAnnouncementsPage() {
             style={{ background: "#ff7a1a", color: "#111111", minHeight: 48 }}
             leftIcon={<Send size={16} />}
           >
-            Gửi thông báo
+            Send announcement
           </Button>
         </form>
 
         <aside style={{ ...panelStyle, display: "grid", gap: 14 }}>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>Lịch sử</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>History</div>
             <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-              Danh sách thông báo gần đây và số lượng thông báo đã phát sinh.
+              Recent announcements and delivery totals.
             </div>
           </div>
 
           {isLoadingHistory ? (
-            <div style={{ color: "#9ca8b7", fontSize: 14 }}>Đang tải lịch sử thông báo...</div>
+            <div style={{ color: "#9ca8b7", fontSize: 14 }}>Loading history...</div>
           ) : null}
 
           {!isLoadingHistory && announcements.length === 0 ? (
@@ -614,7 +614,7 @@ export function AdminAnnouncementsPage() {
                 color: "#9ca8b7",
               }}
             >
-              Chưa có thông báo nào được gửi.
+              No announcements have been sent yet.
             </div>
           ) : null}
 
@@ -657,7 +657,7 @@ export function AdminAnnouncementsPage() {
                       ...notificationAccent("announcement"),
                     }}
                   >
-                    Đã gửi
+                    Sent
                   </span>
                 </div>
 
@@ -680,7 +680,7 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Người nhận
+                      Recipients
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{announcement.recipient_count}</div>
                   </div>
@@ -692,7 +692,7 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Đã đọc
+                      Read
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{announcement.read_count}</div>
                   </div>
@@ -704,10 +704,10 @@ export function AdminAnnouncementsPage() {
                     }}
                   >
                     <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 6 }}>
-                      Người gửi
+                      Sender
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>
-                      {announcement.created_by_name || "Không rõ quản trị viên"}
+                      {announcement.created_by_name || "Unknown administrator"}
                     </div>
                   </div>
                 </div>
@@ -728,9 +728,9 @@ export function AdminAnnouncementsPage() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontWeight: 800 }}>
               <ShieldAlert size={16} />
-              <span>Ghi chú</span>
+              <span>Note</span>
             </div>
-            Mỗi lần gửi sẽ tạo một bản ghi ở `announcements` và một thông báo cho từng người nhận.
+            Each send creates one record in `announcements` and one notification per recipient.
           </div>
         </aside>
       </section>

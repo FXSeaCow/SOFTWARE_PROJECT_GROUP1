@@ -23,7 +23,7 @@ import {
 } from "../services/paymentService";
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
@@ -31,7 +31,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -75,7 +75,7 @@ export function AdminPaymentsPage() {
       setPayments(await listAdminPayments("pending"));
     } catch (nextError) {
       setError(
-        nextError instanceof Error ? nextError.message : "Không thể tải danh sách thanh toán.",
+        nextError instanceof Error ? nextError.message : "Unable to load payment requests.",
       );
     } finally {
       setIsLoading(false);
@@ -130,16 +130,16 @@ export function AdminPaymentsPage() {
     setFeedback(null);
 
     try {
-      const approved = await confirmAdminPayment(paymentId, "Đã xác minh chuyển khoản");
+      const approved = await confirmAdminPayment(paymentId, "Bank transfer verified");
       const nextMessage = approved.activation_code
-        ? `Đã duyệt. Mã kích hoạt: ${approved.activation_code}`
-        : "Đã duyệt thanh toán.";
+        ? `Approved. Activation code: ${approved.activation_code}`
+        : "Payment approved.";
 
       setFeedback(nextMessage);
       setToastMessage(nextMessage);
       await loadPayments();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Không thể duyệt thanh toán.");
+      setError(nextError instanceof Error ? nextError.message : "Unable to approve payment.");
     } finally {
       setActivePaymentId(null);
     }
@@ -151,11 +151,11 @@ export function AdminPaymentsPage() {
     setFeedback(null);
 
     try {
-      await rejectAdminPayment(paymentId, "Thông tin chuyển khoản không khớp");
-      setFeedback("Đã từ chối thanh toán.");
+      await rejectAdminPayment(paymentId, "Bank transfer details do not match");
+      setFeedback("Payment rejected.");
       await loadPayments();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Không thể từ chối thanh toán.");
+      setError(nextError instanceof Error ? nextError.message : "Unable to reject payment.");
     } finally {
       setActivePaymentId(null);
     }
@@ -174,9 +174,9 @@ export function AdminPaymentsPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Thanh toán</div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Payments</div>
           <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-            Kiểm tra giao dịch đang chờ, xác nhận thanh toán và phát hành mã kích hoạt.
+            Review pending transactions, confirm payments, and issue activation codes.
           </div>
         </div>
 
@@ -191,7 +191,7 @@ export function AdminPaymentsPage() {
           }}
           leftIcon={<ShieldCheck size={16} />}
         >
-          Quay lại tổng quan
+          Back to overview
         </Button>
       </section>
 
@@ -205,28 +205,28 @@ export function AdminPaymentsPage() {
       >
         {[
           {
-            label: "Đơn chờ duyệt",
+            label: "Pending requests",
             value: stats.totalPending,
             icon: <Clock3 size={18} />,
             iconBg: "rgba(250,204,21,0.12)",
             iconColor: "#fde68a",
           },
           {
-            label: "Giá trị chờ duyệt",
+            label: "Pending value",
             value: formatCurrency(stats.totalAmount),
             icon: <CreditCard size={18} />,
             iconBg: "rgba(255,122,26,0.12)",
             iconColor: "#ff9a3d",
           },
           {
-            label: "Hội viên đang chờ",
+            label: "Members waiting",
             value: stats.uniqueMembers,
             icon: <Users size={18} />,
             iconBg: "rgba(59,130,246,0.12)",
             iconColor: "#93c5fd",
           },
           {
-            label: "Chuyển khoản",
+            label: "Bank transfers",
             value: stats.bankTransfers,
             icon: <CheckCircle2 size={18} />,
             iconBg: "rgba(34,197,94,0.12)",
@@ -262,7 +262,7 @@ export function AdminPaymentsPage() {
       </section>
 
       <section className="dashboard-card-enter" style={panelStyle}>
-        <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Đơn thanh toán</div>
+        <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Payment requests</div>
 
         <div
           style={{
@@ -288,7 +288,7 @@ export function AdminPaymentsPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo hội viên, email, gói hoặc nội dung chuyển khoản"
+              placeholder="Search by member, email, plan, or transfer note"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -317,7 +317,7 @@ export function AdminPaymentsPage() {
               fontWeight: 800,
             }}
           >
-            Chỉ chờ duyệt
+            Pending only
           </div>
 
           <Button
@@ -331,7 +331,7 @@ export function AdminPaymentsPage() {
               padding: "0 28px",
             }}
           >
-            Tải lại
+            Reload
           </Button>
         </div>
 
@@ -374,12 +374,12 @@ export function AdminPaymentsPage() {
             fontSize: 14,
           }}
         >
-          <div>Hội viên</div>
-          <div>Gói</div>
-          <div>Số tiền</div>
-          <div>Nội dung CK</div>
-          <div>Thời gian</div>
-          <div>Thao tác</div>
+          <div>Member</div>
+          <div>Plan</div>
+          <div>Amount</div>
+          <div>Transfer note</div>
+          <div>Time</div>
+          <div>Actions</div>
         </div>
 
         {isLoading ? (
@@ -418,7 +418,7 @@ export function AdminPaymentsPage() {
 
         {!isLoading && filteredPayments.length === 0 ? (
           <div style={{ padding: "24px 12px", color: "#9ca8b7" }}>
-            Không có đơn thanh toán chờ duyệt.
+            No pending payment requests.
           </div>
         ) : null}
 
@@ -443,7 +443,7 @@ export function AdminPaymentsPage() {
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
-                    {payment.user_name ?? "Không rõ hội viên"}
+                    {payment.user_name ?? "Unknown member"}
                   </div>
                   <div style={{ color: "#9ca8b7", fontSize: 14 }}>{payment.user_email}</div>
                 </div>
@@ -452,7 +452,7 @@ export function AdminPaymentsPage() {
                   <div style={{ fontWeight: 800 }}>{payment.plan_name ?? "-"}</div>
                   <div style={{ marginTop: 8 }}>
                     <span className="pending-badge" style={statusPillStyle()}>
-                      Chờ duyệt
+                      Pending
                     </span>
                   </div>
                 </div>
@@ -488,7 +488,7 @@ export function AdminPaymentsPage() {
                       cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
                     }}
                   >
-                    {activePaymentId === payment.id ? "Đang xử lý..." : "Duyệt"}
+                    {activePaymentId === payment.id ? "Processing..." : "Approve"}
                   </button>
 
                   <button
@@ -507,7 +507,7 @@ export function AdminPaymentsPage() {
                   >
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <XCircle size={14} />
-                      Từ chối
+                      Reject
                     </span>
                   </button>
                 </div>

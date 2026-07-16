@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Ban,
-  ChevronDown,
   BellRing,
+  ChevronDown,
   Crown,
   EllipsisVertical,
   Lock,
@@ -300,9 +300,9 @@ export function AdminUsersPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Hội viên</div>
+          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Members</div>
           <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-            Quản lý tài khoản, phân quyền, trạng thái truy cập và gói thành viên.
+            Manage accounts, roles, access status, and membership plans.
           </div>
         </div>
 
@@ -317,7 +317,7 @@ export function AdminUsersPage() {
           }}
           leftIcon={<BellRing size={16} />}
         >
-          Tạo thông báo
+          Create announcement
         </Button>
       </section>
 
@@ -330,10 +330,10 @@ export function AdminUsersPage() {
         }}
       >
         {[
-          { label: "Tổng hội viên", value: stats.total, icon: <Users size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
-          { label: "Quản trị viên", value: stats.admins, icon: <Shield size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
-          { label: "Bị khóa", value: stats.locked, icon: <Lock size={18} />, iconBg: "rgba(239,68,68,0.12)", iconColor: "#f87171" },
-          { label: "Gói đang hoạt động", value: stats.activeMemberships, icon: <Crown size={18} />, iconBg: "rgba(245,158,11,0.12)", iconColor: "#f59e0b" },
+          { label: "Total members", value: stats.total, icon: <Users size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
+          { label: "Administrators", value: stats.admins, icon: <Shield size={18} />, iconBg: "rgba(255,122,26,0.12)", iconColor: "#ff9a3d" },
+          { label: "Locked", value: stats.locked, icon: <Lock size={18} />, iconBg: "rgba(239,68,68,0.12)", iconColor: "#f87171" },
+          { label: "Active plans", value: stats.activeMemberships, icon: <Crown size={18} />, iconBg: "rgba(245,158,11,0.12)", iconColor: "#f59e0b" },
         ].map((item) => (
           <div key={item.label} className="interactive-card dashboard-card-enter" style={{ ...panelStyle, padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -368,7 +368,7 @@ export function AdminUsersPage() {
         }}
       >
         <div className="dashboard-card-enter" style={panelStyle}>
-          <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Quản lý hội viên</div>
+          <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Member management</div>
 
           <form
             onSubmit={handleSearchSubmit}
@@ -395,7 +395,7 @@ export function AdminUsersPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm theo tên hoặc email"
+                placeholder="Search by name or email"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -424,7 +424,7 @@ export function AdminUsersPage() {
                   fontSize: 14,
                 }}
               >
-                <option value="all">Vai trò</option>
+                <option value="all">Role</option>
                 <option value="admin">Admin</option>
                 <option value="member">Member</option>
               </select>
@@ -452,9 +452,9 @@ export function AdminUsersPage() {
                   fontSize: 14,
                 }}
               >
-                <option value="all">Trạng thái</option>
-                <option value="active">Hoạt động</option>
-                <option value="locked">Khóa</option>
+                <option value="all">Status</option>
+                <option value="active">Active</option>
+                <option value="locked">Locked</option>
               </select>
               <ChevronDown
                 size={16}
@@ -463,7 +463,7 @@ export function AdminUsersPage() {
             </label>
 
             <Button type="submit" style={{ background: "#ff7a1a", color: "#111111", minHeight: 46 }}>
-              Tìm
+              Search
             </Button>
           </form>
 
@@ -509,12 +509,12 @@ export function AdminUsersPage() {
               borderBottom: "1px solid rgba(255,255,255,0.06)",
             }}
           >
-            <span>Hội viên</span>
-            <span>Vai trò</span>
-            <span>Trạng thái</span>
-            <span>Gói</span>
-            <span>Cập nhật</span>
-            <span>Thao tác</span>
+            <span>Member</span>
+            <span>Role</span>
+            <span>Status</span>
+            <span>Plan</span>
+            <span>Updated</span>
+            <span>Action</span>
             <span />
           </div>
 
@@ -602,7 +602,7 @@ export function AdminUsersPage() {
                     <span style={pillStyle(roleAccent(user.role))}>{user.role}</span>
                     <span style={pillStyle(statusAccent(user.account_status))}>{user.account_status}</span>
                     <span style={pillStyle(membershipAccent(user.membership_status))}>
-                      {user.membership_status === "none" ? "Chưa có gói" : `Gói ${user.membership_status}`}
+                      {user.membership_status === "none" ? "No plan" : `Plan ${user.membership_status}`}
                     </span>
                     <span style={{ color: "#b4bac4", fontSize: 13 }}>
                       {formatDate(user.updated_at || user.created_at)}
@@ -619,7 +619,7 @@ export function AdminUsersPage() {
                         fontWeight: 700,
                       }}
                     >
-                      Quản lý
+                      Manage
                     </span>
                     <EllipsisVertical size={16} color="#9ca8b7" />
                   </div>
@@ -638,7 +638,7 @@ export function AdminUsersPage() {
                   marginTop: 14,
                 }}
               >
-                Không có hội viên phù hợp.
+                No matching members found.
               </div>
             ) : null}
           </div>
@@ -655,7 +655,7 @@ export function AdminUsersPage() {
             }}
           >
             <span>
-              Hiển thị {filteredUsers.length} / {filteredUsers.length} hội viên
+              Showing {filteredUsers.length} / {filteredUsers.length} members
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -774,9 +774,9 @@ export function AdminUsersPage() {
                   borderTop: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                    <span>Tạo lúc</span>
+                    <span>Created</span>
                 <span>{formatDate(selectedUser.created_at)}</span>
-                    <span>Cập nhật</span>
+                    <span>Updated</span>
                 <span>{formatDate(selectedUser.updated_at || selectedUser.created_at)}</span>
               </div>
 
@@ -789,7 +789,7 @@ export function AdminUsersPage() {
                   disabled={!selectedPlanId || selectedPlanId === currentMembershipPlanId}
                   style={{ background: "#ff7a1a", color: "#111111", minHeight: 46 }}
                 >
-                  Lưu thay đổi
+                  Save changes
                 </Button>
                 <Button
                   type="button"
@@ -803,7 +803,7 @@ export function AdminUsersPage() {
                     selectedUser.account_status === "active" ? <Ban size={16} /> : <Unlock size={16} />
                   }
                 >
-                  {selectedUser.account_status === "active" ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                  {selectedUser.account_status === "active" ? "Lock account" : "Unlock account"}
                 </Button>
                 <Button
                   type="button"
@@ -817,12 +817,12 @@ export function AdminUsersPage() {
                   }}
                   leftIcon={<Trash2 size={16} />}
                 >
-                  Xóa hội viên
+                  Delete member
                 </Button>
               </div>
             </>
           ) : (
-            <div style={{ color: "#9ca8b7" }}>Chưa chọn hội viên.</div>
+            <div style={{ color: "#9ca8b7" }}>No member selected.</div>
           )}
         </aside>
       </section>

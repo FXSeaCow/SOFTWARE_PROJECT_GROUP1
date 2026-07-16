@@ -39,10 +39,10 @@ export function AdminTopBar({
 
   const navItems: AdminNavItem[] = [
     { id: "main-menu", label: "Main Menu", onClick: () => navigate("/") },
-    { id: "overview", label: "Tổng quan", onClick: () => navigate("/admin") },
-    { id: "payments", label: "Thanh toán", onClick: () => navigate("/admin/payments") },
-    { id: "users", label: "Hội viên", onClick: () => navigate("/admin/users") },
-    { id: "announcements", label: "Thông báo", onClick: () => navigate("/admin/announcements") },
+    { id: "overview", label: "Overview", onClick: () => navigate("/admin") },
+    { id: "payments", label: "Payments", onClick: () => navigate("/admin/payments") },
+    { id: "users", label: "Members", onClick: () => navigate("/admin/users") },
+    { id: "announcements", label: "Announcements", onClick: () => navigate("/admin/announcements") },
   ];
 
   return (

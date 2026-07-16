@@ -11,6 +11,7 @@ import {
 import { LoginPage } from "./src/pages/LoginPage";
 import { RegisterPage } from "./src/pages/RegisterPage";
 import { MainMenuPage } from "./src/pages/MainMenuPage";
+import { ProgressPage } from "./src/pages/ProgressPage";
 import { MembershipPage } from "./src/pages/MembershipPage";
 import { AccountPage } from "./src/pages/AccountPage";
 import { getCurrentUser } from "./src/services/authService";
@@ -52,6 +53,14 @@ function AppRouter() {
       <Routes>
         <Route path="/" element={<MainMenuPage />} />
         <Route path="/exercises" element={<WorkoutPage />} />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute>
+              <ProgressPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<RegisterPage />} />
         <Route

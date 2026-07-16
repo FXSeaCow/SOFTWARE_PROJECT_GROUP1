@@ -24,11 +24,11 @@ import {
 } from "../services/paymentService";
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN").format(value);
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 function formatDateLabel(value: Date) {
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -41,7 +41,7 @@ function formatCompactDate(value?: string) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -64,15 +64,15 @@ function getInitials(name?: string) {
 function getMembershipLabel(status: AdminUserRecord["membership_status"]) {
   switch (status) {
     case "active":
-      return "Hoạt động";
+      return "Active";
     case "expired":
-      return "Hết hạn";
+      return "Expired";
     case "suspended":
-      return "Tạm dừng";
+      return "Suspended";
     case "cancelled":
-      return "Đã hủy";
+      return "Cancelled";
     default:
-      return "Chờ duyệt";
+      return "Pending";
   }
 }
 
@@ -169,7 +169,7 @@ export function AdminConsolePage() {
       setAnnouncements(announcementsResult);
     } catch (nextError) {
       setError(
-        nextError instanceof Error ? nextError.message : "Không thể tải dữ liệu trang quản trị.",
+        nextError instanceof Error ? nextError.message : "Unable to load admin dashboard data.",
       );
     } finally {
       setIsLoading(false);
@@ -203,11 +203,11 @@ export function AdminConsolePage() {
     setFeedback(null);
 
     try {
-      await confirmAdminPayment(paymentId, "Duyệt từ tổng quan");
-      setFeedback("Đã duyệt thanh toán.");
+      await confirmAdminPayment(paymentId, "Approved from overview");
+      setFeedback("Payment approved.");
       await loadDashboard();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Không thể duyệt thanh toán.");
+      setError(nextError instanceof Error ? nextError.message : "Unable to approve payment.");
     } finally {
       setActivePaymentId(null);
     }
@@ -219,11 +219,11 @@ export function AdminConsolePage() {
     setFeedback(null);
 
     try {
-      await rejectAdminPayment(paymentId, "Thông tin chuyển khoản không hợp lệ");
-      setFeedback("Đã từ chối thanh toán.");
+      await rejectAdminPayment(paymentId, "Invalid bank transfer details");
+      setFeedback("Payment rejected.");
       await loadDashboard();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Không thể từ chối thanh toán.");
+      setError(nextError instanceof Error ? nextError.message : "Unable to reject payment.");
     } finally {
       setActivePaymentId(null);
     }
@@ -243,7 +243,7 @@ export function AdminConsolePage() {
       >
         <div>
           <h1 style={{ margin: 0, fontSize: 42, fontWeight: 900, letterSpacing: "-0.05em" }}>
-            Tổng quan
+            Overview
           </h1>
           <div style={{ marginTop: 8, color: "rgba(255,255,255,0.56)", fontSize: 15 }}>
             {formatDateLabel(new Date())}
@@ -269,7 +269,7 @@ export function AdminConsolePage() {
           }}
         >
           <AlertTriangle size={15} />
-          {overview.pendingCount} đơn chờ duyệt
+          {overview.pendingCount} pending requests
         </button>
       </section>
 
@@ -314,9 +314,9 @@ export function AdminConsolePage() {
           style={cardStyle("rgba(245, 158, 11, 0.26)", "rgba(27, 20, 12, 0.9)")}
         >
           <OverviewCard
-            title="Chờ duyệt"
+            title="Pending"
             value={String(overview.pendingCount)}
-            subtitle="đơn"
+            subtitle="requests"
             icon={<AlertTriangle size={18} />}
             accent="#fbbf24"
           />
@@ -326,7 +326,7 @@ export function AdminConsolePage() {
           style={cardStyle("rgba(16, 185, 129, 0.26)", "rgba(7, 43, 31, 0.72)")}
         >
           <OverviewCard
-            title="Hội viên hoạt động"
+            title="Active members"
             value={String(overview.activeMembers)}
             subtitle={`/ ${users.length || 0}`}
             icon={<UserRound size={18} />}
@@ -338,9 +338,9 @@ export function AdminConsolePage() {
           style={cardStyle("rgba(59, 130, 246, 0.26)", "rgba(14, 22, 37, 0.88)")}
         >
           <OverviewCard
-            title={`Doanh thu tháng ${new Date().getMonth() + 1}`}
+            title={`Revenue for month ${new Date().getMonth() + 1}`}
             value={formatCurrency(overview.monthlyRevenue)}
-            subtitle="đ"
+            subtitle="VND"
             icon={<CreditCard size={18} />}
             accent="#60a5fa"
           />
@@ -350,9 +350,9 @@ export function AdminConsolePage() {
           style={cardStyle("rgba(168, 85, 247, 0.26)", "rgba(30, 20, 41, 0.84)")}
         >
           <OverviewCard
-            title="Thông báo đã gửi"
+            title="Announcements sent"
             value={String(overview.sentAnnouncements)}
-            subtitle="thông báo"
+            subtitle="announcements"
             icon={<Bell size={18} />}
             accent="#a78bfa"
           />
@@ -361,8 +361,8 @@ export function AdminConsolePage() {
 
       <section style={{ marginTop: 28 }}>
         <SectionHeader
-          title="Đơn thanh toán chờ duyệt"
-          actionLabel="Xem tất cả"
+          title="Pending payment requests"
+          actionLabel="View all"
           onAction={() => navigate("/admin/payments")}
         />
 
@@ -388,20 +388,20 @@ export function AdminConsolePage() {
               minWidth: 880,
             }}
           >
-            <div>Mã đơn</div>
-            <div>Hội viên</div>
-            <div>Gói</div>
-            <div>Số tiền</div>
-            <div style={{ textAlign: "right" }}>Thao tác</div>
+            <div>Order ID</div>
+            <div>Member</div>
+            <div>Plan</div>
+            <div>Amount</div>
+            <div style={{ textAlign: "right" }}>Actions</div>
           </div>
 
           {isLoading ? (
-            <div style={{ padding: 18, color: "rgba(255,255,255,0.56)" }}>Đang tải dữ liệu...</div>
+            <div style={{ padding: 18, color: "rgba(255,255,255,0.56)" }}>Loading data...</div>
           ) : null}
 
           {!isLoading && pendingPayments.length === 0 ? (
             <div style={{ padding: 18, color: "rgba(255,255,255,0.56)" }}>
-              Không có đơn thanh toán đang chờ duyệt.
+              No pending payment requests.
             </div>
           ) : null}
 
@@ -427,17 +427,17 @@ export function AdminConsolePage() {
                 </div>
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 800, color: "#fff8ef" }}>
-                    {payment.user_name ?? "Khách hàng"}
+                    {payment.user_name ?? "Customer"}
                   </div>
                   <div style={{ marginTop: 4, color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
                     {payment.user_email ?? "-"}
                   </div>
                 </div>
                 <div style={{ color: "rgba(255,255,255,0.66)", fontSize: 15 }}>
-                  {payment.plan_name ?? "Gói thành viên"}
+                  {payment.plan_name ?? "Membership plan"}
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#fffaf2" }}>
-                  {formatCurrency(payment.amount)} đ
+                  {formatCurrency(payment.amount)} VND
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                   <button
@@ -452,7 +452,7 @@ export function AdminConsolePage() {
                   >
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <CheckCircle2 size={14} />
-                      {activePaymentId === payment.id ? "Đang xử lý" : "Duyệt"}
+                      {activePaymentId === payment.id ? "Processing" : "Approve"}
                     </span>
                   </button>
                   <button
@@ -467,7 +467,7 @@ export function AdminConsolePage() {
                   >
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <XCircle size={14} />
-                      Từ chối
+                      Reject
                     </span>
                   </button>
                 </div>
@@ -478,8 +478,8 @@ export function AdminConsolePage() {
 
       <section style={{ marginTop: 28 }}>
         <SectionHeader
-          title="Hội viên mới nhất"
-          actionLabel="Xem tất cả"
+          title="Newest members"
+          actionLabel="View all"
           onAction={() => navigate("/admin/users")}
         />
 

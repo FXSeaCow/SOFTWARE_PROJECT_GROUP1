@@ -4,17 +4,19 @@ import { Link } from "react-router-dom";
 
 import { bottomNavItemStyle } from "./styles";
 
-type NavItem = "home" | "train" | "membership" | "schedule" | "profile" | "none";
+type NavItem = "home" | "train" | "membership" | "progress" | "schedule" | "profile" | "none";
 
 export function MainMenuBottomNav({
   profileHref,
   trainHref = "/exercises",
   membershipHref = "/membership",
+  progressHref = "/progress",
   activeItem = "home",
 }: {
   profileHref: string;
   trainHref?: string;
   membershipHref?: string;
+  progressHref?: string;
   activeItem?: NavItem;
 }) {
   return (
@@ -36,7 +38,7 @@ export function MainMenuBottomNav({
           maxWidth: 1440,
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
           gap: 8,
           alignItems: "center",
         }}
@@ -58,6 +60,12 @@ export function MainMenuBottomNav({
           icon={<CreditCard size={21} />}
           to={membershipHref}
           active={activeItem === "membership"}
+        />
+        <MainMenuBottomNavButton
+          label="Progress"
+          icon={<LineChart size={21} />}
+          to={progressHref}
+          active={activeItem === "progress"}
         />
         <MainMenuBottomNavLink
           label="Profile"
