@@ -19,7 +19,8 @@ import { AdminUsersPage } from "./src/pages/AdminUsersPage";
 import { WorkoutPage } from "./src/pages/WorkoutPage";
 import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
 import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
-import { AdminConsolePage } from "./src/pages/AdminConsolePage";
+import { AdminOccupancyPage } from "./src/pages/AdminOccupancyPage";
+import { AdminReportsPage } from "./src/pages/AdminReportsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -91,7 +92,7 @@ function AppRouter() {
           path="/admin"
           element={
             <AdminRoute>
-              <AdminConsolePage />
+              <AdminReportsPage />
             </AdminRoute>
           }
         />
@@ -116,6 +117,14 @@ function AppRouter() {
           element={
             <AdminRoute>
               <AdminPaymentsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/occupancy"
+          element={
+            <AdminRoute>
+              <AdminOccupancyPage />
             </AdminRoute>
           }
         />

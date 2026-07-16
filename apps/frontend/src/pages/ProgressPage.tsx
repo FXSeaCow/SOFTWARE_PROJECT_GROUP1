@@ -3,7 +3,9 @@ import { CalendarDays, CheckCircle2, Dumbbell, Flame, Trophy } from "lucide-reac
 import { useNavigate } from "react-router-dom";
 
 import { MainMenuStatCard } from "../components/main-menu/MainMenuStatCard";
+import { FitnessMetricsSection } from "../components/progress/FitnessMetricsSection";
 import { GoalEntry, ProgressGoalTracking } from "../components/progress/ProgressGoalTracking";
+import { ProgressLeaderboard } from "../components/progress/ProgressLeaderboard";
 import { MuscleBalanceEntry, ProgressMuscleBalance } from "../components/progress/ProgressMuscleBalance";
 import { ProgressSuggestedWorkout } from "../components/progress/ProgressSuggestedWorkout";
 import { DayActivity, ProgressWeeklyActivity } from "../components/progress/ProgressWeeklyActivity";
@@ -13,14 +15,17 @@ import {
   ActiveSchedule,
   CheckinEntry,
   GymBranch,
+  LeaderboardEntry,
   ScheduleDay,
   StreakSummary,
   getActiveSchedule,
   getGymBranches,
   getMyCheckins,
   getMyStreak,
-  recordMyCheckin,
+  getStreakLeaderboard,
 } from "../services/progressService";
+import { getCurrentUser } from "../services/authService";
+import { GymSession, checkInGym, checkOutGym, getMyGymSessions } from "../services/occupancyService";
 
 const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 const muscleAccentPalette = ["#ff7a1a", "#4fa3ff", "#3ddc97", "#ffd166", "#f04a4a", "#c084fc", "#38bdf8"];
@@ -112,6 +117,8 @@ export function ProgressPage() {
   const [checkinError, setCheckinError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [openSession, setOpenSession] = useState<GymSession | null>(null);
 
   useEffect(() => {
     async function loadProgressData() {
@@ -122,12 +129,14 @@ export function ProgressPage() {
         const monday = getMondayOfWeek(new Date());
         const weekDates = buildWeekDates(monday);
 
-        const [streakResult, weekCheckinsResult, recentCheckinsResult, scheduleResult, branchesResult] = await Promise.all([
+        const [streakResult, weekCheckinsResult, recentCheckinsResult, scheduleResult, branchesResult, leaderboardResult, openSessionResult] = await Promise.all([
           getMyStreak(),
           getMyCheckins({ fromDate: weekDates[0], toDate: weekDates[6], limit: 100 }),
           getMyCheckins({ limit: 6 }),
           getActiveSchedule().catch(() => null),
           getGymBranches().catch(() => []),
+          getStreakLeaderboard(10).catch(() => []),
+          getMyGymSessions({ status: "open", limit: 1 }).catch(() => ({ sessions: [], total: 0 })),
         ]);
 
         setStreak(streakResult);
@@ -135,7 +144,9 @@ export function ProgressPage() {
         setRecentCheckins(recentCheckinsResult);
         setActiveSchedule(scheduleResult);
         setBranches(branchesResult);
-        setSelectedBranchId((current) => current || branchesResult[0]?.branch_id || "");
+        setLeaderboard(leaderboardResult);
+        setOpenSession(openSessionResult.sessions[0] ?? null);
+        setSelectedBranchId((current) => current || openSessionResult.sessions[0]?.branch_id || branchesResult[0]?.branch_id || "");
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load progress data.");
       } finally {
@@ -150,15 +161,19 @@ export function ProgressPage() {
     const monday = getMondayOfWeek(new Date());
     const weekDates = buildWeekDates(monday);
 
-    const [streakResult, weekCheckinsResult, recentCheckinsResult] = await Promise.all([
+    const [streakResult, weekCheckinsResult, recentCheckinsResult, branchesResult, openSessionResult] = await Promise.all([
       getMyStreak(),
       getMyCheckins({ fromDate: weekDates[0], toDate: weekDates[6], limit: 100 }),
       getMyCheckins({ limit: 6 }),
+      getGymBranches().catch(() => []),
+      getMyGymSessions({ status: "open", limit: 1 }).catch(() => ({ sessions: [], total: 0 })),
     ]);
 
     setStreak(streakResult);
     setWeekCheckins(weekCheckinsResult);
     setRecentCheckins(recentCheckinsResult);
+    setBranches(branchesResult);
+    setOpenSession(openSessionResult.sessions[0] ?? null);
   }
 
   if (isLoading) {
@@ -179,20 +194,22 @@ export function ProgressPage() {
 
   const monday = getMondayOfWeek(new Date());
   const weekDates = buildWeekDates(monday);
-  const today = formatDateLocal(new Date());
   const weeklyActivity: DayActivity[] = weekDates.map((date, index) => ({
     label: weeklyLabels[index],
     value: weekCheckins.filter((checkin) => checkin.checkin_date === date).length,
   }));
   const daysActiveThisWeek = new Set(weekCheckins.map((checkin) => checkin.checkin_date)).size;
-  const todayCheckin = recentCheckins.find((checkin) => checkin.checkin_date === today);
   const branchOptions = branches.map((branch) => ({
     id: branch.branch_id,
     name: branch.branch_name,
+    currentOccupancy: branch.current_occupancy,
+    capacity: branch.capacity,
+    occupancyRate: branch.occupancy_rate,
+    isCrowded: branch.is_crowded,
   }));
 
   async function handleCheckin() {
-    if (!selectedBranchId || isSubmittingCheckin || todayCheckin) {
+    if (!selectedBranchId || isSubmittingCheckin || openSession) {
       return;
     }
 
@@ -201,11 +218,31 @@ export function ProgressPage() {
     setCheckinMessage(null);
 
     try {
-      const checkin = await recordMyCheckin(selectedBranchId);
+      const result = await checkInGym(selectedBranchId);
       await refreshCheckinData();
-      setCheckinMessage(`Checked in successfully at ${checkin.branch_name}.`);
+      setCheckinMessage(`Checked in successfully at ${result.branch.branch_name}.`);
     } catch (error) {
       setCheckinError(error instanceof Error ? error.message : "Unable to check in right now.");
+    } finally {
+      setIsSubmittingCheckin(false);
+    }
+  }
+
+  async function handleCheckout() {
+    if (isSubmittingCheckin || !openSession) {
+      return;
+    }
+
+    setIsSubmittingCheckin(true);
+    setCheckinError(null);
+    setCheckinMessage(null);
+
+    try {
+      const result = await checkOutGym();
+      await refreshCheckinData();
+      setCheckinMessage(`Checked out from ${result.branch.branch_name}.`);
+    } catch (error) {
+      setCheckinError(error instanceof Error ? error.message : "Unable to check out right now.");
     } finally {
       setIsSubmittingCheckin(false);
     }
@@ -286,13 +323,30 @@ export function ProgressPage() {
         selectedBranchId={selectedBranchId}
         onBranchChange={setSelectedBranchId}
         onCheckin={() => void handleCheckin()}
+        onCheckout={() => void handleCheckout()}
         isSubmitting={isSubmittingCheckin}
-        checkinMessage={checkinMessage ?? (todayCheckin ? `You already checked in today at ${todayCheckin.branch_name}.` : null)}
+        checkinMessage={checkinMessage ?? (openSession ? `Currently checked in at ${openSession.branch_name}.` : null)}
         checkinError={checkinError}
-        hasCheckedInToday={Boolean(todayCheckin)}
+        isCheckedIn={Boolean(openSession)}
       />
 
       <ProgressWorkoutHistory entries={workoutHistory} />
+
+      <ProgressLeaderboard entries={leaderboard} currentUserId={getCurrentUser()?.id} />
+
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 900,
+          textTransform: "uppercase",
+          letterSpacing: "-0.03em",
+          marginBottom: 12,
+        }}
+      >
+        Body Metrics
+      </div>
+
+      <FitnessMetricsSection />
 
       {muscleBalance.length > 0 ? (
         <ProgressMuscleBalance entries={muscleBalance} />

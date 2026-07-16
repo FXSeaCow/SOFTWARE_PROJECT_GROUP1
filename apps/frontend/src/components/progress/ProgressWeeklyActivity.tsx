@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, LogOut, Users } from "lucide-react";
 
 import { panelStyle, startButtonStyle } from "../main-menu/styles";
 
@@ -11,6 +11,10 @@ export type DayActivity = {
 export type WeeklyCheckinBranchOption = {
   id: string;
   name: string;
+  currentOccupancy?: number;
+  capacity?: number;
+  occupancyRate?: number;
+  isCrowded?: boolean;
 };
 
 export function ProgressWeeklyActivity({
@@ -20,10 +24,11 @@ export function ProgressWeeklyActivity({
   selectedBranchId,
   onBranchChange,
   onCheckin,
+  onCheckout,
   isSubmitting,
   checkinMessage,
   checkinError,
-  hasCheckedInToday,
+  isCheckedIn,
 }: {
   days: DayActivity[];
   summary: string;
@@ -31,12 +36,14 @@ export function ProgressWeeklyActivity({
   selectedBranchId: string;
   onBranchChange: (branchId: string) => void;
   onCheckin: () => void;
+  onCheckout: () => void;
   isSubmitting?: boolean;
   checkinMessage?: string | null;
   checkinError?: string | null;
-  hasCheckedInToday?: boolean;
+  isCheckedIn?: boolean;
 }) {
   const maxValue = Math.max(...days.map((day) => day.value), 1);
+  const selectedBranch = branchOptions.find((branch) => branch.id === selectedBranchId);
 
   return (
     <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>
@@ -90,7 +97,7 @@ export function ProgressWeeklyActivity({
           <select
             value={selectedBranchId}
             onChange={(event) => onBranchChange(event.target.value)}
-            disabled={branchOptions.length === 0 || hasCheckedInToday}
+            disabled={branchOptions.length === 0 || isCheckedIn}
             style={{
               width: "100%",
               minHeight: 48,
@@ -100,7 +107,7 @@ export function ProgressWeeklyActivity({
               color: "#f5f5f5",
               padding: "0 14px",
               fontSize: 14,
-              opacity: branchOptions.length === 0 || hasCheckedInToday ? 0.7 : 1,
+              opacity: branchOptions.length === 0 || isCheckedIn ? 0.7 : 1,
             }}
           >
             {branchOptions.length === 0 ? (
@@ -115,20 +122,57 @@ export function ProgressWeeklyActivity({
           </select>
         </label>
 
-        <button
-          type="button"
-          onClick={onCheckin}
-          disabled={!selectedBranchId || branchOptions.length === 0 || isSubmitting || hasCheckedInToday}
+        {isCheckedIn ? (
+          <button
+            type="button"
+            onClick={onCheckout}
+            disabled={isSubmitting}
+            style={{
+              ...startButtonStyle,
+              minHeight: 48,
+              background: "transparent",
+              color: "#f87171",
+              border: "1px solid rgba(248,113,113,0.32)",
+              opacity: isSubmitting ? 0.6 : 1,
+            }}
+          >
+            <LogOut size={16} />
+            {isSubmitting ? "Checking out..." : "Check out"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onCheckin}
+            disabled={!selectedBranchId || branchOptions.length === 0 || isSubmitting}
+            style={{
+              ...startButtonStyle,
+              minHeight: 48,
+              opacity: !selectedBranchId || branchOptions.length === 0 || isSubmitting ? 0.6 : 1,
+            }}
+          >
+            <CheckCircle2 size={16} />
+            {isSubmitting ? "Checking in..." : "Check in"}
+          </button>
+        )}
+      </div>
+
+      {selectedBranch && selectedBranch.capacity !== undefined ? (
+        <div
           style={{
-            ...startButtonStyle,
-            minHeight: 48,
-            opacity: !selectedBranchId || branchOptions.length === 0 || isSubmitting || hasCheckedInToday ? 0.6 : 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 18,
+            color: selectedBranch.isCrowded ? "#fca5a5" : "#8d98a7",
+            fontSize: 13,
           }}
         >
-          <CheckCircle2 size={16} />
-          {hasCheckedInToday ? "Checked in" : isSubmitting ? "Checking..." : "Check in"}
-        </button>
-      </div>
+          <Users size={14} />
+          {selectedBranch.currentOccupancy ?? 0} / {selectedBranch.capacity} currently at{" "}
+          {selectedBranch.name}
+          {selectedBranch.isCrowded ? " · Crowded" : ""}
+        </div>
+      ) : null}
 
       {checkinMessage ? (
         <div

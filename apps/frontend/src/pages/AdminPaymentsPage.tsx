@@ -3,24 +3,37 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  RotateCcw,
   Search,
-  ShieldCheck,
+  TrendingUp,
   Users,
   XCircle,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
 import { Toast } from "../components/Toast";
 import { panelStyle } from "../components/main-menu/styles";
+import { FitnessMetricsChart } from "../components/progress/FitnessMetricsChart";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   confirmAdminPayment,
+  getAdminRevenueSummary,
   listAdminPayments,
+  refundAdminPayment,
   rejectAdminPayment,
   type PaymentRecord,
+  type RevenueReportRow,
 } from "../services/paymentService";
+
+type PaymentStatusFilter = PaymentRecord["status"];
+
+const STATUS_TABS: { id: PaymentStatusFilter; label: string }[] = [
+  { id: "pending", label: "Pending" },
+  { id: "completed", label: "Completed" },
+  { id: "failed", label: "Failed" },
+  { id: "refunded", label: "Refunded" },
+];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -40,7 +53,14 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function statusPillStyle(): React.CSSProperties {
+function statusPillStyle(status: PaymentRecord["status"]): React.CSSProperties {
+  const colors: Record<PaymentRecord["status"], { background: string; color: string }> = {
+    pending: { background: "rgba(250,204,21,0.16)", color: "#fde68a" },
+    completed: { background: "rgba(34,197,94,0.16)", color: "#86efac" },
+    failed: { background: "rgba(239,68,68,0.16)", color: "#fca5a5" },
+    refunded: { background: "rgba(148,163,184,0.18)", color: "#cbd5e1" },
+  };
+
   return {
     display: "inline-flex",
     alignItems: "center",
@@ -50,16 +70,15 @@ function statusPillStyle(): React.CSSProperties {
     borderRadius: 999,
     fontSize: 12,
     fontWeight: 900,
-    background: "rgba(250,204,21,0.16)",
-    color: "#fde68a",
     letterSpacing: "0.04em",
     whiteSpace: "nowrap",
+    ...colors[status],
   };
 }
 
 export function AdminPaymentsPage() {
-  const navigate = useNavigate();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [statusFilter, setStatusFilter] = useState<PaymentStatusFilter>("pending");
   const [search, setSearch] = useState("");
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,12 +86,15 @@ export function AdminPaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  async function loadPayments() {
+  const [revenue, setRevenue] = useState<RevenueReportRow[]>([]);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(true);
+
+  async function loadPayments(status: PaymentStatusFilter = statusFilter) {
     setIsLoading(true);
     setError(null);
 
     try {
-      setPayments(await listAdminPayments("pending"));
+      setPayments(await listAdminPayments(status));
     } catch (nextError) {
       setError(
         nextError instanceof Error ? nextError.message : "Unable to load payment requests.",
@@ -82,9 +104,38 @@ export function AdminPaymentsPage() {
     }
   }
 
+  async function loadRevenue() {
+    setIsLoadingRevenue(true);
+
+    try {
+      setRevenue(await getAdminRevenueSummary());
+    } catch {
+      setRevenue([]);
+    } finally {
+      setIsLoadingRevenue(false);
+    }
+  }
+
   useEffect(() => {
-    void loadPayments();
+    void loadPayments(statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    void loadRevenue();
   }, []);
+
+  const revenueStats = useMemo(() => {
+    const totalRevenue = revenue.reduce((sum, row) => sum + Number(row.total_revenue || 0), 0);
+    const totalTransactions = revenue.reduce((sum, row) => sum + Number(row.transaction_count || 0), 0);
+    const chartPoints = [...revenue]
+      .sort((left, right) => new Date(left.report_date).getTime() - new Date(right.report_date).getTime())
+      .map((row) => ({
+        label: new Date(row.report_date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        value: Number(row.total_revenue || 0),
+      }));
+
+    return { totalRevenue, totalTransactions, chartPoints };
+  }, [revenue]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -137,7 +188,8 @@ export function AdminPaymentsPage() {
 
       setFeedback(nextMessage);
       setToastMessage(nextMessage);
-      await loadPayments();
+      await loadPayments(statusFilter);
+      await loadRevenue();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to approve payment.");
     } finally {
@@ -153,7 +205,7 @@ export function AdminPaymentsPage() {
     try {
       await rejectAdminPayment(paymentId, "Bank transfer details do not match");
       setFeedback("Payment rejected.");
-      await loadPayments();
+      await loadPayments(statusFilter);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to reject payment.");
     } finally {
@@ -161,38 +213,30 @@ export function AdminPaymentsPage() {
     }
   }
 
+  async function handleRefund(paymentId: string) {
+    setActivePaymentId(paymentId);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      await refundAdminPayment(paymentId, "Refunded by admin");
+      setFeedback("Payment refunded.");
+      await loadPayments(statusFilter);
+      await loadRevenue();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to refund payment.");
+    } finally {
+      setActivePaymentId(null);
+    }
+  }
+
   return (
     <AdminPageLayout activeItem="payments">
-      <section
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          marginBottom: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Payments</div>
-          <div style={{ color: "#9ca8b7", fontSize: 14 }}>
-            Review pending transactions, confirm payments, and issue activation codes.
-          </div>
+      <section style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 6 }}>Payments</div>
+        <div style={{ color: "#9ca8b7", fontSize: 14 }}>
+          Review pending transactions, confirm payments, and issue activation codes.
         </div>
-
-        <Button
-          type="button"
-          onClick={() => navigate("/admin")}
-          style={{
-            width: "auto",
-            height: 46,
-            background: "#ff7a1a",
-            color: "#111111",
-          }}
-          leftIcon={<ShieldCheck size={16} />}
-        >
-          Back to overview
-        </Button>
       </section>
 
       <section
@@ -205,21 +249,21 @@ export function AdminPaymentsPage() {
       >
         {[
           {
-            label: "Pending requests",
+            label: `${STATUS_TABS.find((tab) => tab.id === statusFilter)?.label ?? ""} requests`,
             value: stats.totalPending,
             icon: <Clock3 size={18} />,
             iconBg: "rgba(250,204,21,0.12)",
             iconColor: "#fde68a",
           },
           {
-            label: "Pending value",
+            label: "Shown value",
             value: formatCurrency(stats.totalAmount),
             icon: <CreditCard size={18} />,
             iconBg: "rgba(255,122,26,0.12)",
             iconColor: "#ff9a3d",
           },
           {
-            label: "Members waiting",
+            label: "Members",
             value: stats.uniqueMembers,
             icon: <Users size={18} />,
             iconBg: "rgba(59,130,246,0.12)",
@@ -261,13 +305,74 @@ export function AdminPaymentsPage() {
         ))}
       </section>
 
+      <section className="dashboard-card-enter" style={{ ...panelStyle, marginBottom: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 18,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 22, fontWeight: 900 }}>
+            <TrendingUp size={20} color="#93c5fd" />
+            Revenue report
+          </div>
+          <div style={{ display: "flex", gap: 24 }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#93c5fd" }}>
+                {formatCurrency(revenueStats.totalRevenue)}
+              </div>
+              <div style={{ color: "#8d98a7", fontSize: 12 }}>Total revenue</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>{revenueStats.totalTransactions}</div>
+              <div style={{ color: "#8d98a7", fontSize: 12 }}>Completed transactions</div>
+            </div>
+          </div>
+        </div>
+
+        {isLoadingRevenue ? (
+          <Skeleton height={140} width="100%" radius={12} />
+        ) : (
+          <FitnessMetricsChart points={revenueStats.chartPoints} unit=" VND" accent="#60a5fa" />
+        )}
+      </section>
+
       <section className="dashboard-card-enter" style={panelStyle}>
         <div style={{ fontSize: 34, fontWeight: 900, marginBottom: 18 }}>Payment requests</div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatusFilter(tab.id)}
+              style={{
+                borderRadius: 999,
+                border:
+                  statusFilter === tab.id
+                    ? "1px solid rgba(255,122,26,0.4)"
+                    : "1px solid rgba(255,255,255,0.08)",
+                background: statusFilter === tab.id ? "rgba(255,122,26,0.16)" : "rgba(255,255,255,0.02)",
+                color: statusFilter === tab.id ? "#ffb15f" : "#9ca8b7",
+                fontWeight: 800,
+                fontSize: 13,
+                padding: "8px 16px",
+                cursor: "pointer",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto auto",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
             gap: 10,
             marginBottom: 16,
           }}
@@ -301,28 +406,9 @@ export function AdminPaymentsPage() {
             />
           </div>
 
-          <div
-            className="pending-badge"
-            style={{
-              minHeight: 46,
-              minWidth: 142,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "rgba(255,255,255,0.02)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fde68a",
-              fontSize: 14,
-              fontWeight: 800,
-            }}
-          >
-            Pending only
-          </div>
-
           <Button
             type="button"
-            onClick={() => void loadPayments()}
+            onClick={() => void loadPayments(statusFilter)}
             style={{
               width: "auto",
               height: 46,
@@ -418,7 +504,7 @@ export function AdminPaymentsPage() {
 
         {!isLoading && filteredPayments.length === 0 ? (
           <div style={{ padding: "24px 12px", color: "#9ca8b7" }}>
-            No pending payment requests.
+            No {statusFilter} payment requests.
           </div>
         ) : null}
 
@@ -451,8 +537,8 @@ export function AdminPaymentsPage() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 800 }}>{payment.plan_name ?? "-"}</div>
                   <div style={{ marginTop: 8 }}>
-                    <span className="pending-badge" style={statusPillStyle()}>
-                      Pending
+                    <span className={payment.status === "pending" ? "pending-badge" : undefined} style={statusPillStyle(payment.status)}>
+                      {payment.status}
                     </span>
                   </div>
                 </div>
@@ -474,42 +560,72 @@ export function AdminPaymentsPage() {
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-start" }}>
-                  <button
-                    type="button"
-                    disabled={activePaymentId === payment.id}
-                    onClick={() => void handleApprove(payment.id)}
-                    style={{
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      background: "#22c55e",
-                      color: "#03120a",
-                      fontWeight: 900,
-                      cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {activePaymentId === payment.id ? "Processing..." : "Approve"}
-                  </button>
+                  {payment.status === "pending" ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={activePaymentId === payment.id}
+                        onClick={() => void handleApprove(payment.id)}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          background: "#22c55e",
+                          color: "#03120a",
+                          fontWeight: 900,
+                          cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {activePaymentId === payment.id ? "Processing..." : "Approve"}
+                      </button>
 
-                  <button
-                    type="button"
-                    disabled={activePaymentId === payment.id}
-                    onClick={() => void handleReject(payment.id)}
-                    style={{
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      background: "#ef4444",
-                      color: "#fff7f7",
-                      fontWeight: 900,
-                      cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <XCircle size={14} />
-                      Reject
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        disabled={activePaymentId === payment.id}
+                        onClick={() => void handleReject(payment.id)}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          background: "#ef4444",
+                          color: "#fff7f7",
+                          fontWeight: 900,
+                          cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <XCircle size={14} />
+                          Reject
+                        </span>
+                      </button>
+                    </>
+                  ) : null}
+
+                  {payment.status === "completed" ? (
+                    <button
+                      type="button"
+                      disabled={activePaymentId === payment.id}
+                      onClick={() => void handleRefund(payment.id)}
+                      style={{
+                        border: "none",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                        background: "rgba(148,163,184,0.18)",
+                        color: "#e2e8f0",
+                        fontWeight: 900,
+                        cursor: activePaymentId === payment.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <RotateCcw size={14} />
+                        {activePaymentId === payment.id ? "Processing..." : "Refund"}
+                      </span>
+                    </button>
+                  ) : null}
+
+                  {payment.status === "failed" || payment.status === "refunded" ? (
+                    <span style={{ color: "#8d98a7", fontSize: 13 }}>No actions</span>
+                  ) : null}
                 </div>
               </div>
             ))}

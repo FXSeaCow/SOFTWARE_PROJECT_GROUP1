@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { getCurrentUser, logout } from "../services/authService";
 import { NotificationBell } from "./NotificationBell";
-import { MainMenuSearchBar } from "./main-menu/MainMenuSearchBar";
 import { iconButtonStyle } from "./main-menu/styles";
 
 const menuButtonStyle: React.CSSProperties = {
@@ -40,7 +39,6 @@ export function TopBarActions({
 
   return (
     <>
-      <MainMenuSearchBar />
       <NotificationBell />
 
       <div style={{ position: "relative" }}>

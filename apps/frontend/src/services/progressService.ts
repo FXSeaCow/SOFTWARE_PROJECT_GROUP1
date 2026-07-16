@@ -121,6 +121,47 @@ export async function getGymBranches(): Promise<GymBranch[]> {
   return response.data;
 }
 
+export type LeaderboardEntry = {
+  rank: number;
+  user_id: string;
+  full_name: string;
+  current_streak: number;
+  longest_streak: number;
+  last_active_date: string | null;
+  status: "not_started" | "active" | "at_risk" | "broken" | string;
+};
+
+export async function getStreakLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {
+  const response = await apiClient<ApiResponse<LeaderboardEntry[]>>(
+    `/streaks/leaderboard?limit=${limit}`,
+  );
+  return response.data;
+}
+
+export type AdminUserStreakResult = {
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    created_at: string;
+  };
+  streak: StreakSummary;
+};
+
+export async function getAdminUserStreak(userId: string): Promise<AdminUserStreakResult> {
+  const response = await apiClient<ApiResponse<AdminUserStreakResult>>(`/streaks/admin/${userId}`);
+  return response.data;
+}
+
+export async function recalculateAdminUserStreak(userId: string): Promise<AdminUserStreakResult> {
+  const response = await apiClient<ApiResponse<AdminUserStreakResult>>(
+    `/streaks/admin/${userId}/recalculate`,
+    { method: "POST" },
+  );
+  return response.data;
+}
+
 export async function recordMyCheckin(branchId: string, checkinDate?: string): Promise<CheckinEntry> {
   const response = await apiClient<ApiResponse<{ checkin: CheckinEntry }>>("/streaks/checkins", {
     method: "POST",

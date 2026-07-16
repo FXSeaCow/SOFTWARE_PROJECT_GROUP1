@@ -141,3 +141,59 @@ export async function createAdminMembership(userId: string, planId: string): Pro
 
   return response.data;
 }
+
+export type CreateMembershipPlanInput = {
+  name: string;
+  description?: string;
+  price: number;
+  duration_days: number;
+};
+
+export type UpdateMembershipPlanInput = Partial<CreateMembershipPlanInput> & {
+  is_active?: boolean;
+};
+
+export async function createAdminPlan(input: CreateMembershipPlanInput): Promise<MembershipPlan> {
+  const response = await apiClient<ApiResponse<MembershipPlan>>("/memberships/admin/plans", {
+    method: "POST",
+    body: input,
+  });
+
+  return response.data;
+}
+
+export async function updateAdminPlan(
+  planId: string,
+  patch: UpdateMembershipPlanInput,
+): Promise<MembershipPlan> {
+  const response = await apiClient<ApiResponse<MembershipPlan>>(`/memberships/admin/plans/${planId}`, {
+    method: "PATCH",
+    body: patch,
+  });
+
+  return response.data;
+}
+
+export async function updateMembershipStatus(
+  membershipId: string,
+  status: MembershipRecord["status"],
+): Promise<MembershipRecord> {
+  const response = await apiClient<ApiResponse<MembershipRecord>>(
+    `/memberships/admin/${membershipId}/status`,
+    {
+      method: "PATCH",
+      body: { status },
+    },
+  );
+
+  return response.data;
+}
+
+export async function expireOverdueMemberships(): Promise<{ expired_count: number }> {
+  const response = await apiClient<ApiResponse<{ expired_count: number }>>(
+    "/memberships/admin/expire-overdue",
+    { method: "POST" },
+  );
+
+  return response.data;
+}

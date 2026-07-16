@@ -1,13 +1,11 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   BellRing,
-  ChevronLeft,
   Megaphone,
   Send,
   ShieldAlert,
   Users,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { panelStyle, searchBarStyle } from "../components/main-menu/styles";
@@ -71,7 +69,6 @@ function darkOptionStyle(): React.CSSProperties {
 }
 
 export function AdminAnnouncementsPage() {
-  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(initialForm);
   const [announcements, setAnnouncements] = useState<AdminAnnouncementRecord[]>([]);
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
@@ -192,21 +189,6 @@ export function AdminAnnouncementsPage() {
             Send announcements to members
           </h2>
         </div>
-
-        <Button
-          type="button"
-          onClick={() => navigate("/admin")}
-          style={{
-            width: "auto",
-            height: 46,
-            background: "rgba(255,255,255,0.04)",
-            color: "#f5f5f5",
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}
-          leftIcon={<ChevronLeft size={16} />}
-        >
-          Back to overview
-        </Button>
       </section>
 
       <section

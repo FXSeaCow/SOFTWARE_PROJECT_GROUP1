@@ -1,29 +1,40 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   Ban,
   BellRing,
+  CalendarClock,
   ChevronDown,
   Crown,
   EllipsisVertical,
+  Flame,
   Lock,
+  Pencil,
+  Plus,
+  RotateCcw,
   Search,
   Shield,
   Trash2,
   Unlock,
   Users,
-} from "lucide-react"; 
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
-import { panelStyle } from "../components/main-menu/styles";
+import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import { getCurrentUser } from "../services/authService";
 import {
+  AdminMembershipRecord,
   createAdminMembership,
+  createAdminPlan,
+  expireOverdueMemberships,
   getAdminMembershipPlans,
   listAdminMemberships,
   MembershipPlan,
+  updateAdminPlan,
+  updateMembershipStatus,
 } from "../services/membershipService";
 import {
   AdminUserRecord,
@@ -33,6 +44,9 @@ import {
   toggleAdminUserStatus,
   updateAdminUserRole,
 } from "../services/adminUserService";
+import { FitnessProgress, getAdminUserFitnessProgress } from "../services/fitnessRecordsService";
+import { FitnessMetricsChart } from "../components/progress/FitnessMetricsChart";
+import { AdminUserStreakResult, getAdminUserStreak, recalculateAdminUserStreak } from "../services/progressService";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -108,11 +122,32 @@ export function AdminUsersPage() {
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [currentMembershipPlanId, setCurrentMembershipPlanId] = useState("");
+  const [selectedMembership, setSelectedMembership] = useState<AdminMembershipRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMembershipPlans, setIsLoadingMembershipPlans] = useState(true);
   const [isSavingMembership, setIsSavingMembership] = useState(false);
+  const [isUpdatingMembershipStatus, setIsUpdatingMembershipStatus] = useState(false);
+  const [isExpiringOverdue, setIsExpiringOverdue] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [allPlans, setAllPlans] = useState<MembershipPlan[]>([]);
+  const [isLoadingAllPlans, setIsLoadingAllPlans] = useState(true);
+  const [editingPlanId, setEditingPlanId] = useState<string | "new" | null>(null);
+  const [planNameInput, setPlanNameInput] = useState("");
+  const [planDescriptionInput, setPlanDescriptionInput] = useState("");
+  const [planPriceInput, setPlanPriceInput] = useState("");
+  const [planDurationInput, setPlanDurationInput] = useState("");
+  const [planActiveInput, setPlanActiveInput] = useState(true);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  const [selectedUserProgress, setSelectedUserProgress] = useState<FitnessProgress | null>(null);
+  const [isLoadingProgress, setIsLoadingProgress] = useState(false);
+
+  const [selectedUserStreak, setSelectedUserStreak] = useState<AdminUserStreakResult | null>(null);
+  const [isLoadingStreak, setIsLoadingStreak] = useState(false);
+  const [isRecalculatingStreak, setIsRecalculatingStreak] = useState(false);
 
   async function loadUsers(nextSearch = search) {
     setIsLoading(true);
@@ -189,19 +224,20 @@ export function AdminUsersPage() {
       if (!selectedUser) {
         setCurrentMembershipPlanId("");
         setSelectedPlanId("");
+        setSelectedMembership(null);
         return;
       }
 
       try {
         const memberships = await listAdminMemberships({
           userId: selectedUser.id,
-          status: "active",
           limit: 1,
         });
 
-        const nextPlanId = memberships[0]?.plan_id ?? "";
-        setCurrentMembershipPlanId(nextPlanId);
-        setSelectedPlanId(nextPlanId);
+        const latest = memberships[0] ?? null;
+        setSelectedMembership(latest);
+        setCurrentMembershipPlanId(latest?.plan_id ?? "");
+        setSelectedPlanId(latest?.plan_id ?? "");
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : "Unable to load membership");
       }
@@ -209,6 +245,86 @@ export function AdminUsersPage() {
 
     void loadSelectedUserMembership();
   }, [selectedUser?.id]);
+
+  useEffect(() => {
+    async function loadSelectedUserProgress() {
+      if (!selectedUser) {
+        setSelectedUserProgress(null);
+        return;
+      }
+
+      setIsLoadingProgress(true);
+
+      try {
+        const progress = await getAdminUserFitnessProgress(selectedUser.id, { limit: 15 });
+        setSelectedUserProgress(progress);
+      } catch {
+        setSelectedUserProgress(null);
+      } finally {
+        setIsLoadingProgress(false);
+      }
+    }
+
+    void loadSelectedUserProgress();
+  }, [selectedUser?.id]);
+
+  async function loadSelectedUserStreak() {
+    if (!selectedUser) {
+      setSelectedUserStreak(null);
+      return;
+    }
+
+    setIsLoadingStreak(true);
+
+    try {
+      const streak = await getAdminUserStreak(selectedUser.id);
+      setSelectedUserStreak(streak);
+    } catch {
+      setSelectedUserStreak(null);
+    } finally {
+      setIsLoadingStreak(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadSelectedUserStreak();
+  }, [selectedUser?.id]);
+
+  async function handleRecalculateStreak() {
+    if (!selectedUser) {
+      return;
+    }
+
+    setIsRecalculatingStreak(true);
+    setFeedback(null);
+    setError(null);
+
+    try {
+      const streak = await recalculateAdminUserStreak(selectedUser.id);
+      setSelectedUserStreak(streak);
+      setFeedback("Streak recalculated successfully");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to recalculate streak");
+    } finally {
+      setIsRecalculatingStreak(false);
+    }
+  }
+
+  async function loadAllPlans() {
+    setIsLoadingAllPlans(true);
+
+    try {
+      setAllPlans(await getAdminMembershipPlans());
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to load plans");
+    } finally {
+      setIsLoadingAllPlans(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadAllPlans();
+  }, []);
 
   async function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -287,6 +403,124 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleMembershipStatusChange(status: "active" | "suspended" | "cancelled") {
+    if (!selectedMembership) {
+      return;
+    }
+
+    setIsUpdatingMembershipStatus(true);
+    setFeedback(null);
+    setError(null);
+
+    try {
+      const updated = await updateMembershipStatus(selectedMembership.id, status);
+      setSelectedMembership({ ...selectedMembership, status: updated.status });
+      await loadUsers(search);
+      setFeedback(`Membership ${status} successfully`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to update membership status");
+    } finally {
+      setIsUpdatingMembershipStatus(false);
+    }
+  }
+
+  async function handleExpireOverdue() {
+    setIsExpiringOverdue(true);
+    setFeedback(null);
+    setError(null);
+
+    try {
+      const result = await expireOverdueMemberships();
+      await loadUsers(search);
+      setFeedback(`${result.expired_count} membership(s) expired`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to run expiry job");
+    } finally {
+      setIsExpiringOverdue(false);
+    }
+  }
+
+  function startCreatePlan() {
+    setEditingPlanId("new");
+    setPlanNameInput("");
+    setPlanDescriptionInput("");
+    setPlanPriceInput("");
+    setPlanDurationInput("");
+    setPlanActiveInput(true);
+    setPlanError(null);
+  }
+
+  function startEditPlan(plan: MembershipPlan) {
+    setEditingPlanId(plan.id);
+    setPlanNameInput(plan.name);
+    setPlanDescriptionInput(plan.description ?? "");
+    setPlanPriceInput(String(plan.price));
+    setPlanDurationInput(String(plan.duration_days));
+    setPlanActiveInput(plan.is_active !== false);
+    setPlanError(null);
+  }
+
+  function cancelPlanEdit() {
+    setEditingPlanId(null);
+    setPlanError(null);
+  }
+
+  async function handlePlanSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setPlanError(null);
+
+    const price = Number(planPriceInput);
+    const durationDays = Number(planDurationInput);
+
+    if (!planNameInput.trim()) {
+      setPlanError("Plan name is required.");
+      return;
+    }
+
+    if (!price || price <= 0) {
+      setPlanError("Enter a valid price.");
+      return;
+    }
+
+    if (!durationDays || durationDays <= 0) {
+      setPlanError("Enter a valid duration in days.");
+      return;
+    }
+
+    setIsSavingPlan(true);
+
+    try {
+      if (editingPlanId === "new") {
+        await createAdminPlan({
+          name: planNameInput.trim(),
+          description: planDescriptionInput.trim() || undefined,
+          price,
+          duration_days: durationDays,
+        });
+        setFeedback("Plan created successfully");
+      } else if (editingPlanId) {
+        await updateAdminPlan(editingPlanId, {
+          name: planNameInput.trim(),
+          description: planDescriptionInput.trim() || undefined,
+          price,
+          duration_days: durationDays,
+          is_active: planActiveInput,
+        });
+        setFeedback("Plan updated successfully");
+      }
+
+      setEditingPlanId(null);
+      await loadAllPlans();
+
+      const activePlans = await getAdminMembershipPlans();
+      setMembershipPlans(activePlans.filter((plan) => plan.is_active !== false));
+    } catch (nextError) {
+      setPlanError(nextError instanceof Error ? nextError.message : "Unable to save plan");
+    } finally {
+      setIsSavingPlan(false);
+    }
+  }
+
   return (
     <AdminPageLayout activeItem="users">
       <section
@@ -306,19 +540,37 @@ export function AdminUsersPage() {
           </div>
         </div>
 
-        <Button
-          type="button"
-          onClick={() => navigate("/admin/announcements")}
-          style={{
-            width: "auto",
-            height: 46,
-            background: "#ff7a1a",
-            color: "#111111",
-          }}
-          leftIcon={<BellRing size={16} />}
-        >
-          Create announcement
-        </Button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Button
+            type="button"
+            onClick={() => void handleExpireOverdue()}
+            isLoading={isExpiringOverdue}
+            loadingText="Running..."
+            style={{
+              width: "auto",
+              height: 46,
+              background: "rgba(255,255,255,0.02)",
+              color: "#f5f5f5",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+            leftIcon={<CalendarClock size={16} />}
+          >
+            Run expire overdue
+          </Button>
+          <Button
+            type="button"
+            onClick={() => navigate("/admin/announcements")}
+            style={{
+              width: "auto",
+              height: 46,
+              background: "#ff7a1a",
+              color: "#111111",
+            }}
+            leftIcon={<BellRing size={16} />}
+          >
+            Create announcement
+          </Button>
+        </div>
       </section>
 
       <section
@@ -780,6 +1032,176 @@ export function AdminUsersPage() {
                 <span>{formatDate(selectedUser.updated_at || selectedUser.created_at)}</span>
               </div>
 
+              {selectedMembership ? (
+                <div
+                  style={{
+                    marginTop: 22,
+                    paddingTop: 18,
+                    borderTop: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <div style={{ color: "#a1a1aa", fontSize: 14, marginBottom: 10 }}>
+                    Membership status: <strong style={{ color: "#f5f5f5" }}>{selectedMembership.status}</strong>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {selectedMembership.status !== "active" ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleMembershipStatusChange("active")}
+                        disabled={isUpdatingMembershipStatus}
+                        style={smallActionButtonStyle("rgba(34,197,94,0.14)", "#86efac", "1px solid rgba(34,197,94,0.28)")}
+                      >
+                        Reactivate
+                      </button>
+                    ) : null}
+                    {selectedMembership.status !== "suspended" ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleMembershipStatusChange("suspended")}
+                        disabled={isUpdatingMembershipStatus}
+                        style={smallActionButtonStyle("rgba(250,204,21,0.14)", "#fde68a", "1px solid rgba(250,204,21,0.28)")}
+                      >
+                        Suspend
+                      </button>
+                    ) : null}
+                    {selectedMembership.status !== "cancelled" ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleMembershipStatusChange("cancelled")}
+                        disabled={isUpdatingMembershipStatus}
+                        style={smallActionButtonStyle("rgba(239,68,68,0.14)", "#fca5a5", "1px solid rgba(239,68,68,0.28)")}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              <div
+                style={{
+                  marginTop: 22,
+                  paddingTop: 18,
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#a1a1aa", fontSize: 14, marginBottom: 12 }}>
+                  <Activity size={16} />
+                  <span>Fitness progress</span>
+                </div>
+
+                {isLoadingProgress ? (
+                  <Skeleton height={60} width="100%" radius={12} />
+                ) : selectedUserProgress && selectedUserProgress.record_count > 0 ? (
+                  <>
+                    <div style={{ display: "flex", gap: 20, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 900 }}>
+                          {selectedUserProgress.latest_record?.weight_kg ?? "—"} kg
+                        </div>
+                        <div style={{ color: "#8d98a7", fontSize: 12 }}>Weight</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 900 }}>
+                          {selectedUserProgress.latest_record?.bmi?.toFixed(1) ?? "—"}
+                        </div>
+                        <div style={{ color: "#8d98a7", fontSize: 12 }}>BMI</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 900 }}>{selectedUserProgress.record_count}</div>
+                        <div style={{ color: "#8d98a7", fontSize: 12 }}>Records</div>
+                      </div>
+                    </div>
+                    <FitnessMetricsChart
+                      points={selectedUserProgress.trend
+                        .filter((point) => point.weight_kg !== null)
+                        .map((point) => ({
+                          label: new Date(`${point.recorded_date}T00:00:00`).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          }),
+                          value: point.weight_kg as number,
+                        }))}
+                      unit="kg"
+                    />
+                  </>
+                ) : (
+                  <div style={{ color: "#9ca8b7", fontSize: 13 }}>No fitness records logged yet.</div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 22,
+                  paddingTop: 18,
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#a1a1aa", fontSize: 14 }}>
+                    <Flame size={16} />
+                    <span>Workout streak</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleRecalculateStreak()}
+                    disabled={isRecalculatingStreak || !selectedUserStreak}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 8,
+                      background: "rgba(255,255,255,0.02)",
+                      color: "#d3dae5",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      padding: "6px 10px",
+                      cursor: isRecalculatingStreak ? "not-allowed" : "pointer",
+                      opacity: isRecalculatingStreak ? 0.6 : 1,
+                    }}
+                  >
+                    <RotateCcw size={12} />
+                    {isRecalculatingStreak ? "Recalculating..." : "Recalculate"}
+                  </button>
+                </div>
+
+                {isLoadingStreak ? (
+                  <Skeleton height={40} width="100%" radius={12} />
+                ) : selectedUserStreak ? (
+                  <div style={{ display: "flex", gap: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 900 }}>
+                        {selectedUserStreak.streak.current_streak}d
+                      </div>
+                      <div style={{ color: "#8d98a7", fontSize: 12 }}>Current</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 900 }}>
+                        {selectedUserStreak.streak.longest_streak}d
+                      </div>
+                      <div style={{ color: "#8d98a7", fontSize: 12 }}>Longest</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 900 }}>
+                        {selectedUserStreak.streak.total_checkins}
+                      </div>
+                      <div style={{ color: "#8d98a7", fontSize: 12 }}>Check-ins</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: "#9ca8b7", fontSize: 13 }}>No streak data yet.</div>
+                )}
+              </div>
+
               <div style={{ display: "grid", gap: 12, marginTop: 26 }}>
                 <Button
                   type="button"
@@ -826,9 +1248,235 @@ export function AdminUsersPage() {
           )}
         </aside>
       </section>
+
+      <section className="dashboard-card-enter" style={{ ...panelStyle, marginTop: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 18,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 900 }}>Membership plans</div>
+          <button
+            type="button"
+            onClick={startCreatePlan}
+            style={{ ...startButtonStyle, minHeight: 40 }}
+          >
+            <Plus size={16} />
+            New plan
+          </button>
+        </div>
+
+        {editingPlanId ? (
+          <form
+            onSubmit={handlePlanSubmit}
+            style={{
+              padding: 16,
+              borderRadius: 14,
+              background: "rgba(255,122,26,0.05)",
+              border: "1px solid rgba(255,122,26,0.18)",
+              marginBottom: 18,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <label>
+                <span style={planLabelStyle}>Name</span>
+                <input
+                  value={planNameInput}
+                  onChange={(event) => setPlanNameInput(event.target.value)}
+                  style={planInputStyle}
+                  required
+                />
+              </label>
+              <label>
+                <span style={planLabelStyle}>Price (VND)</span>
+                <input
+                  type="number"
+                  step="1000"
+                  min="0"
+                  value={planPriceInput}
+                  onChange={(event) => setPlanPriceInput(event.target.value)}
+                  style={planInputStyle}
+                  required
+                />
+              </label>
+              <label>
+                <span style={planLabelStyle}>Duration (days)</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={planDurationInput}
+                  onChange={(event) => setPlanDurationInput(event.target.value)}
+                  style={planInputStyle}
+                  required
+                />
+              </label>
+              {editingPlanId !== "new" ? (
+                <label style={{ display: "flex", alignItems: "flex-end", gap: 8, paddingBottom: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={planActiveInput}
+                    onChange={(event) => setPlanActiveInput(event.target.checked)}
+                  />
+                  <span style={{ color: "#d3dae5", fontSize: 14 }}>Active</span>
+                </label>
+              ) : null}
+            </div>
+
+            <label style={{ display: "block", marginBottom: 12 }}>
+              <span style={planLabelStyle}>Description</span>
+              <input
+                value={planDescriptionInput}
+                onChange={(event) => setPlanDescriptionInput(event.target.value)}
+                style={planInputStyle}
+              />
+            </label>
+
+            {planError ? (
+              <div style={{ color: "#fca5a5", fontSize: 13, marginBottom: 12 }}>{planError}</div>
+            ) : null}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="submit"
+                disabled={isSavingPlan}
+                style={{ ...startButtonStyle, minHeight: 38, opacity: isSavingPlan ? 0.6 : 1 }}
+              >
+                {isSavingPlan ? "Saving..." : "Save plan"}
+              </button>
+              <button
+                type="button"
+                onClick={cancelPlanEdit}
+                style={{
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 999,
+                  background: "transparent",
+                  color: "#d3dae5",
+                  minHeight: 38,
+                  padding: "0 18px",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {isLoadingAllPlans ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} height={56} width="100%" radius={12} />
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {allPlans.map((plan) => (
+              <div
+                key={plan.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "14px 16px",
+                  borderRadius: 14,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ minWidth: 160 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{plan.name}</div>
+                  {plan.description ? (
+                    <div style={{ color: "#8d98a7", fontSize: 12, marginTop: 4 }}>{plan.description}</div>
+                  ) : null}
+                </div>
+                <div style={{ color: "#d3dae5", fontSize: 14, fontWeight: 700 }}>
+                  {new Intl.NumberFormat("en-US").format(plan.price)} VND
+                </div>
+                <div style={{ color: "#d3dae5", fontSize: 14 }}>{plan.duration_days} days</div>
+                <span
+                  style={pillStyle(
+                    plan.is_active === false
+                      ? { background: "rgba(148,163,184,0.18)", color: "#cbd5e1" }
+                      : { background: "rgba(34,197,94,0.16)", color: "#86efac" },
+                  )}
+                >
+                  {plan.is_active === false ? "Inactive" : "Active"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => startEditPlan(plan)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#8d98a7",
+                    cursor: "pointer",
+                    padding: 6,
+                  }}
+                  aria-label="Edit plan"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+            ))}
+
+            {allPlans.length === 0 ? (
+              <div style={{ color: "#9ca8b7", fontSize: 14 }}>No membership plans yet.</div>
+            ) : null}
+          </div>
+        )}
+      </section>
     </AdminPageLayout>
   );
 }
+
+function smallActionButtonStyle(background: string, color: string, border: string): React.CSSProperties {
+  return {
+    borderRadius: 8,
+    border,
+    background,
+    color,
+    fontWeight: 800,
+    fontSize: 13,
+    padding: "8px 14px",
+    cursor: "pointer",
+  };
+}
+
+const planLabelStyle: React.CSSProperties = {
+  color: "#9ca8b7",
+  fontSize: 12,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  marginBottom: 6,
+  display: "block",
+};
+
+const planInputStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 42,
+  borderRadius: 12,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#f5f5f5",
+  padding: "0 12px",
+  fontSize: 14,
+  boxSizing: "border-box",
+};
 
 function DetailField({
   label,

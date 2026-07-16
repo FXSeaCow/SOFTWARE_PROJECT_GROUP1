@@ -89,3 +89,34 @@ export async function rejectAdminPayment(paymentId: string, reason: string): Pro
 
   return response.data;
 }
+
+export async function refundAdminPayment(paymentId: string, reason: string): Promise<PaymentRecord> {
+  const response = await apiClient<ApiResponse<PaymentRecord>>(`/payments/admin/${paymentId}/refund`, {
+    method: "POST",
+    body: {
+      reason,
+    },
+  });
+
+  return response.data;
+}
+
+export type RevenueReportRow = {
+  report_date: string;
+  transaction_count: number;
+  total_revenue: number;
+};
+
+export async function getAdminRevenueSummary(
+  params: { fromDate?: string; toDate?: string } = {},
+): Promise<RevenueReportRow[]> {
+  const query = new URLSearchParams();
+  if (params.fromDate) query.set("from_date", params.fromDate);
+  if (params.toDate) query.set("to_date", params.toDate);
+
+  const response = await apiClient<ApiResponse<RevenueReportRow[]>>(
+    `/payments/admin/revenue?${query.toString()}`,
+  );
+
+  return response.data;
+}
