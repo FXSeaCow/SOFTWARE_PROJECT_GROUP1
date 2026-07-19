@@ -11,12 +11,14 @@ export function MainMenuBottomNav({
   trainHref = "/exercises",
   membershipHref = "/membership",
   progressHref = "/progress",
+  scheduleHref = "/schedule",
   activeItem = "home",
 }: {
   profileHref: string;
   trainHref?: string;
   membershipHref?: string;
   progressHref?: string;
+  scheduleHref?: string;
   activeItem?: NavItem;
 }) {
   return (
@@ -76,6 +78,7 @@ export function MainMenuBottomNav({
         <MainMenuBottomNavButton
           label="Schedule"
           icon={<CalendarDays size={21} />}
+          to={scheduleHref}
           active={activeItem === "schedule"}
         />
       </div>

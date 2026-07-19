@@ -66,6 +66,7 @@ export function AppShell({
             onTrainClick={() => navigate("/exercises")}
             onMembershipClick={() => navigate("/membership")}
             onProgressClick={() => navigate("/progress")}
+            onScheduleClick={() => navigate("/schedule")}
             onAdminClick={() => navigate("/admin")}
             showAdminEntry={currentUser?.role === "admin"}
           />

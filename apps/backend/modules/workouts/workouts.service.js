@@ -131,7 +131,7 @@ const generatePlan = async (userId, { title, goal, fitness_level, days_per_week 
 
     // b. Create the new plan
     const newPlan = await repo.createPlan(
-      { user_id: userId, title, goal, fitness_level, is_customized: false },
+      { user_id: userId, title, goal, fitness_level, is_active: true, is_customized: false },
       client
     );
 
@@ -230,7 +230,7 @@ const createCustomPlan = async (userId, { title, goal, fitness_level }) => {
     await repo.deactivateAllPlans(userId, client);
 
     const newPlan = await repo.createPlan(
-      { user_id: userId, title, goal, fitness_level, is_customized: true },
+      { user_id: userId, title, goal, fitness_level, is_active: true, is_customized: true },
       client
     );
 
@@ -411,6 +411,8 @@ const groupScheduleByDay = (rows) => {
         sets:          row.sets,
         reps:          row.reps,
         rest_seconds:  row.rest_seconds,
+        scheduled_period: row.scheduled_period,
+        scheduled_time:   row.scheduled_time,
         order_index:   row.order_index,
         notes:         row.notes,
       });

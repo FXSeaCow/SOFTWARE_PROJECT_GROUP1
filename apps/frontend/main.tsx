@@ -21,6 +21,7 @@ import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
 import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
 import { AdminOccupancyPage } from "./src/pages/AdminOccupancyPage";
 import { AdminReportsPage } from "./src/pages/AdminReportsPage";
+import { SchedulePage } from "./src/pages/SchedulePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -54,6 +55,14 @@ function AppRouter() {
       <Routes>
         <Route path="/" element={<MainMenuPage />} />
         <Route path="/exercises" element={<WorkoutPage />} />
+        <Route
+          path="/schedule"
+          element={
+            <ProtectedRoute>
+              <SchedulePage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/progress"
           element={

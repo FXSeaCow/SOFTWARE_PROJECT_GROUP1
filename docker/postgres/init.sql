@@ -181,6 +181,38 @@ CREATE TABLE IF NOT EXISTS exercises (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name_lower ON exercises (LOWER(name));
 
+INSERT INTO exercises (name, muscle_group, equipment, difficulty, description, goal_tags)
+SELECT *
+FROM (VALUES
+  ('Push Up', 'chest', 'bodyweight', 'beginner', 'Builds chest, shoulders, and triceps with no equipment.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Dumbbell Bench Press', 'chest', 'dumbbells', 'intermediate', 'Pressing movement for chest strength and control.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Incline Barbell Press', 'chest', 'barbell', 'advanced', 'Upper-chest compound lift for heavier training days.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Lat Pulldown', 'back', 'cable machine', 'beginner', 'Develops lats and upper-back pulling strength.', ARRAY['strength', 'posture']::TEXT[]),
+  ('Seated Cable Row', 'back', 'cable machine', 'intermediate', 'Horizontal pull for mid-back thickness and posture.', ARRAY['strength', 'posture']::TEXT[]),
+  ('Pull Up', 'back', 'pull-up bar', 'advanced', 'Bodyweight pull for back and arm strength.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Bodyweight Squat', 'legs', 'bodyweight', 'beginner', 'Teaches squat pattern and lower-body control.', ARRAY['strength', 'weight_loss']::TEXT[]),
+  ('Goblet Squat', 'legs', 'dumbbell', 'intermediate', 'Loaded squat variation for quads and glutes.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Barbell Back Squat', 'legs', 'barbell', 'advanced', 'Heavy compound lift for complete leg strength.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Dumbbell Shoulder Press', 'shoulders', 'dumbbells', 'beginner', 'Overhead press for shoulder strength.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Lateral Raise', 'shoulders', 'dumbbells', 'intermediate', 'Isolation movement for side delts.', ARRAY['muscle_gain', 'toning']::TEXT[]),
+  ('Arnold Press', 'shoulders', 'dumbbells', 'advanced', 'Rotational shoulder press for advanced control.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Biceps Curl', 'arms', 'dumbbells', 'beginner', 'Simple curl for biceps strength.', ARRAY['muscle_gain', 'toning']::TEXT[]),
+  ('Triceps Rope Pushdown', 'arms', 'cable machine', 'intermediate', 'Cable isolation for triceps volume.', ARRAY['muscle_gain', 'toning']::TEXT[]),
+  ('Close-Grip Bench Press', 'arms', 'barbell', 'advanced', 'Compound triceps-focused press.', ARRAY['strength', 'muscle_gain']::TEXT[]),
+  ('Plank', 'core', 'bodyweight', 'beginner', 'Core stability hold for trunk control.', ARRAY['core', 'stability']::TEXT[]),
+  ('Cable Woodchop', 'core', 'cable machine', 'intermediate', 'Rotational core exercise for control.', ARRAY['core', 'stability']::TEXT[]),
+  ('Hanging Leg Raise', 'core', 'pull-up bar', 'advanced', 'Advanced core flexion exercise.', ARRAY['core', 'strength']::TEXT[]),
+  ('Treadmill Walk', 'cardio', 'treadmill', 'beginner', 'Low-impact cardio for endurance and calorie burn.', ARRAY['weight_loss', 'endurance']::TEXT[]),
+  ('Rowing Machine Intervals', 'cardio', 'rowing machine', 'intermediate', 'Full-body cardio intervals.', ARRAY['weight_loss', 'endurance']::TEXT[]),
+  ('Assault Bike Sprint', 'cardio', 'assault bike', 'advanced', 'High-intensity conditioning sprint.', ARRAY['weight_loss', 'endurance']::TEXT[]),
+  ('Step Up', 'full_body', 'box', 'beginner', 'Simple full-body movement focused on legs and balance.', ARRAY['weight_loss', 'stability']::TEXT[]),
+  ('Kettlebell Swing', 'full_body', 'kettlebell', 'intermediate', 'Power movement for hips, core, and conditioning.', ARRAY['power', 'weight_loss']::TEXT[]),
+  ('Burpee', 'full_body', 'bodyweight', 'advanced', 'High-effort full-body conditioning exercise.', ARRAY['weight_loss', 'endurance']::TEXT[])
+) AS seed(name, muscle_group, equipment, difficulty, description, goal_tags)
+WHERE NOT EXISTS (
+  SELECT 1 FROM exercises WHERE LOWER(exercises.name) = LOWER(seed.name)
+);
+
 CREATE TABLE IF NOT EXISTS workout_plans (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -210,6 +242,8 @@ CREATE TABLE IF NOT EXISTS workout_day_exercises (
   sets            INTEGER NOT NULL,
   reps            INTEGER NOT NULL,
   rest_seconds    INTEGER NOT NULL DEFAULT 60,
+  scheduled_period TEXT CHECK (scheduled_period IN ('morning', 'afternoon')),
+  scheduled_time   TIME,
   order_index     INTEGER NOT NULL DEFAULT 0,
   notes           TEXT
 );

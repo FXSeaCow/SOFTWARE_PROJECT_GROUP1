@@ -145,6 +145,14 @@ const setDayExercisesSchema = Joi.object({
         sets:         Joi.number().integer().min(1).max(20).required(),
         reps:         Joi.number().integer().min(1).max(200).required(),
         rest_seconds: Joi.number().integer().min(0).max(600).default(60),
+        scheduled_period: Joi.string().valid('morning', 'afternoon').allow(null).optional(),
+        scheduled_time:   Joi.string()
+          .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .allow('', null)
+          .optional()
+          .messages({
+            'string.pattern.base': 'scheduled_time must use HH:mm format',
+          }),
         notes:        Joi.string().trim().max(200).allow('', null).optional(),
       })
     )
