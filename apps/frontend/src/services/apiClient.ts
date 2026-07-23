@@ -1,32 +1,172 @@
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "/api";
+const STORAGE_KEY = "gym-web.auth-session";
+
 export type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
 };
 
+type StoredSession = {
+  accessToken?: string;
+  user?: {
+    id?: string;
+  };
+};
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function isJwtLike(value: string): boolean {
+  return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(value);
+}
+
+function isValidStoredSession(session: unknown): session is StoredSession {
+  if (!session || typeof session !== "object") {
+    return false;
+  }
+
+  const candidate = session as StoredSession;
+  return (
+    typeof candidate.accessToken === "string" &&
+    isJwtLike(candidate.accessToken) &&
+    !!candidate.user &&
+    typeof candidate.user.id === "string" &&
+    isUuid(candidate.user.id)
+  );
+}
+
+function getStoredSession(): StoredSession | null {
+  const rawSession = localStorage.getItem(STORAGE_KEY);
+  if (!rawSession) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawSession) as unknown;
+    if (!isValidStoredSession(parsed)) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
+
+function setStoredAccessToken(accessToken: string) {
+  const session = getStoredSession();
+  if (!session) {
+    return;
+  }
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...session,
+      accessToken,
+    }),
+  );
+}
+
+async function refreshAccessToken(): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  const rawBody = await response.text();
+  let parsed: { data?: { accessToken?: string }; message?: string } | null = null;
+
+  if (rawBody) {
+    try {
+      parsed = JSON.parse(rawBody) as { data?: { accessToken?: string }; message?: string };
+    } catch {
+      parsed = null;
+    }
+  }
+
+  if (!response.ok || !parsed?.data?.accessToken) {
+    throw new Error(parsed?.message || "Session expired. Please log in again.");
+  }
+
+  setStoredAccessToken(parsed.data.accessToken);
+  return parsed.data.accessToken;
+}
+
 export async function apiClient<T>(
   endpoint: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(endpoint, {
-    method: options.method ?? "GET",
-    headers: {
+  const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${normalizedEndpoint}`;
+
+  async function sendRequest(accessTokenOverride?: string): Promise<T> {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...options.headers,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+    };
 
-  const data = (await response.json().catch(() => null)) as T | {
-    message?: string;
-  } | null;
+    const session = getStoredSession();
+    const accessToken = accessTokenOverride || session?.accessToken;
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
 
-  if (!response.ok) {
-    throw new Error(
-      (data && typeof data === "object" && "message" in data && data.message) ||
-        "Request failed",
-    );
+    const response = await fetch(url, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      credentials: "same-origin",
+    });
+
+    const rawBody = await response.text();
+    let data: T | { message?: string } | null = null;
+
+    if (rawBody) {
+      try {
+        data = JSON.parse(rawBody) as T | { message?: string };
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!response.ok) {
+      const message =
+        data && typeof data === "object" && "message" in data && typeof data.message === "string"
+          ? data.message
+          : rawBody || `Request failed (${response.status} ${response.statusText})`;
+
+      throw new Error(message);
+    }
+
+    return data as T;
   }
 
-  return data as T;
+  try {
+    return await sendRequest();
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== "Access token expired") {
+      throw error;
+    }
+
+    try {
+      const nextAccessToken = await refreshAccessToken();
+      return await sendRequest(nextAccessToken);
+    } catch (refreshError) {
+      localStorage.removeItem(STORAGE_KEY);
+      throw refreshError;
+    }
+  }
 }

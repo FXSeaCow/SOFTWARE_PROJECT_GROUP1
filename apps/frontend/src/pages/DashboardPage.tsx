@@ -31,16 +31,34 @@ export function DashboardPage() {
         <p style={{ color: "#475569" }}>
           Signed in as <strong>{user?.email ?? "unknown user"}</strong>.
         </p>
-        <div style={{ maxWidth: 180 }}>
-          <Button
-            type="button"
-            onClick={() => {
-              logout();
-              navigate("/login", { replace: true });
-            }}
-          >
-            Sign out
-          </Button>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            maxWidth: 420,
+          }}
+        >
+          <div style={{ width: 180 }}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/change-password")}
+            >
+              Change password
+            </Button>
+          </div>
+          <div style={{ width: 180 }}>
+            <Button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate("/login", { replace: true });
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
         </div>
       </div>
     </main>
