@@ -102,10 +102,10 @@ const resolveGoal = async (userText) => {
  *      d. Insert workout_day_exercises for each non-rest day
  *
  * @param {string} userId
- * @param {{ title, goal, fitness_level, days_per_week }} data
+ * @param {{ title, goal, fitness_level, days_per_week, preferred_slots? }} data
  * @returns {Promise<{ plan: object, schedule: object[] }>}
  */
-const generatePlan = async (userId, { title, goal, fitness_level, days_per_week }) => {
+const generatePlan = async (userId, { title, goal, fitness_level, days_per_week, preferred_slots }) => {
   // 1. Fetch exercises matching the member's fitness level
   const catalog = await repo.findExercises({ difficulty: fitness_level });
 
@@ -122,6 +122,7 @@ const generatePlan = async (userId, { title, goal, fitness_level, days_per_week 
     fitness_level,
     days_per_week,
     exerciseCatalog: catalog,
+    preferredSlots:  preferred_slots,
   });
 
   // 3. Persist everything atomically

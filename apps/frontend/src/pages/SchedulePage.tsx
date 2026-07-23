@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Sparkles,
   Target,
   Trash2,
   X,
@@ -17,10 +18,13 @@ import { panelStyle, searchBarStyle, startButtonStyle } from "../components/main
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser } from "../services/authService";
 import {
+  applyGeneratedPlanToWeeklySchedule,
   createEmptySchedule,
   createScheduleEntry,
+  generateSmartWorkoutPlan,
   getScheduleCellKey,
   loadWeeklySchedule,
+  resolveWorkoutGoal,
   saveCustomWeeklySchedule,
   saveWeeklySchedule,
   scheduleDays,
@@ -89,6 +93,14 @@ function getCurrentWeekDates() {
 
 const calendarDayLabels = ["THỨ 2", "THỨ 3", "THỨ 4", "THỨ 5", "THỨ 6", "THỨ 7", "CHỦ NHẬT"];
 
+const GOAL_SUGGESTIONS = [
+  "Tôi muốn giảm cân và săn chắc cơ thể",
+  "Tôi muốn tăng cơ, khỏe hơn",
+  "Tôi muốn cải thiện sức bền, chạy bền hơn",
+  "Tôi muốn dẻo dai và linh hoạt hơn",
+  "Tôi mới bắt đầu, chỉ muốn khỏe mạnh hơn",
+];
+
 export function SchedulePage() {
   const currentUser = getCurrentUser();
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -104,6 +116,11 @@ export function SchedulePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [goalText, setGoalText] = useState("");
+  const [daysPerWeek, setDaysPerWeek] = useState(3);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [smartError, setSmartError] = useState<string | null>(null);
+  const [smartMessage, setSmartMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -240,6 +257,46 @@ export function SchedulePage() {
     }
   }
 
+  async function handleGenerateSmartPlan() {
+    if (!goalText.trim()) {
+      setSmartError("Hãy mô tả mục tiêu tập luyện của bạn trước, hoặc chọn một gợi ý bên dưới.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setSmartError(null);
+    setSmartMessage(null);
+
+    try {
+      const resolved = await resolveWorkoutGoal(goalText);
+      const goal = resolved.goal ?? "general_fitness";
+
+      const generated = await generateSmartWorkoutPlan({
+        title: `Smart plan ${new Date().toLocaleDateString()}`,
+        goal,
+        fitnessLevel: selectedFitnessLevel,
+        daysPerWeek: resolved.preferred_slots.length || daysPerWeek,
+        preferredSlots: resolved.preferred_slots,
+      });
+
+      const nextSchedule = applyGeneratedPlanToWeeklySchedule(generated.schedule, (exerciseId) =>
+        getExerciseById(exercises, exerciseId),
+      );
+      setSchedule(nextSchedule);
+      setSmartMessage(
+        resolved.fallback
+          ? `Đã tạo lịch tập theo mục tiêu "${formatLabel(goal)}" (AI tạm thời không khả dụng, dùng gợi ý dự phòng).`
+          : `Đã tạo lịch tập theo mục tiêu "${formatLabel(goal)}". Nhấn Save để lưu lại nếu bạn muốn giữ lịch này.`,
+      );
+    } catch (error) {
+      setSmartError(
+        error instanceof Error ? error.message : "Không thể tạo lịch tập thông minh.",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   async function handleSaveSchedule() {
     setIsSaving(true);
     setSaveMessage(null);
@@ -365,6 +422,110 @@ export function SchedulePage() {
         <SummaryCard label="Catalog" value={exercises.length} icon={<Dumbbell size={20} />} />
         <SummaryCard label="Scheduled" value={scheduledCount} icon={<CalendarDays size={20} />} />
         <SummaryCard label="Groups" value={muscleGroups.length} icon={<Target size={20} />} />
+      </section>
+
+      <section style={{ ...panelStyle, marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <Sparkles size={18} color="#ff9a3d" />
+          <div style={{ fontSize: 15, fontWeight: 900, textTransform: "uppercase" }}>
+            Tạo lịch tập thông minh
+          </div>
+        </div>
+
+        <div style={{ color: "#9ca8b7", fontSize: 13, marginBottom: 10 }}>
+          Mô tả mục tiêu tập luyện bằng lời của bạn, hệ thống sẽ tự hiểu và tạo lịch tập phù hợp.
+        </div>
+
+        <textarea
+          value={goalText}
+          onChange={(event) => setGoalText(event.target.value)}
+          placeholder="Ví dụ: Tôi muốn giảm mỡ bụng và tăng sức bền..."
+          rows={3}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            borderRadius: 14,
+            background: "#1f1f1f",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "#f5f5f5",
+            padding: 12,
+            fontSize: 14,
+            resize: "vertical",
+            marginBottom: 10,
+          }}
+        />
+
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <span style={{ color: "#6f7784", fontSize: 12 }}>Chưa biết viết gì? Thử:</span>
+          {GOAL_SUGGESTIONS.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => setGoalText(suggestion)}
+              style={{
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.04)",
+                color: "#cfd5df",
+                fontSize: 12,
+                padding: "6px 12px",
+                cursor: "pointer",
+              }}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase" }}>
+              Số ngày/tuần
+            </span>
+            <select
+              value={daysPerWeek}
+              onChange={(event) => setDaysPerWeek(Number(event.target.value))}
+              style={{
+                minHeight: 38,
+                borderRadius: 999,
+                background: "#1f1f1f",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#f5f5f5",
+                padding: "0 14px",
+                fontSize: 14,
+                fontWeight: 800,
+              }}
+            >
+              {[2, 3, 4, 5, 6].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={handleGenerateSmartPlan}
+            disabled={isGenerating}
+            style={{
+              ...startButtonStyle,
+              width: "auto",
+              opacity: isGenerating ? 0.66 : 1,
+              cursor: isGenerating ? "wait" : "pointer",
+            }}
+          >
+            <Sparkles size={18} />
+            {isGenerating ? "Đang tạo..." : "Tạo lịch tập"}
+          </button>
+        </div>
+
+        {smartError ? (
+          <div style={{ marginTop: 12, color: "#fecaca", fontSize: 13 }}>{smartError}</div>
+        ) : null}
+        {smartMessage ? (
+          <div style={{ marginTop: 12, color: "#bbf7d0", fontSize: 13 }}>{smartMessage}</div>
+        ) : null}
       </section>
 
       {errorMessage ? (

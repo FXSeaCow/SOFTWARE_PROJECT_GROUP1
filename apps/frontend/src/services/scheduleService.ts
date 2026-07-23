@@ -120,6 +120,116 @@ type CreateWorkoutPlanResponse = {
   schedule: WorkoutDayResponse[];
 };
 
+export type PreferredSlot = {
+  day_of_week: number;
+  period: SchedulePeriod | null;
+};
+
+export type ResolveGoalResult = {
+  is_fitness_related: boolean;
+  goal: string | null;
+  confidence: "high" | "medium" | "low" | null;
+  redirect_message: string | null;
+  raw_text: string;
+  fallback: boolean;
+  preferred_slots: PreferredSlot[];
+};
+
+export async function resolveWorkoutGoal(text: string): Promise<ResolveGoalResult> {
+  const response = await apiClient<ApiResponse<ResolveGoalResult>>("/workouts/resolve-goal", {
+    method: "POST",
+    body: { text },
+  });
+  return response.data;
+}
+
+export type GeneratedPlanDay = {
+  id?: string;
+  day_id?: string;
+  day_of_week: number;
+  day_label: string;
+  is_rest_day: boolean;
+  exercises: Array<{
+    exercise_id: string;
+    sets: number;
+    reps: number;
+    rest_seconds: number;
+    scheduled_period?: SchedulePeriod | null;
+  }>;
+};
+
+export type GenerateWorkoutPlanResponse = {
+  plan: { id: string; title: string; goal: string; fitness_level: string };
+  schedule: GeneratedPlanDay[];
+};
+
+export async function generateSmartWorkoutPlan({
+  title,
+  goal,
+  fitnessLevel,
+  daysPerWeek,
+  preferredSlots,
+}: {
+  title: string;
+  goal: string;
+  fitnessLevel: "beginner" | "intermediate" | "advanced";
+  daysPerWeek: number;
+  preferredSlots?: PreferredSlot[];
+}): Promise<GenerateWorkoutPlanResponse> {
+  const response = await apiClient<ApiResponse<GenerateWorkoutPlanResponse>>("/workouts/generate", {
+    method: "POST",
+    body: {
+      title,
+      goal,
+      fitness_level: fitnessLevel,
+      days_per_week: daysPerWeek,
+      preferred_slots: preferredSlots && preferredSlots.length > 0 ? preferredSlots : undefined,
+    },
+  });
+  return response.data;
+}
+
+export function applyGeneratedPlanToWeeklySchedule(
+  generatedDays: GeneratedPlanDay[],
+  findExercise: (exerciseId: string) => Exercise | null,
+): WeeklySchedule {
+  const nextSchedule = createEmptySchedule();
+
+  generatedDays.forEach((day) => {
+    if (day.is_rest_day) {
+      return;
+    }
+
+    const entriesByPeriod: Record<SchedulePeriod, ScheduleEntry[]> = {
+      morning: [],
+      afternoon: [],
+    };
+
+    day.exercises.forEach((item) => {
+      const exercise = findExercise(item.exercise_id);
+      if (!exercise) {
+        return;
+      }
+
+      const period: SchedulePeriod = item.scheduled_period ?? "morning";
+      entriesByPeriod[period].push({
+        id: `${item.exercise_id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        exerciseId: item.exercise_id,
+        sets: item.sets,
+        reps: item.reps,
+        restSeconds: item.rest_seconds,
+      });
+    });
+
+    schedulePeriods.forEach((period) => {
+      const key = getScheduleCellKey(day.day_of_week, period.value);
+      nextSchedule[key] = { ...nextSchedule[key], entries: entriesByPeriod[period.value] };
+    });
+  });
+
+  return nextSchedule;
+}
+
 export async function saveCustomWeeklySchedule({
   title,
   goal,

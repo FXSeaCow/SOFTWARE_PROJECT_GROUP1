@@ -89,6 +89,17 @@ const generatePlanSchema = Joi.object({
     'number.max':   'days_per_week cannot exceed 6',
     'any.required': 'days_per_week is required',
   }),
+  preferred_slots: Joi.array()
+    .items(
+      Joi.object({
+        day_of_week: Joi.number().integer().min(1).max(7).required(),
+        period:      Joi.string().valid('morning', 'afternoon').allow(null).optional(),
+      })
+    )
+    .optional()
+    .messages({
+      'array.base': 'preferred_slots must be an array of { day_of_week, period }',
+    }),
 });
 
 /**
