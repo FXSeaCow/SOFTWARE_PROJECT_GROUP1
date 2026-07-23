@@ -4,8 +4,10 @@ const requestLogger = require('./middlewares/RequestLogger.middleware');
 const notFound = require('./middlewares/NotFound.middleware');
 const errorHandler = require('./middlewares/ErrorHandler.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 const membershipsRoutes = require('./modules/memberships/memberships.routes');
 const paymentsRoutes = require('./modules/payments/payments.routes');
+const workoutRoutes = require('./modules/workouts/workouts.routes');
 
 const { generalLimiter } = require('./middlewares/RateLimiter.middleware');
 
@@ -45,8 +47,10 @@ app.use(cors({
 }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/memberships', membershipsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/workouts', workoutRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
