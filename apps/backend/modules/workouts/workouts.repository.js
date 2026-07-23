@@ -168,13 +168,13 @@ const findPlanByIdAndUser = async (planId, userId) => {
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const createPlan = async ({ user_id, title, goal, fitness_level, is_customized }, client) => {
+const createPlan = async ({ user_id, title, goal, fitness_level, is_active, is_customized }, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
-    `INSERT INTO workout_plans (user_id, title, goal, fitness_level, is_customized)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO workout_plans (user_id, title, goal, fitness_level, is_active, is_customized)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [user_id, title, goal || null, fitness_level, is_customized || false]
+    [user_id, title, goal || null, fitness_level, is_active || false, is_customized || false]
   );
   return rows[0];
 };

@@ -263,23 +263,45 @@ const pickBestExercises = (pool, count, goalProfile) => {
  *   }>
  * }>}
  */
-const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog }) => {
-  const split       = SPLITS[days_per_week] || SPLITS[3];
-  const goalProfile = GOAL_PROFILES[goal]   || GOAL_PROFILES['general_fitness'];
-  const volume      = goalProfile.volumeOverrides[fitness_level]
-                   || goalProfile.volumeOverrides['beginner'];
-  const exPerGroup  = EXERCISES_PER_GROUP[fitness_level] || 2;
+const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, preferredSlots }) => {
+  const goalProfile = GOAL_PROFILES[goal] || GOAL_PROFILES['general_fitness'];
+  const volume       = goalProfile.volumeOverrides[fitness_level]
+                    || goalProfile.volumeOverrides['beginner'];
+  const exPerGroup   = EXERCISES_PER_GROUP[fitness_level] || 2;
 
   // ── Pre-compute catalog index ONCE for the entire plan ────────────────────
   const { byGroup } = buildCatalogIndex(exerciseCatalog);
 
-  // Active training days (Set of day-of-week numbers)
-  const activeDayNums = new Set(split.map((s) => s.day));
+  // If the member specified exact days/periods (e.g. "chiều thứ 5 và sáng thứ 7"),
+  // honor those days instead of the fixed SPLITS template. The split template is
+  // still used for its muscle-group rotation — just remapped onto the requested days.
+  const sortedSlots = Array.isArray(preferredSlots) && preferredSlots.length > 0
+    ? [...preferredSlots].sort((a, b) => a.day_of_week - b.day_of_week).slice(0, 6)
+    : [];
+
+  const effectiveDaysPerWeek = sortedSlots.length > 0
+    ? Math.max(2, sortedSlots.length)
+    : days_per_week;
+
+  const split = SPLITS[effectiveDaysPerWeek] || SPLITS[3];
+
+  // Positional mapping: split[i]'s label/groups go onto sortedSlots[i]'s day/period
+  // (or the template's own day when no preferred slots were given).
+  const activeDayByDow = new Map();
+  split.forEach((templateDay, index) => {
+    const slot = sortedSlots[index];
+    const dow  = slot ? slot.day_of_week : templateDay.day;
+    activeDayByDow.set(dow, {
+      label:  templateDay.label,
+      groups: templateDay.groups,
+      period: slot ? slot.period : null,
+    });
+  });
 
   const days = [];
 
   for (let dow = 1; dow <= 7; dow++) {
-    const activeDay = split.find((s) => s.day === dow);
+    const activeDay = activeDayByDow.get(dow);
 
     if (!activeDay) {
       days.push({ day_of_week: dow, day_label: 'Rest day', is_rest_day: true, exercises: [] });
@@ -303,12 +325,13 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog }
 
       for (const ex of picked) {
         exercises.push({
-          exercise_id:  ex.id,
-          sets:         volume.sets,
-          reps:         volume.reps,
-          rest_seconds: volume.rest_seconds,
-          order_index:  orderIndex++,
-          notes:        null,
+          exercise_id:      ex.id,
+          sets:             volume.sets,
+          reps:             volume.reps,
+          rest_seconds:     volume.rest_seconds,
+          scheduled_period: activeDay.period || null,
+          order_index:      orderIndex++,
+          notes:            null,
         });
       }
     }
@@ -408,6 +431,84 @@ const LOCAL_NON_FITNESS_KEYWORDS = [
 const LOCAL_REDIRECT_MESSAGE =
   'GymHub is here to help with fitness goals. Tell me what you want to improve at the gym, such as building muscle, losing weight, or improving stamina.';
 
+// ─── Preferred day/period keyword parser (Vietnamese, local fallback) ─────────
+// day_of_week: 1=Monday ... 7=Sunday, matching workout_days.day_of_week.
+
+const WEEKDAY_KEYWORDS = [
+  { day: 1, terms: ['thứ 2', 'thứ hai', 't2'] },
+  { day: 2, terms: ['thứ 3', 'thứ ba', 't3'] },
+  { day: 3, terms: ['thứ 4', 'thứ tư', 't4'] },
+  { day: 4, terms: ['thứ 5', 'thứ năm', 't5'] },
+  { day: 5, terms: ['thứ 6', 'thứ sáu', 't6'] },
+  { day: 6, terms: ['thứ 7', 'thứ bảy', 't7'] },
+  { day: 7, terms: ['chủ nhật', 'chủ nhựt', 'cn'] },
+];
+
+// Only 'morning'/'afternoon' are supported by the schedule schema — 'tối' (evening)
+// is mapped onto 'afternoon' as the closest existing slot.
+const PERIOD_KEYWORDS = [
+  { period: 'morning',   terms: ['sáng'] },
+  { period: 'afternoon', terms: ['chiều', 'tối'] },
+];
+
+const WEEKEND_DAYS   = [6, 7];
+const EARLY_WEEK_DAYS = [1, 2, 3];
+
+/**
+ * Lightweight local fallback that extracts preferred training days/periods
+ * from free text when the LLM is unavailable. Not as flexible as the LLM
+ * (only recognizes the keyword forms listed above), but covers the common
+ * ways members phrase availability in Vietnamese.
+ *
+ * Clauses are split on commas/"và" so each day keeps the period mentioned
+ * right next to it — e.g. "chiều thứ 5 và sáng thứ 7" → Thu=afternoon, Sat=morning.
+ *
+ * @param {string} text
+ * @returns {Array<{ day_of_week: number, period: string|null }>}
+ */
+const parsePreferredSlotsLocally = (text) => {
+  const normalized = text.toLowerCase();
+
+  if (/hàng ngày|mỗi ngày|ngày nào cũng/.test(normalized)) {
+    return [1, 2, 3, 4, 5, 6, 7].map((day) => ({ day_of_week: day, period: null }));
+  }
+
+  const clauses = normalized
+    .split(/,| và |;/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  const slots = [];
+
+  clauses.forEach((clause) => {
+    const daysInClause = [];
+
+    if (clause.includes('cuối tuần')) daysInClause.push(...WEEKEND_DAYS);
+    if (clause.includes('đầu tuần'))  daysInClause.push(...EARLY_WEEK_DAYS);
+
+    WEEKDAY_KEYWORDS.forEach(({ day, terms }) => {
+      if (terms.some((term) => clause.includes(term))) daysInClause.push(day);
+    });
+
+    if (daysInClause.length === 0) return;
+
+    let period = null;
+    for (const { period: candidatePeriod, terms } of PERIOD_KEYWORDS) {
+      if (terms.some((term) => clause.includes(term))) {
+        period = candidatePeriod;
+        break;
+      }
+    }
+
+    daysInClause.forEach((day) => slots.push({ day_of_week: day, period }));
+  });
+
+  // De-dup by day_of_week (last mention wins), sorted Mon → Sun
+  const byDay = new Map();
+  slots.forEach((slot) => byDay.set(slot.day_of_week, slot));
+  return Array.from(byDay.values()).sort((a, b) => a.day_of_week - b.day_of_week);
+};
+
 const countKeywordMatches = (text, keywords) =>
   keywords.reduce((count, keyword) => (
     text.includes(keyword) ? count + 1 : count
@@ -469,18 +570,20 @@ const classifyGoalLocally = (cleanText) => {
 const SYSTEM_PROMPT = `
 You are a fitness goal classifier embedded in a gym management app called GymHub.
 
-Your job is to read what a gym member types and do TWO things:
+Your job is to read what a gym member types and do THREE things:
   1. Decide if it is related to fitness / exercise / health goals.
   2. If it is, classify it into exactly one goal key.
+  3. Extract any specific days/times the member says they are free to train.
 
 ─── RESPONSE SCHEMA ────────────────────────────────────────────────────────────
-Always respond with a single JSON object containing EXACTLY these four keys:
+Always respond with a single JSON object containing EXACTLY these five keys:
 
 {
   "is_fitness_related": true | false,
   "goal":               string | null,
   "confidence":         "high" | "medium" | "low" | null,
-  "redirect_message":   string | null
+  "redirect_message":   string | null,
+  "preferred_slots":    [{ "day_of_week": 1-7, "period": "morning" | "afternoon" | null }]
 }
 
 ─── RULES ───────────────────────────────────────────────────────────────────────
@@ -508,32 +611,50 @@ IF the input is NOT fitness-related (e.g. food recipes, weather, coding, random 
   • Set "redirect_message" to a SHORT, friendly message (1-2 sentences) telling
     the user this app is for fitness goals, and asking them to describe their
     fitness goal instead. Keep the tone warm and helpful, NOT robotic.
+  • Set "preferred_slots" to []
+
+─── PREFERRED_SLOTS RULES ────────────────────────────────────────────────────────
+  • day_of_week uses 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday,
+    6=Saturday, 7=Sunday (accepts Vietnamese day names like "thứ 5", "thứ Năm").
+  • "period" is "morning" for sáng, "afternoon" for chiều OR tối (evening has no
+    separate slot — map it to afternoon), or null if only a day is mentioned
+    with no time of day.
+  • "cuối tuần" (weekend) → Saturday + Sunday. "đầu tuần" (early week) → Mon-Wed.
+  • "hàng ngày" / "mỗi ngày" (every day) → all 7 days, period null.
+  • If NO specific day/time is mentioned anywhere in the input, return [].
+  • One object per distinct day mentioned — never duplicate a day_of_week.
 
 ─── EXAMPLES ────────────────────────────────────────────────────────────────────
 
 Input: "I want to lose belly fat and feel lighter"
-Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null}
+Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"preferred_slots":[]}
 
 Input: "Build bigger arms and a wider back"
-Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null}
+Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"preferred_slots":[]}
 
 Input: "I want to run a 10k without stopping"
-Output: {"is_fitness_related":true,"goal":"endurance","confidence":"high","redirect_message":null}
+Output: {"is_fitness_related":true,"goal":"endurance","confidence":"high","redirect_message":null,"preferred_slots":[]}
 
 Input: "I'm pretty stiff, I can't touch my toes"
-Output: {"is_fitness_related":true,"goal":"flexibility","confidence":"high","redirect_message":null}
+Output: {"is_fitness_related":true,"goal":"flexibility","confidence":"high","redirect_message":null,"preferred_slots":[]}
 
 Input: "Just want to be healthier, I'm not sure where to start"
-Output: {"is_fitness_related":true,"goal":"general_fitness","confidence":"medium","redirect_message":null}
+Output: {"is_fitness_related":true,"goal":"general_fitness","confidence":"medium","redirect_message":null,"preferred_slots":[]}
+
+Input: "Tôi muốn giảm cân và săn chắc cơ thể, tôi rảnh vào chiều thứ 5 và sáng thứ 7"
+Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"preferred_slots":[{"day_of_week":4,"period":"afternoon"},{"day_of_week":6,"period":"morning"}]}
+
+Input: "Tôi chỉ rảnh cuối tuần để tập gym, muốn tăng cơ"
+Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"preferred_slots":[{"day_of_week":6,"period":null},{"day_of_week":7,"period":null}]}
 
 Input: "How do I make pasta carbonara?"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"That sounds delicious, but GymHub is here to help with your fitness journey! 😊 Could you tell me what you'd like to achieve at the gym — like losing weight, building muscle, or improving your stamina?"}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"That sounds delicious, but GymHub is here to help with your fitness journey! 😊 Could you tell me what you'd like to achieve at the gym — like losing weight, building muscle, or improving your stamina?","preferred_slots":[]}
 
 Input: "What is the weather today?"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"I can only help with fitness goals here! Tell me what you'd like to work on — for example, 'I want to get stronger' or 'I want more energy'."}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"I can only help with fitness goals here! Tell me what you'd like to work on — for example, 'I want to get stronger' or 'I want more energy'.","preferred_slots":[]}
 
 Input: "xyzabc123!!!"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"Hmm, I didn't quite catch that! I'm here to help you build your workout plan. What fitness goal are you working toward?"}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"Hmm, I didn't quite catch that! I'm here to help you build your workout plan. What fitness goal are you working toward?","preferred_slots":[]}
 `.trim();
 
 /**
@@ -557,6 +678,7 @@ Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_mess
  *   redirect_message:   string|null,   — friendly message to show user, or null
  *   raw_text:           string,        — original trimmed input
  *   fallback:           boolean,       — true if Gemini was unavailable
+ *   preferred_slots:    Array<{ day_of_week: number, period: string|null }>,
  * }>}
  *
  * @throws {Error} only for empty input — Gemini errors are caught and return fallback
@@ -631,6 +753,16 @@ const resolveGoalFromText = async (userText) => {
       ? parsed.redirect_message.trim()
       : null;
 
+    // Sanitise preferred_slots: must be an array of { day_of_week: 1-7, period }
+    const rawSlots = Array.isArray(parsed.preferred_slots) ? parsed.preferred_slots : [];
+    const preferredSlots = rawSlots
+      .filter((slot) => slot && Number.isInteger(slot.day_of_week)
+        && slot.day_of_week >= 1 && slot.day_of_week <= 7)
+      .map((slot) => ({
+        day_of_week: slot.day_of_week,
+        period: ['morning', 'afternoon'].includes(slot.period) ? slot.period : null,
+      }));
+
     return {
       is_fitness_related: isFitnessRelated,
       goal,
@@ -638,6 +770,7 @@ const resolveGoalFromText = async (userText) => {
       redirect_message: redirectMessage,
       raw_text:         cleanText,
       fallback:         false,
+      preferred_slots:  preferredSlots,
     };
 
   } catch (err) {
@@ -653,8 +786,9 @@ const resolveGoalFromText = async (userText) => {
 
     return {
       ...localResult,
-      raw_text: cleanText,
-      fallback: true,            // caller can show "our AI is unavailable" note
+      raw_text:        cleanText,
+      fallback:        true,            // caller can show "our AI is unavailable" note
+      preferred_slots: parsePreferredSlotsLocally(cleanText),
     };
   }
 };
@@ -667,6 +801,7 @@ module.exports = {
   scoreExercise,
   pickBestExercises,
   classifyGoalLocally,
+  parsePreferredSlotsLocally,
   GOAL_PROFILES,
   SPLITS,
   VALID_GOALS,

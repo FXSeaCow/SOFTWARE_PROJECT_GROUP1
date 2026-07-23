@@ -4,7 +4,7 @@
  */
 
 const repo = require('./admin.repository');
-const { calculateOccupancyRate } = require('../occupancy/occupancyCalculator');
+// const { calculateOccupancyRate } = require('../occupancy/occupancyCalculator');
 
 const toNumber = (value) => Number(value || 0);
 
