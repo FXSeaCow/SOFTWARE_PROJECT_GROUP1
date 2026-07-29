@@ -1,5 +1,5 @@
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "/api";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "/api";
+
 const STORAGE_KEY = "gym-web.auth-session";
 
 export type ApiRequestOptions = {
@@ -12,13 +12,13 @@ type StoredSession = {
   accessToken?: string;
   user?: {
     id?: string;
+    email?: string;
+    name?: string;
   };
 };
 
 function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function isJwtLike(value: string): boolean {
@@ -76,7 +76,8 @@ function setStoredAccessToken(accessToken: string) {
 }
 
 async function refreshAccessToken(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+  const refreshUrl = `${API_BASE_URL}/auth/refresh-token`;
+  const response = await fetch(refreshUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -96,7 +97,20 @@ async function refreshAccessToken(): Promise<string> {
   }
 
   if (!response.ok || !parsed?.data?.accessToken) {
-    throw new Error(parsed?.message || "Session expired. Please log in again.");
+    const backendMessage = parsed?.message?.trim();
+
+    if (
+      backendMessage === "Invalid ID format — must be a valid UUID" ||
+      backendMessage === "Invalid ID format â€” must be a valid UUID" ||
+      backendMessage === "Invalid refresh token" ||
+      backendMessage === "Refresh token expired — please log in again" ||
+      backendMessage === "Refresh token expired â€” please log in again" ||
+      backendMessage === "Account no longer exists"
+    ) {
+      throw new Error("Session expired. Please log in again.");
+    }
+
+    throw new Error(backendMessage || "Session expired. Please log in again.");
   }
 
   setStoredAccessToken(parsed.data.accessToken);
@@ -121,7 +135,7 @@ export async function apiClient<T>(
     const session = getStoredSession();
     const accessToken = accessTokenOverride || session?.accessToken;
     if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
+      headers["Authorization"] = `Bearer ${accessToken}`;
     }
 
     const response = await fetch(url, {
@@ -132,7 +146,7 @@ export async function apiClient<T>(
     });
 
     const rawBody = await response.text();
-    let data: T | { message?: string } | null = null;
+    let data: (T | { message?: string } | null) = null;
 
     if (rawBody) {
       try {
@@ -143,12 +157,17 @@ export async function apiClient<T>(
     }
 
     if (!response.ok) {
-      const message =
+      const messageFromJson =
         data && typeof data === "object" && "message" in data && typeof data.message === "string"
           ? data.message
-          : rawBody || `Request failed (${response.status} ${response.statusText})`;
+          : null;
+      const messageFromText = rawBody && !messageFromJson ? rawBody : null;
 
-      throw new Error(message);
+      throw new Error(
+        messageFromJson ||
+          messageFromText ||
+          `Request failed (${response.status} ${response.statusText})`,
+      );
     }
 
     return data as T;

@@ -14,6 +14,13 @@ import { RegisterPage } from "./src/pages/RegisterPage";
 import { ForgotPasswordPage } from "./src/pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./src/pages/ResetPasswordPage";
 import { ChangePasswordPage } from "./src/pages/ChangePasswordPage";
+import { MembershipPage } from "./src/pages/MembershipPage";
+import { AccountPage } from "./src/pages/AccountPage";
+import { AdminUsersPage } from "./src/pages/AdminUsersPage";
+import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
+import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
+import { AdminOccupancyPage } from "./src/pages/AdminOccupancyPage";
+import { AdminReportsPage } from "./src/pages/AdminReportsPage";
 import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -22,6 +29,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const user = getCurrentUser();
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (user.role !== "admin") {
+    return <Navigate to="/account" replace />;
   }
 
   return <>{children}</>;
@@ -37,6 +59,22 @@ function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
+          path="/membership"
+          element={
+            <ProtectedRoute>
+              <MembershipPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
@@ -50,6 +88,46 @@ function AppRouter() {
             <ProtectedRoute>
               <ChangePasswordPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminReportsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <AdminUsersPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/announcements"
+          element={
+            <AdminRoute>
+              <AdminAnnouncementsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/payments"
+          element={
+            <AdminRoute>
+              <AdminPaymentsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/occupancy"
+          element={
+            <AdminRoute>
+              <AdminOccupancyPage />
+            </AdminRoute>
           }
         />
         <Route path="*" element={<Navigate to="/login" replace />} />
