@@ -963,8 +963,10 @@ export function SchedulePage() {
                               : "1px dashed rgba(255,255,255,0.14)",
                           display: "grid",
                           placeItems: "center",
-                          color: "#6f7784",
-                          fontSize: 13,
+                          color: activeDropKey === key ? "#ff9a3d" : "#9ca8b7",
+                          fontSize: 34,
+                          fontWeight: 300,
+                          lineHeight: 1,
                           textAlign: "center",
                           padding: 12,
                         }}
