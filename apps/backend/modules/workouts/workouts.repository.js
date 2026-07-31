@@ -297,8 +297,8 @@ const replaceDayExercises = async (dayId, exercises, client) => {
 
   // Bulk insert the new set
   const placeholders = exercises.map((_, i) => {
-    const base = i * 6;
-    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+    const base = i * 8;
+    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
   });
 
   const values = exercises.flatMap((ex, i) => [
@@ -307,12 +307,14 @@ const replaceDayExercises = async (dayId, exercises, client) => {
     ex.sets,
     ex.reps,
     ex.rest_seconds ?? 60,
+    ex.scheduled_period || null,
+    ex.scheduled_time || null,
     i,              // order_index = position in array
   ]);
 
   const { rows } = await client.query(
     `INSERT INTO workout_day_exercises
-       (workout_day_id, exercise_id, sets, reps, rest_seconds, order_index)
+       (workout_day_id, exercise_id, sets, reps, rest_seconds, scheduled_period, scheduled_time, order_index)
      VALUES ${placeholders.join(', ')}
      RETURNING *`,
     values
@@ -341,6 +343,8 @@ const findWeeklySchedule = async (planId) => {
        wde.sets,
        wde.reps,
        wde.rest_seconds,
+       wde.scheduled_period,
+       wde.scheduled_time,
        wde.order_index,
        wde.notes,
        e.id               AS exercise_id,

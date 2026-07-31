@@ -98,7 +98,7 @@ const generatePlanSchema = Joi.object({
     )
     .optional()
     .messages({
-      'array.base': 'preferred_slots must be an array of objects with day_of_week and period',
+      'array.base': 'preferred_slots must be an array of day_of_week/period objects',
     }),
 });
 

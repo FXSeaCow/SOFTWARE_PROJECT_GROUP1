@@ -9,7 +9,9 @@ import {
 } from "react-router-dom";
 
 import { LoginPage } from "./src/pages/LoginPage";
-import { DashboardPage } from "./src/pages/DashboardPage";
+import { MainMenuPage } from "./src/pages/MainMenuPage";
+import { WorkoutPage } from "./src/pages/WorkoutPage";
+import { ProgressPage } from "./src/pages/ProgressPage";
 import { RegisterPage } from "./src/pages/RegisterPage";
 import { ForgotPasswordPage } from "./src/pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./src/pages/ResetPasswordPage";
@@ -21,6 +23,7 @@ import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
 import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
 import { AdminOccupancyPage } from "./src/pages/AdminOccupancyPage";
 import { AdminReportsPage } from "./src/pages/AdminReportsPage";
+import { SchedulePage } from "./src/pages/SchedulePage";
 import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -53,7 +56,22 @@ function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainMenuPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/exercises"
+          element={
+            <ProtectedRoute>
+              <WorkoutPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -67,6 +85,22 @@ function AppRouter() {
           }
         />
         <Route
+          path="/schedule"
+          element={
+            <ProtectedRoute>
+              <SchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute>
+              <ProgressPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/account"
           element={
             <ProtectedRoute>
@@ -76,11 +110,7 @@ function AppRouter() {
         />
         <Route
           path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/" replace />}
         />
         <Route
           path="/change-password"
@@ -130,7 +160,7 @@ function AppRouter() {
             </AdminRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

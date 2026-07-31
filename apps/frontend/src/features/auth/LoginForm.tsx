@@ -80,7 +80,7 @@ export function LoginForm() {
 
       const from = locationState?.from?.pathname;
 
-      navigate(from || "/dashboard", { replace: true });
+      navigate(from || "/", { replace: true });
     } catch (error) {
       setErrors({
         form:

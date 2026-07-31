@@ -412,6 +412,8 @@ const groupScheduleByDay = (rows) => {
         sets:          row.sets,
         reps:          row.reps,
         rest_seconds:  row.rest_seconds,
+        scheduled_period: row.scheduled_period,
+        scheduled_time:   row.scheduled_time,
         order_index:   row.order_index,
         notes:         row.notes,
       });

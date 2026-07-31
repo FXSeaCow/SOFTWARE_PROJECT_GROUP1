@@ -7,7 +7,7 @@ const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRE
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
 
 module.exports = {
-  PORT: process.env.PORT || 4000,
+  PORT: process.env.PORT || 3000,
   JWT_ACCESS_SECRET,
   JWT_REFRESH_SECRET,
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN,
