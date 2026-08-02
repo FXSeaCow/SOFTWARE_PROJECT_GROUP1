@@ -8,7 +8,7 @@ export function RegisterPage() {
   const currentUser = getCurrentUser();
 
   if (currentUser) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <RegisterForm />;

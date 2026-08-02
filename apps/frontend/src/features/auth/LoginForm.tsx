@@ -260,7 +260,21 @@ export function LoginForm() {
           <span>Remember me for 30 days</span>
         </label>
 
-        {/* Form error */}
+        {successMessage ? (
+          <div
+            style={{
+              borderRadius: 12,
+              padding: "12px 14px",
+              background: "#dcfce7",
+              color: "#166534",
+              fontSize: 14,
+              marginBottom: 16,
+            }}
+          >
+            {successMessage}
+          </div>
+        ) : null}
+
         {errors.form ? (
           <div
             style={{

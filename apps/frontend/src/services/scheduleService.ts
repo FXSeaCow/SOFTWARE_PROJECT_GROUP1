@@ -63,13 +63,15 @@ export function createEmptySchedule(): WeeklySchedule {
   return schedule;
 }
 
-export function getScheduleStorageKey(userId?: string) {
-  return `gym-web.schedule.${userId || "guest"}`;
+export function getScheduleStorageKey(userId?: string, weekStart?: string, boardId?: string) {
+  return `gym-web.schedule.${userId || "guest"}.${boardId || "default"}.${weekStart || "current"}`;
 }
 
-export function loadWeeklySchedule(userId?: string): WeeklySchedule {
+export function loadWeeklySchedule(userId?: string, weekStart?: string, boardId?: string): WeeklySchedule {
   const fallback = createEmptySchedule();
-  const rawSchedule = localStorage.getItem(getScheduleStorageKey(userId));
+  const rawSchedule =
+    localStorage.getItem(getScheduleStorageKey(userId, weekStart, boardId)) ??
+    localStorage.getItem(getScheduleStorageKey(userId, undefined, boardId));
 
   if (!rawSchedule) {
     return fallback;
@@ -87,13 +89,63 @@ export function loadWeeklySchedule(userId?: string): WeeklySchedule {
       return nextSchedule;
     }, {});
   } catch {
-    localStorage.removeItem(getScheduleStorageKey(userId));
+    localStorage.removeItem(getScheduleStorageKey(userId, weekStart, boardId));
     return fallback;
   }
 }
 
-export function saveWeeklySchedule(userId: string | undefined, schedule: WeeklySchedule) {
-  localStorage.setItem(getScheduleStorageKey(userId), JSON.stringify(schedule));
+export function saveWeeklySchedule(
+  userId: string | undefined,
+  schedule: WeeklySchedule,
+  weekStart?: string,
+  boardId?: string,
+) {
+  localStorage.setItem(getScheduleStorageKey(userId, weekStart, boardId), JSON.stringify(schedule));
+}
+
+const DEFAULT_SCHEDULE_BOARD_IDS = ["board-1", "board-2", "board-3"];
+
+export function getScheduleBoardsStorageKey(userId?: string) {
+  return `gym-web.schedule-boards.${userId || "guest"}`;
+}
+
+export function loadScheduleBoards(userId?: string): string[] {
+  const raw = localStorage.getItem(getScheduleBoardsStorageKey(userId));
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((id) => typeof id === "string")) {
+        return parsed as string[];
+      }
+    } catch {
+      // fall through to defaults
+    }
+  }
+
+  return [...DEFAULT_SCHEDULE_BOARD_IDS];
+}
+
+export function saveScheduleBoards(userId: string | undefined, boardIds: string[]) {
+  localStorage.setItem(getScheduleBoardsStorageKey(userId), JSON.stringify(boardIds));
+}
+
+export function createScheduleBoardId() {
+  return `board-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function deleteScheduleBoardData(userId: string | undefined, boardId: string) {
+  const prefix = `gym-web.schedule.${userId || "guest"}.${boardId}.`;
+  const keysToRemove: string[] = [];
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key && key.startsWith(prefix)) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
 export function createScheduleEntry(exercise: Exercise): ScheduleEntry {

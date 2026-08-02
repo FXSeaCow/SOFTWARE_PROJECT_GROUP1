@@ -7,7 +7,7 @@ import { UnifiedTopBar } from "./UnifiedTopBar";
 import { MainMenuSearchBar } from "./main-menu/MainMenuSearchBar";
 import { iconButtonStyle } from "./main-menu/styles";
 
-export type AdminTopBarItem = "payments" | "users" | "announcements" | "occupancy" | "reports";
+export type AdminTopBarItem = "payments" | "users" | "announcements" | "occupancy";
 
 type AdminNavItem = {
   id: "main-menu" | AdminTopBarItem;
@@ -39,7 +39,6 @@ export function AdminTopBar({
 
   const navItems: AdminNavItem[] = [
     { id: "main-menu", label: "Main Menu", onClick: () => navigate("/") },
-    { id: "reports", label: "Reports", onClick: () => navigate("/admin") },
     { id: "payments", label: "Payments", onClick: () => navigate("/admin/payments") },
     { id: "users", label: "Members", onClick: () => navigate("/admin/users") },
     { id: "occupancy", label: "Occupancy", onClick: () => navigate("/admin/occupancy") },

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "npm run dev:frontend",
     "dev:frontend": "npm run dev -w apps/frontend",
+    "dev:frontend:mobile": "npm run dev:mobile -w apps/frontend",
     "dev:backend": "npm run dev -w apps/backend",
     "build:frontend": "npm run build -w apps/frontend",
     "build:backend": "npm run build -w apps/backend",

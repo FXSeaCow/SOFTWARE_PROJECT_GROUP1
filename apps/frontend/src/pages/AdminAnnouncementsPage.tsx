@@ -9,6 +9,7 @@ import {
 
 import { Button } from "../components/Button";
 import { panelStyle, searchBarStyle } from "../components/main-menu/styles";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   AdminAnnouncementRecord,
@@ -69,6 +70,7 @@ function darkOptionStyle(): React.CSSProperties {
 }
 
 export function AdminAnnouncementsPage() {
+  const isMobile = useIsMobile();
   const [form, setForm] = useState<FormState>(initialForm);
   const [announcements, setAnnouncements] = useState<AdminAnnouncementRecord[]>([]);
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
@@ -194,7 +196,7 @@ export function AdminAnnouncementsPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
           gap: 12,
           marginBottom: 18,
         }}
@@ -269,7 +271,7 @@ export function AdminAnnouncementsPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(360px, 0.9fr)",
+          gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1.1fr) minmax(360px, 0.9fr)",
           gap: 18,
           alignItems: "start",
         }}

@@ -12,6 +12,16 @@ type RegisterPayload = {
   confirm_password: string;
 };
 
+type ForgotPasswordPayload = {
+  email: string;
+};
+
+type ResetPasswordPayload = {
+  token: string;
+  password: string;
+  confirm_password: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -77,8 +87,13 @@ const demoUser: AuthSession = {
   },
 };
 
-export async function login(payload: LoginPayload): Promise<AuthSession> {
+type BackendMessageResponse = {
+  success: boolean;
+  message: string;
+  data: unknown;
+};
 
+export async function login(payload: LoginPayload): Promise<AuthSession> {
   const response = await apiClient<BackendAuthResponse>("/auth/login", {
     method: "POST",
     body: payload,
@@ -103,7 +118,7 @@ export async function register(payload: RegisterPayload): Promise<User> {
     full_name: payload.name,
     email: payload.email,
     password: payload.password,
-    confirm_password: payload.confirm_password, 
+    confirm_password: payload.confirm_password,
   };
 
   const response = await apiClient<BackendAuthResponse>("/auth/register", {
@@ -115,7 +130,26 @@ export async function register(payload: RegisterPayload): Promise<User> {
     id: response.data.user.id,
     email: response.data.user.email,
     name: response.data.user.full_name,
+    role: response.data.user.role as User["role"],
   };
+}
+
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<string> {
+  const response = await apiClient<BackendMessageResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: payload,
+  });
+
+  return response.message;
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<string> {
+  const response = await apiClient<BackendMessageResponse>("/auth/reset-password", {
+    method: "POST",
+    body: payload,
+  });
+
+  return response.message;
 }
 
 export function logout() {

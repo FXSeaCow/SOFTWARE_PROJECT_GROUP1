@@ -15,6 +15,7 @@ import { Skeleton } from "../components/Skeleton";
 import { Toast } from "../components/Toast";
 import { panelStyle } from "../components/main-menu/styles";
 import { FitnessMetricsChart } from "../components/progress/FitnessMetricsChart";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   confirmAdminPayment,
@@ -76,7 +77,16 @@ function statusPillStyle(status: PaymentRecord["status"]): React.CSSProperties {
   };
 }
 
+function FieldLabel({ text }: { text: string }) {
+  return (
+    <div style={{ color: "#6b7280", fontSize: 11, fontWeight: 800, textTransform: "uppercase", marginBottom: 2 }}>
+      {text}
+    </div>
+  );
+}
+
 export function AdminPaymentsPage() {
+  const isMobile = useIsMobile();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<PaymentStatusFilter>("pending");
   const [search, setSearch] = useState("");
@@ -449,24 +459,26 @@ export function AdminPaymentsPage() {
           </div>
         ) : null}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
-            gap: 12,
-            padding: "0 12px 14px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            color: "#9cc0e7",
-            fontSize: 14,
-          }}
-        >
-          <div>Member</div>
-          <div>Plan</div>
-          <div>Amount</div>
-          <div>Transfer note</div>
-          <div>Time</div>
-          <div>Actions</div>
-        </div>
+        {isMobile ? null : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
+              gap: 12,
+              padding: "0 12px 14px",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              color: "#9cc0e7",
+              fontSize: 14,
+            }}
+          >
+            <div>Member</div>
+            <div>Plan</div>
+            <div>Amount</div>
+            <div>Transfer note</div>
+            <div>Time</div>
+            <div>Actions</div>
+          </div>
+        )}
 
         {isLoading ? (
           <div style={{ display: "grid" }}>
@@ -475,7 +487,7 @@ export function AdminPaymentsPage() {
                 key={`payment-skeleton-${index}`}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
+                  gridTemplateColumns: isMobile ? "1fr" : "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
                   gap: 12,
                   alignItems: "center",
                   padding: "18px 12px",
@@ -513,19 +525,32 @@ export function AdminPaymentsPage() {
             {filteredPayments.map((payment, index) => (
               <div
                 key={payment.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "18px 12px",
-                  borderBottom:
-                    index === filteredPayments.length - 1
-                      ? "none"
-                      : "1px solid rgba(255,255,255,0.06)",
-                  background:
-                    activePaymentId === payment.id ? "rgba(255,122,26,0.06)" : "transparent",
-                }}
+                style={
+                  isMobile
+                    ? {
+                        display: "grid",
+                        gap: 8,
+                        padding: 14,
+                        marginBottom: 10,
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        background:
+                          activePaymentId === payment.id ? "rgba(255,122,26,0.06)" : "rgba(255,255,255,0.02)",
+                      }
+                    : {
+                        display: "grid",
+                        gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr 1fr 1fr",
+                        gap: 12,
+                        alignItems: "center",
+                        padding: "18px 12px",
+                        borderBottom:
+                          index === filteredPayments.length - 1
+                            ? "none"
+                            : "1px solid rgba(255,255,255,0.06)",
+                        background:
+                          activePaymentId === payment.id ? "rgba(255,122,26,0.06)" : "transparent",
+                      }
+                }
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
@@ -535,6 +560,7 @@ export function AdminPaymentsPage() {
                 </div>
 
                 <div style={{ minWidth: 0 }}>
+                  {isMobile ? <FieldLabel text="Plan" /> : null}
                   <div style={{ fontWeight: 800 }}>{payment.plan_name ?? "-"}</div>
                   <div style={{ marginTop: 8 }}>
                     <span className={payment.status === "pending" ? "pending-badge" : undefined} style={statusPillStyle(payment.status)}>
@@ -543,20 +569,29 @@ export function AdminPaymentsPage() {
                   </div>
                 </div>
 
-                <div style={{ fontWeight: 900 }}>{formatCurrency(payment.amount)}</div>
-
-                <div
-                  style={{
-                    color: "#fbbf24",
-                    fontWeight: 800,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {payment.admin_note || payment.provider_tx_id || "-"}
+                <div>
+                  {isMobile ? <FieldLabel text="Amount" /> : null}
+                  <div style={{ fontWeight: 900 }}>{formatCurrency(payment.amount)}</div>
                 </div>
 
-                <div style={{ color: "#d4d4d8", fontSize: 14 }}>
-                  {payment.created_at ? formatDate(payment.created_at) : "-"}
+                <div>
+                  {isMobile ? <FieldLabel text="Transfer note" /> : null}
+                  <div
+                    style={{
+                      color: "#fbbf24",
+                      fontWeight: 800,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {payment.admin_note || payment.provider_tx_id || "-"}
+                  </div>
+                </div>
+
+                <div>
+                  {isMobile ? <FieldLabel text="Time" /> : null}
+                  <div style={{ color: "#d4d4d8", fontSize: 14 }}>
+                    {payment.created_at ? formatDate(payment.created_at) : "-"}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-start" }}>

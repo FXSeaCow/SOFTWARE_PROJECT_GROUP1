@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { panelStyle, searchBarStyle, startButtonStyle } from "../components/main-menu/styles";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 import { Exercise, getExercises } from "../services/workoutService";
@@ -47,6 +48,7 @@ function getDifficultyTone(difficulty: string) {
 }
 
 export function WorkoutPage() {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role === "admin";
@@ -246,7 +248,7 @@ export function WorkoutPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1.8fr) repeat(2, minmax(180px, 1fr))",
+            gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1.8fr) repeat(2, minmax(180px, 1fr))",
             gap: 14,
           }}
         >

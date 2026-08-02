@@ -9,19 +9,21 @@ import {
 } from "react-router-dom";
 
 import { LoginPage } from "./src/pages/LoginPage";
-import { RegisterPage } from "./src/pages/RegisterPage";
 import { MainMenuPage } from "./src/pages/MainMenuPage";
+import { WorkoutPage } from "./src/pages/WorkoutPage";
 import { ProgressPage } from "./src/pages/ProgressPage";
+import { RegisterPage } from "./src/pages/RegisterPage";
+import { ForgotPasswordPage } from "./src/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./src/pages/ResetPasswordPage";
+import { ChangePasswordPage } from "./src/pages/ChangePasswordPage";
 import { MembershipPage } from "./src/pages/MembershipPage";
 import { AccountPage } from "./src/pages/AccountPage";
-import { getCurrentUser } from "./src/services/authService";
 import { AdminUsersPage } from "./src/pages/AdminUsersPage";
-import { WorkoutPage } from "./src/pages/WorkoutPage";
 import { AdminAnnouncementsPage } from "./src/pages/AdminAnnouncementsPage";
 import { AdminPaymentsPage } from "./src/pages/AdminPaymentsPage";
 import { AdminOccupancyPage } from "./src/pages/AdminOccupancyPage";
-import { AdminReportsPage } from "./src/pages/AdminReportsPage";
 import { SchedulePage } from "./src/pages/SchedulePage";
+import { getCurrentUser } from "./src/services/authService";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -53,8 +55,34 @@ function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainMenuPage />} />
-        <Route path="/exercises" element={<WorkoutPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainMenuPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/exercises"
+          element={
+            <ProtectedRoute>
+              <WorkoutPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route
+          path="/membership"
+          element={
+            <ProtectedRoute>
+              <MembershipPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/schedule"
           element={
@@ -71,16 +99,6 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<RegisterPage />} />
-        <Route
-          path="/membership"
-          element={
-            <ProtectedRoute>
-              <MembershipPage />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/account"
           element={
@@ -91,9 +109,13 @@ function AppRouter() {
         />
         <Route
           path="/dashboard"
+          element={<Navigate to="/" replace />}
+        />
+        <Route
+          path="/change-password"
           element={
             <ProtectedRoute>
-              <Navigate to="/" replace />
+              <ChangePasswordPage />
             </ProtectedRoute>
           }
         />
@@ -101,7 +123,7 @@ function AppRouter() {
           path="/admin"
           element={
             <AdminRoute>
-              <AdminReportsPage />
+              <Navigate to="/admin/users" replace />
             </AdminRoute>
           }
         />

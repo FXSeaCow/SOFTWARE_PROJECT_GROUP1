@@ -284,16 +284,12 @@ export function RegisterForm() {
             name="confirmPassword"
             type={showConfirmPassword ? "text" : "password"}
             autoComplete="new-password"
-            placeholder="••••••••"
+            placeholder="********"
             value={form.confirmPassword}
             error={errors.confirmPassword}
             leftIcon={<Lock size={20} />}
-            rightIcon={
-              showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />
-            }
-            onRightIconClick={() =>
-              setShowConfirmPassword((current) => !current)
-            }
+            rightIcon={showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            onRightIconClick={() => setShowConfirmPassword((current) => !current)}
             onChange={(event) =>
               setForm((current) => ({
                 ...current,
@@ -321,70 +317,8 @@ export function RegisterForm() {
           <div style={{ height: 18 }} />
         )}
 
-        <Button
-          type="submit"
-          isLoading={isSubmitting}
-          loadingText="Creating account..."
-        >
+        <Button type="submit" isLoading={isSubmitting}>
           Create account
-        </Button>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginTop: 24,
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              height: 1,
-              background: "#d9d9df",
-            }}
-          />
-
-          <span
-            style={{
-              fontSize: 14,
-              color: "#667085",
-              whiteSpace: "nowrap",
-            }}
-          >
-            or continue with
-          </span>
-
-          <div
-            style={{
-              flex: 1,
-              height: 1,
-              background: "#d9d9df",
-            }}
-          />
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          leftIcon={
-            <span
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#4285f4",
-                lineHeight: 1,
-              }}
-            >
-              G
-            </span>
-          }
-          onClick={() => {
-            // Sau nay goi API dang ky Google o day.
-          }}
-        >
-          Continue with Google
         </Button>
 
         <p
@@ -398,9 +332,7 @@ export function RegisterForm() {
           Already have an account?{" "}
           <Link
             to="/login"
-            state={{
-              email: form.email.trim(),
-            }}
+            state={{ email: form.email.trim() }}
             style={{
               color: "#050816",
               fontWeight: 600,

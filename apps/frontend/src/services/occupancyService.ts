@@ -80,18 +80,18 @@ export async function getCurrentOccupancy(branchId?: string): Promise<CurrentOcc
   return response.data;
 }
 
-export async function checkInGym(branchId: string): Promise<CheckInResult> {
+export async function checkInGym(branchId: string, qrCodeToken?: string): Promise<CheckInResult> {
   const response = await apiClient<ApiResponse<CheckInResult>>("/occupancy/checkin", {
     method: "POST",
-    body: { branch_id: branchId },
+    body: qrCodeToken ? { branch_id: branchId, qr_code_token: qrCodeToken } : { branch_id: branchId },
   });
   return response.data;
 }
 
-export async function checkOutGym(): Promise<CheckOutResult> {
+export async function checkOutGym(qrCodeToken?: string): Promise<CheckOutResult> {
   const response = await apiClient<ApiResponse<CheckOutResult>>("/occupancy/checkout", {
     method: "POST",
-    body: {},
+    body: qrCodeToken ? { qr_code_token: qrCodeToken } : {},
   });
   return response.data;
 }

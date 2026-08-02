@@ -351,10 +351,7 @@ export function AccountPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns:
-            activeSection === "profile"
-              ? "minmax(320px, 1fr)"
-              : "minmax(300px, 1fr)",
+          gridTemplateColumns: "minmax(0, 1fr)",
           gap: 18,
           alignItems: "start",
         }}

@@ -23,6 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import { getCurrentUser } from "../services/authService";
 import {
@@ -111,6 +112,7 @@ function initials(name: string) {
 }
 
 export function AdminUsersPage() {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [search, setSearch] = useState("");
@@ -576,7 +578,7 @@ export function AdminUsersPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
           gap: 12,
           marginBottom: 16,
         }}
@@ -614,7 +616,7 @@ export function AdminUsersPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.7fr) minmax(290px, 0.85fr)",
+          gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1.7fr) minmax(290px, 0.85fr)",
           gap: 16,
           alignItems: "start",
         }}
@@ -626,7 +628,7 @@ export function AdminUsersPage() {
             onSubmit={handleSearchSubmit}
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) 86px 96px 140px",
+              gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 86px 96px 140px",
               gap: 10,
               marginBottom: 16,
             }}
@@ -749,26 +751,28 @@ export function AdminUsersPage() {
             </div>
           ) : null}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
-              gap: 12,
-              padding: "14px 12px",
-              color: "#9ca8b7",
-              fontSize: 12,
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              borderBottom: "1px solid rgba(255,255,255,0.06)",
-            }}
-          >
-            <span>Member</span>
-            <span>Role</span>
-            <span>Status</span>
-            <span>Plan</span>
-            <span>Updated</span>
-            <span>Action</span>
-            <span />
-          </div>
+          {isMobile ? null : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
+                gap: 12,
+                padding: "14px 12px",
+                color: "#9ca8b7",
+                fontSize: 12,
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <span>Member</span>
+              <span>Role</span>
+              <span>Status</span>
+              <span>Plan</span>
+              <span>Updated</span>
+              <span>Action</span>
+              <span />
+            </div>
+          )}
 
           <div>
             {isLoading ? (
@@ -778,7 +782,7 @@ export function AdminUsersPage() {
                     key={`user-skeleton-${index}`}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
+                      gridTemplateColumns: isMobile ? "1fr" : "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
                       gap: 12,
                       alignItems: "center",
                       padding: "14px 12px",
@@ -823,12 +827,16 @@ export function AdminUsersPage() {
                   }}
                 >
                   <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
-                      gap: 12,
-                      alignItems: "center",
-                    }}
+                    style={
+                      isMobile
+                        ? { display: "grid", gap: 10 }
+                        : {
+                            display: "grid",
+                            gridTemplateColumns: "1.5fr 0.8fr 0.9fr 1.1fr 1fr 0.9fr 28px",
+                            gap: 12,
+                            alignItems: "center",
+                          }
+                    }
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div
@@ -846,34 +854,50 @@ export function AdminUsersPage() {
                       >
                         {initials(user.full_name)}
                       </div>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 700 }}>{user.full_name}</div>
                         <div style={{ color: "#9ca8b7", fontSize: 13, marginTop: 4 }}>{user.email}</div>
                       </div>
                     </div>
-                    <span style={pillStyle(roleAccent(user.role))}>{user.role}</span>
-                    <span style={pillStyle(statusAccent(user.account_status))}>{user.account_status}</span>
-                    <span style={pillStyle(membershipAccent(user.membership_status))}>
-                      {user.membership_status === "none" ? "No plan" : `Plan ${user.membership_status}`}
-                    </span>
-                    <span style={{ color: "#b4bac4", fontSize: 13 }}>
-                      {formatDate(user.updated_at || user.created_at)}
-                    </span>
-                    <span
-                      style={{
-                        minHeight: 34,
-                        borderRadius: 10,
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      Manage
-                    </span>
-                    <EllipsisVertical size={16} color="#9ca8b7" />
+
+                    {isMobile ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                        <span style={pillStyle(roleAccent(user.role))}>{user.role}</span>
+                        <span style={pillStyle(statusAccent(user.account_status))}>{user.account_status}</span>
+                        <span style={pillStyle(membershipAccent(user.membership_status))}>
+                          {user.membership_status === "none" ? "No plan" : `Plan ${user.membership_status}`}
+                        </span>
+                        <span style={{ color: "#b4bac4", fontSize: 12, marginLeft: "auto" }}>
+                          {formatDate(user.updated_at || user.created_at)}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <span style={pillStyle(roleAccent(user.role))}>{user.role}</span>
+                        <span style={pillStyle(statusAccent(user.account_status))}>{user.account_status}</span>
+                        <span style={pillStyle(membershipAccent(user.membership_status))}>
+                          {user.membership_status === "none" ? "No plan" : `Plan ${user.membership_status}`}
+                        </span>
+                        <span style={{ color: "#b4bac4", fontSize: 13 }}>
+                          {formatDate(user.updated_at || user.created_at)}
+                        </span>
+                        <span
+                          style={{
+                            minHeight: 34,
+                            borderRadius: 10,
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Manage
+                        </span>
+                        <EllipsisVertical size={16} color="#9ca8b7" />
+                      </>
+                    )}
                   </div>
                 </button>
               );

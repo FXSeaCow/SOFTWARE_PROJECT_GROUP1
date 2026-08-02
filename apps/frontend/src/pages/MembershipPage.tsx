@@ -8,6 +8,7 @@ import { MembershipHeader } from "../features/membership/MembershipHeader";
 import { MembershipHero } from "../features/membership/MembershipHero";
 import { benefitCards, tierContent } from "../features/membership/constants";
 import { getUserInitials, inferTier } from "../features/membership/utils";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 import {
@@ -43,6 +44,7 @@ function formatCurrency(value: number) {
 }
 
 export function MembershipPage() {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role === "admin";
@@ -226,7 +228,13 @@ export function MembershipPage() {
 
       {pendingCheckout ? (
         <section className="interactive-card dashboard-card-enter" style={statusCardStyle("rgba(17,24,39,0.94)", "#f8fafc")}>
-          <div style={{ display: "grid", gap: 18, gridTemplateColumns: "minmax(0, 280px) minmax(0, 1fr)" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: 18,
+              gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 280px) minmax(0, 1fr)",
+            }}
+          >
             <div
               style={{
                 background: "#ffffff",

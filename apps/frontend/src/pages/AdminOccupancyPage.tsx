@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, RotateCcw, TrendingUp, Users } from "lucide-react";
+import { Activity, Calendar, Camera, LogIn, LogOut, RotateCcw, TrendingUp, Users } from "lucide-react";
 
+import { QrScannerModal } from "../components/QrScannerModal";
 import { Skeleton } from "../components/Skeleton";
-import { panelStyle } from "../components/main-menu/styles";
+import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
   BranchOccupancy,
@@ -10,6 +12,8 @@ import {
   DailyOccupancyReport,
   GymSession,
   OccupancyStatus,
+  checkInGym,
+  checkOutGym,
   getAdminDailyReport,
   getCurrentOccupancy,
   listAdminGymSessions,
@@ -63,6 +67,7 @@ function formatDuration(minutes: number | null) {
 }
 
 export function AdminOccupancyPage() {
+  const isMobile = useIsMobile();
   const [occupancy, setOccupancy] = useState<CurrentOccupancy | null>(null);
   const [isLoadingOccupancy, setIsLoadingOccupancy] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
@@ -80,6 +85,11 @@ export function AdminOccupancyPage() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [checkInBranchId, setCheckInBranchId] = useState("");
+  const [isCheckInScannerOpen, setIsCheckInScannerOpen] = useState(false);
+  const [isCheckOutScannerOpen, setIsCheckOutScannerOpen] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
   async function loadOccupancy() {
     setIsLoadingOccupancy(true);
@@ -135,6 +145,13 @@ export function AdminOccupancyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, sessionsBranchId]);
 
+  useEffect(() => {
+    if (!checkInBranchId && occupancy?.branches.length) {
+      setCheckInBranchId(occupancy.branches[0].branch_id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occupancy]);
+
   const branchOptions: BranchOccupancy[] = occupancy?.branches ?? [];
 
   const maxHourly = useMemo(() => {
@@ -155,6 +172,40 @@ export function AdminOccupancyPage() {
       setError(nextError instanceof Error ? nextError.message : "Unable to reset open sessions.");
     } finally {
       setIsResetting(false);
+    }
+  }
+
+  async function handleScanCheckIn(token: string) {
+    setIsCheckInScannerOpen(false);
+    setIsProcessingScan(true);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      const result = await checkInGym(checkInBranchId, token);
+      setFeedback(`${result.member.full_name} checked in at ${result.branch.branch_name}.`);
+      await Promise.all([loadOccupancy(), loadSessions(statusFilter, sessionsBranchId)]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to check in this member.");
+    } finally {
+      setIsProcessingScan(false);
+    }
+  }
+
+  async function handleScanCheckOut(token: string) {
+    setIsCheckOutScannerOpen(false);
+    setIsProcessingScan(true);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      const result = await checkOutGym(token);
+      setFeedback(`${result.member.full_name} checked out of ${result.branch.branch_name}.`);
+      await Promise.all([loadOccupancy(), loadSessions(statusFilter, sessionsBranchId)]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to check out this member.");
+    } finally {
+      setIsProcessingScan(false);
     }
   }
 
@@ -321,6 +372,73 @@ export function AdminOccupancyPage() {
             ) : null}
           </div>
         )}
+      </section>
+
+      <section className="dashboard-card-enter" style={{ ...panelStyle, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 22, fontWeight: 900, marginBottom: 6 }}>
+          <Camera size={20} color="#ff9a3d" />
+          Member check-in / check-out
+        </div>
+        <div style={{ color: "#9ca8b7", fontSize: 13, marginBottom: 16 }}>
+          Scan a member's QR code (from their Account page) to check them in or out at a branch.
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <select
+            value={checkInBranchId}
+            onChange={(event) => setCheckInBranchId(event.target.value)}
+            disabled={branchOptions.length === 0}
+            style={{
+              minHeight: 44,
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.02)",
+              color: "#f5f5f5",
+              padding: "0 12px",
+              fontSize: 13,
+            }}
+          >
+            {branchOptions.length === 0 ? <option value="">No active branches</option> : null}
+            {branchOptions.map((branch) => (
+              <option key={branch.branch_id} value={branch.branch_id}>
+                {branch.branch_name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => setIsCheckInScannerOpen(true)}
+            disabled={isProcessingScan || !checkInBranchId}
+            style={{
+              ...startButtonStyle,
+              width: "auto",
+              opacity: isProcessingScan || !checkInBranchId ? 0.6 : 1,
+              cursor: isProcessingScan || !checkInBranchId ? "not-allowed" : "pointer",
+            }}
+          >
+            <LogIn size={18} />
+            Scan to check in
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCheckOutScannerOpen(true)}
+            disabled={isProcessingScan}
+            style={{
+              ...startButtonStyle,
+              width: "auto",
+              background: "#1f1f1f",
+              color: "#f5f5f5",
+              border: "1px solid rgba(255,255,255,0.08)",
+              opacity: isProcessingScan ? 0.6 : 1,
+              cursor: isProcessingScan ? "not-allowed" : "pointer",
+            }}
+          >
+            <LogOut size={18} />
+            Scan to check out
+          </button>
+        </div>
       </section>
 
       <section className="dashboard-card-enter" style={{ ...panelStyle, marginBottom: 16 }}>
@@ -493,23 +611,25 @@ export function AdminOccupancyPage() {
           </select>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr",
-            gap: 12,
-            padding: "0 12px 14px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            color: "#9cc0e7",
-            fontSize: 13,
-          }}
-        >
-          <div>Member</div>
-          <div>Branch</div>
-          <div>Checked in</div>
-          <div>Checked out</div>
-          <div>Duration</div>
-        </div>
+        {isMobile ? null : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr",
+              gap: 12,
+              padding: "0 12px 14px",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              color: "#9cc0e7",
+              fontSize: 13,
+            }}
+          >
+            <div>Member</div>
+            <div>Branch</div>
+            <div>Checked in</div>
+            <div>Checked out</div>
+            <div>Duration</div>
+          </div>
+        )}
 
         {isLoadingSessions ? (
           <div style={{ display: "grid" }}>
@@ -521,6 +641,39 @@ export function AdminOccupancyPage() {
           </div>
         ) : sessions.length === 0 ? (
           <div style={{ padding: "24px 12px", color: "#9ca8b7" }}>No sessions found.</div>
+        ) : isMobile ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(255,255,255,0.02)",
+                  padding: 12,
+                  display: "grid",
+                  gap: 6,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14 }}>{session.user_name}</div>
+                    <div style={{ color: "#9ca8b7", fontSize: 12 }}>{session.user_email}</div>
+                  </div>
+                  {session.checked_out_at ? null : (
+                    <span style={{ color: "#86efac", fontWeight: 800, fontSize: 12, flex: "0 0 auto" }}>Open</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "#d4d4d8" }}>{session.branch_name}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca8b7" }}>
+                  <span>In: {formatDateTime(session.checked_in_at)}</span>
+                  <span>
+                    {session.checked_out_at ? `Out: ${formatDateTime(session.checked_out_at)}` : formatDuration(session.duration_minutes)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div style={{ display: "grid" }}>
             {sessions.map((session, index) => (
@@ -558,6 +711,20 @@ export function AdminOccupancyPage() {
           Showing {sessions.length} of {sessionsTotal} sessions
         </div>
       </section>
+
+      <QrScannerModal
+        isOpen={isCheckInScannerOpen}
+        title="Scan to check in"
+        onClose={() => setIsCheckInScannerOpen(false)}
+        onScan={(token) => void handleScanCheckIn(token)}
+      />
+
+      <QrScannerModal
+        isOpen={isCheckOutScannerOpen}
+        title="Scan to check out"
+        onClose={() => setIsCheckOutScannerOpen(false)}
+        onScan={(token) => void handleScanCheckOut(token)}
+      />
     </AdminPageLayout>
   );
 }
