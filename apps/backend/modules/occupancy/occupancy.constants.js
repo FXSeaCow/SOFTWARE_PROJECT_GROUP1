@@ -81,6 +81,7 @@ const OCCUPANCY_SCHEDULER = {
  */
 const OCCUPANCY_MESSAGES = {
   BRANCHES_FETCHED: 'Gym branches fetched successfully',
+  ACTIVE_MEMBERS_FETCHED: 'Active branch member count fetched successfully',
   CURRENT_FETCHED: 'Current occupancy fetched successfully',
   CHECKED_IN: 'Check-in completed successfully',
   CHECKED_OUT: 'Check-out completed successfully',

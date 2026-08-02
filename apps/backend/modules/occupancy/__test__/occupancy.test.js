@@ -15,6 +15,7 @@ jest.mock('../occupancy.repository', () => ({
   findUserById: jest.fn(),
   findActiveMembership: jest.fn(),
   countOpenSessions: jest.fn(),
+  countActiveMembersInBranch: jest.fn(),
   findOpenSessionByUser: jest.fn(),
   createSession: jest.fn(),
   closeSession: jest.fn(),
@@ -49,6 +50,8 @@ const calculator = require('../occupancyCalculator');
 const service = require('../occupancy.service');
 const scheduler = require('../occupancy.scheduler');
 const routes = require('../occupancy.routes');
+const request = require('supertest');
+const app = require('../../../app');
 const { NOTIFICATION_TEMPLATE } = require('../../notifications/notifications.constants');
 
 const member = {
@@ -198,6 +201,36 @@ describe('occupancy module', () => {
       current_occupancy: 18,
       occupancy_rate: 90,
       is_crowded: true,
+    });
+  });
+
+  it('returns active member count for one branch', async () => {
+    const branchId = '11111111-1111-4111-8111-111111111111';
+    const branchWithUuid = { ...branch, id: branchId, capacity: 10 };
+
+    repo.findBranchById.mockResolvedValue(branchWithUuid);
+    repo.countActiveMembersInBranch.mockResolvedValue(7);
+
+    const result = await service.getBranchActiveMembers(branchId);
+
+    expect(repo.countActiveMembersInBranch).toHaveBeenCalledWith(branchId);
+    expect(result).toMatchObject({
+      active_members: 7,
+      current_occupancy: 7,
+      capacity: 10,
+      available_slots: 3,
+      occupancy_rate: 70,
+      is_full: false,
+    });
+
+    const res = await request(app)
+      .get(`/api/occupancy/branches/${branchId}/active-members`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      active_members: 7,
+      current_occupancy: 7,
+      occupancy_rate: 70,
     });
   });
 

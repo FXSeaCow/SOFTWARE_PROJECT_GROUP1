@@ -6,9 +6,10 @@
  *
  * Member/authenticated routes:
  *   GET  /api/occupancy/branches         - active branches with occupancy
+ *   GET  /api/occupancy/branches/:branchId/active-members - active count
  *   GET  /api/occupancy/current          - current gym occupancy
- *   POST /api/occupancy/checkin          - check in by self or QR token
- *   POST /api/occupancy/checkout         - check out by self or QR token
+ *   POST /api/occupancy/checkin          - check in by self or admin QR scan
+ *   POST /api/occupancy/checkout         - check out by self or admin QR scan
  *   GET  /api/occupancy/me/sessions      - own gym session history
  *
  * Admin routes:
@@ -25,6 +26,7 @@ const { requireRole } = require('../../middlewares/Role.middleware');
 const { requireActiveMembership } = require('../../middlewares/Membership.middleware');
 const { validate } = require('../../middlewares/Validate.middleware');
 const {
+  uuidParam,
   checkInSchema,
   checkOutSchema,
   sessionsQuerySchema,
@@ -35,7 +37,11 @@ const {
 } = require('./occupancy.validation');
 
 router.get('/branches', ctrl.listBranches); // Public route — no auth required, show in home page
-
+router.get(
+  '/branches/:branchId/active-members',
+  validate(null, uuidParam('branchId')),
+  ctrl.getBranchActiveMembers
+);
 
 // Every occupancy endpoint requires authentication.
 router.use(authenticate);

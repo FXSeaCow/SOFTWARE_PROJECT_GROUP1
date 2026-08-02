@@ -346,6 +346,33 @@ const listBranches = async () => {
 };
 
 /**
+ * Return the number of distinct members currently training in one branch.
+ *
+ * A member is considered active in a branch when they have a gym_sessions row
+ * for that branch with checked_out_at still NULL.
+ *
+ * @param {string} branchId
+ * @returns {Promise<object>}
+ */
+const getBranchActiveMembers = async (branchId) => {
+  const branch = await requireBranch(branchId);
+  const activeMembers = await repo.countActiveMembersInBranch(branch.id);
+  const occupancy = formatBranchOccupancy(branch, activeMembers);
+
+  return {
+    branch: formatBranchMetadata(branch),
+    active_members: activeMembers,
+    current_occupancy: activeMembers,
+    capacity: occupancy.capacity,
+    available_slots: occupancy.available_slots,
+    occupancy_rate: occupancy.occupancy_rate,
+    status: occupancy.status,
+    is_full: occupancy.is_full,
+    is_crowded: occupancy.is_crowded,
+  };
+};
+
+/**
  * Return current occupancy for one branch or all active branches.
  *
  * @param {{ branch_id?: string }} query
@@ -659,6 +686,7 @@ const getOccupancyCache = () => occupancyCache;
 
 module.exports = {
   listBranches,
+  getBranchActiveMembers,
   getCurrentOccupancy,
   checkIn,
   checkOut,

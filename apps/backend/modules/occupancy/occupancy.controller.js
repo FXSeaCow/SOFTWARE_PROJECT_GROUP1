@@ -21,6 +21,15 @@ const listBranches = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/occupancy/branches/:branchId/active-members
+ * Return how many distinct members are currently training in one branch.
+ */
+const getBranchActiveMembers = asyncHandler(async (req, res) => {
+  const result = await service.getBranchActiveMembers(req.params.branchId);
+  res.json(ApiResponse.success(result, OCCUPANCY_MESSAGES.ACTIVE_MEMBERS_FETCHED));
+});
+
+/**
  * GET /api/occupancy/current
  * Return current gym occupancy for all branches or one branch.
  */
@@ -106,6 +115,7 @@ const resetOpenSessions = asyncHandler(async (req, res) => {
 
 module.exports = {
   listBranches,
+  getBranchActiveMembers,
   getCurrentOccupancy,
   checkIn,
   checkOut,

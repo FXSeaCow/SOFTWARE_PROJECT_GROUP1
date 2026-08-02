@@ -175,6 +175,25 @@ const countOpenSessions = async (branchId, client) => {
 };
 
 /**
+ * Count distinct members currently inside a branch.
+ *
+ * @param {string} branchId
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<number>}
+ */
+const countActiveMembersInBranch = async (branchId, client) => {
+  const runner = getRunner(client);
+  const { rows } = await runner.query(
+    `SELECT COUNT(DISTINCT user_id)::INT AS total
+     FROM gym_sessions
+     WHERE branch_id = $1
+       AND checked_out_at IS NULL`,
+    [branchId]
+  );
+  return rows[0].total;
+};
+
+/**
  * Find the latest open session for a user across all branches.
  *
  * @param {string} userId
@@ -529,6 +548,7 @@ module.exports = {
   findUserById,
   findActiveMembership,
   countOpenSessions,
+  countActiveMembersInBranch,
   findOpenSessionByUser,
   createSession,
   closeSession,
