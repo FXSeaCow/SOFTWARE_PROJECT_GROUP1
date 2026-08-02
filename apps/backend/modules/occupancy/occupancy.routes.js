@@ -8,14 +8,19 @@
  *   GET  /api/occupancy/branches         - active branches with occupancy
  *   GET  /api/occupancy/branches/:branchId/active-members - active count
  *   GET  /api/occupancy/current          - current gym occupancy
- *   POST /api/occupancy/checkin          - check in by self or admin QR scan
- *   POST /api/occupancy/checkout         - check out by self or admin QR scan
  *   GET  /api/occupancy/me/sessions      - own gym session history
  *
  * Admin routes:
+ *   POST /api/occupancy/checkin                    - check in scanned member
+ *   POST /api/occupancy/checkout                   - check out scanned member
  *   GET  /api/occupancy/admin/sessions             - all gym sessions
  *   GET  /api/occupancy/admin/daily-report         - daily occupancy report
  *   POST /api/occupancy/admin/reset-open-sessions  - close stale open sessions
+ *
+ * Member self-check-in/out is temporarily disabled — checkin/checkout are
+ * admin-only for now (matches origin/dev). Re-enable by swapping
+ * requireRole('admin') back to requireActiveMembership if self-checkin is
+ * revisited later.
  */
 
 const router = require('express').Router();
@@ -23,7 +28,6 @@ const ctrl = require('./occupancy.controller');
 
 const { authenticate } = require('../../middlewares/Auth.middleware');
 const { requireRole } = require('../../middlewares/Role.middleware');
-const { requireActiveMembership } = require('../../middlewares/Membership.middleware');
 const { validate } = require('../../middlewares/Validate.middleware');
 const {
   uuidParam,
@@ -59,7 +63,7 @@ router.get(
 
 router.post(
   '/checkin',
-  requireActiveMembership,
+  requireRole('admin'),
   validate(checkInSchema),
   ctrl.checkIn
 );
@@ -67,13 +71,14 @@ router.post(
 // Alias for clients that prefer dashed route names.
 router.post(
   '/check-in',
-  requireActiveMembership,
+  requireRole('admin'),
   validate(checkInSchema),
   ctrl.checkIn
 );
 
 router.post(
   '/checkout',
+  requireRole('admin'),
   validate(checkOutSchema),
   ctrl.checkOut
 );
@@ -81,6 +86,7 @@ router.post(
 // Alias for clients that prefer dashed route names.
 router.post(
   '/check-out',
+  requireRole('admin'),
   validate(checkOutSchema),
   ctrl.checkOut
 );

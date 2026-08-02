@@ -29,6 +29,7 @@ export function ProgressWeeklyActivity({
   checkinMessage,
   checkinError,
   isCheckedIn,
+  selfCheckinEnabled = true,
 }: {
   days: DayActivity[];
   summary: string;
@@ -41,6 +42,9 @@ export function ProgressWeeklyActivity({
   checkinMessage?: string | null;
   checkinError?: string | null;
   isCheckedIn?: boolean;
+  // Self-check-in is temporarily disabled backend-side (checkin/checkout are
+  // admin-only for now) — set to true again once that's revisited.
+  selfCheckinEnabled?: boolean;
 }) {
   const maxValue = Math.max(...days.map((day) => day.value), 1);
   const selectedBranch = branchOptions.find((branch) => branch.id === selectedBranchId);
@@ -72,91 +76,93 @@ export function ProgressWeeklyActivity({
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) auto",
-          gap: 12,
-          marginBottom: 18,
-          alignItems: "end",
-        }}
-      >
-        <label style={{ display: "block" }}>
-          <div
-            style={{
-              color: "#9ca8b7",
-              fontSize: 12,
-              fontWeight: 800,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: 8,
-            }}
-          >
-            Check-in branch
-          </div>
-          <select
-            value={selectedBranchId}
-            onChange={(event) => onBranchChange(event.target.value)}
-            disabled={branchOptions.length === 0 || isCheckedIn}
-            style={{
-              width: "100%",
-              minHeight: 48,
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#f5f5f5",
-              padding: "0 14px",
-              fontSize: 14,
-              opacity: branchOptions.length === 0 || isCheckedIn ? 0.7 : 1,
-            }}
-          >
-            {branchOptions.length === 0 ? (
-              <option value="">No branch available</option>
-            ) : (
-              branchOptions.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+      {selfCheckinEnabled ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gap: 12,
+            marginBottom: 18,
+            alignItems: "end",
+          }}
+        >
+          <label style={{ display: "block" }}>
+            <div
+              style={{
+                color: "#9ca8b7",
+                fontSize: 12,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 8,
+              }}
+            >
+              Check-in branch
+            </div>
+            <select
+              value={selectedBranchId}
+              onChange={(event) => onBranchChange(event.target.value)}
+              disabled={branchOptions.length === 0 || isCheckedIn}
+              style={{
+                width: "100%",
+                minHeight: 48,
+                borderRadius: 14,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#f5f5f5",
+                padding: "0 14px",
+                fontSize: 14,
+                opacity: branchOptions.length === 0 || isCheckedIn ? 0.7 : 1,
+              }}
+            >
+              {branchOptions.length === 0 ? (
+                <option value="">No branch available</option>
+              ) : (
+                branchOptions.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
 
-        {isCheckedIn ? (
-          <button
-            type="button"
-            onClick={onCheckout}
-            disabled={isSubmitting}
-            style={{
-              ...startButtonStyle,
-              minHeight: 48,
-              background: "transparent",
-              color: "#f87171",
-              border: "1px solid rgba(248,113,113,0.32)",
-              opacity: isSubmitting ? 0.6 : 1,
-            }}
-          >
-            <LogOut size={16} />
-            {isSubmitting ? "Checking out..." : "Check out"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onCheckin}
-            disabled={!selectedBranchId || branchOptions.length === 0 || isSubmitting}
-            style={{
-              ...startButtonStyle,
-              minHeight: 48,
-              opacity: !selectedBranchId || branchOptions.length === 0 || isSubmitting ? 0.6 : 1,
-            }}
-          >
-            <CheckCircle2 size={16} />
-            {isSubmitting ? "Checking in..." : "Check in"}
-          </button>
-        )}
-      </div>
+          {isCheckedIn ? (
+            <button
+              type="button"
+              onClick={onCheckout}
+              disabled={isSubmitting}
+              style={{
+                ...startButtonStyle,
+                minHeight: 48,
+                background: "transparent",
+                color: "#f87171",
+                border: "1px solid rgba(248,113,113,0.32)",
+                opacity: isSubmitting ? 0.6 : 1,
+              }}
+            >
+              <LogOut size={16} />
+              {isSubmitting ? "Checking out..." : "Check out"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onCheckin}
+              disabled={!selectedBranchId || branchOptions.length === 0 || isSubmitting}
+              style={{
+                ...startButtonStyle,
+                minHeight: 48,
+                opacity: !selectedBranchId || branchOptions.length === 0 || isSubmitting ? 0.6 : 1,
+              }}
+            >
+              <CheckCircle2 size={16} />
+              {isSubmitting ? "Checking in..." : "Check in"}
+            </button>
+          )}
+        </div>
+      ) : null}
 
-      {selectedBranch && selectedBranch.capacity !== undefined ? (
+      {selfCheckinEnabled && selectedBranch && selectedBranch.capacity !== undefined ? (
         <div
           style={{
             display: "flex",
@@ -174,7 +180,7 @@ export function ProgressWeeklyActivity({
         </div>
       ) : null}
 
-      {checkinMessage ? (
+      {selfCheckinEnabled && checkinMessage ? (
         <div
           style={{
             marginBottom: 18,
@@ -186,7 +192,7 @@ export function ProgressWeeklyActivity({
         </div>
       ) : null}
 
-      {checkinError ? (
+      {selfCheckinEnabled && checkinError ? (
         <div
           style={{
             marginBottom: 18,

@@ -27,6 +27,11 @@ import {
 import { getCurrentUser } from "../services/authService";
 import { GymSession, checkInGym, checkOutGym, getMyGymSessions } from "../services/occupancyService";
 
+// Member self-check-in is temporarily disabled — the backend now requires
+// admin role on /occupancy/checkin and /occupancy/checkout (staff scans the
+// member's QR instead). Flip back to true if self-checkin is revisited.
+const SELF_CHECKIN_ENABLED = false;
+
 const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 const muscleAccentPalette = ["#ff7a1a", "#4fa3ff", "#3ddc97", "#ffd166", "#f04a4a", "#c084fc", "#38bdf8"];
 
@@ -328,6 +333,7 @@ export function ProgressPage() {
         checkinMessage={checkinMessage ?? (openSession ? `Currently checked in at ${openSession.branch_name}.` : null)}
         checkinError={checkinError}
         isCheckedIn={Boolean(openSession)}
+        selfCheckinEnabled={SELF_CHECKIN_ENABLED}
       />
 
       <ProgressWorkoutHistory entries={workoutHistory} />
