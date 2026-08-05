@@ -7,6 +7,7 @@ import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { MainMenuHeroCard } from "../components/main-menu/MainMenuHeroCard";
 import { MainMenuStatCard } from "../components/main-menu/MainMenuStatCard";
 import { MainMenuWeeklyGoal } from "../components/main-menu/MainMenuWeeklyGoal";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
 
@@ -61,6 +62,7 @@ const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function MainMenuPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile(768);
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role === "admin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -115,7 +117,7 @@ export function MainMenuPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fit, minmax(220px, 1fr))",
           gap: 12,
           marginBottom: 18,
         }}

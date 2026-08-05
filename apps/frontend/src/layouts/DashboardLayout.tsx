@@ -1,5 +1,7 @@
 import React from "react";
 
+import { useIsMobile } from "../hooks/useIsMobile";
+
 export function DashboardLayout({
   children,
   bottomNav,
@@ -7,10 +9,13 @@ export function DashboardLayout({
   children: React.ReactNode;
   bottomNav?: React.ReactNode;
 }) {
+  const isMobile = useIsMobile(768);
+
   return (
     <main
       style={{
         minHeight: "100vh",
+        overflowX: "hidden",
         background:
           "radial-gradient(circle at top center, rgba(255,122,26,0.12), transparent 22%), linear-gradient(180deg, #090909 0%, #050505 100%)",
         color: "#f5f5f5",
@@ -111,7 +116,7 @@ export function DashboardLayout({
         style={{
           maxWidth: 1440,
           margin: "0 auto",
-          padding: "18px 12px 112px",
+          padding: isMobile ? "0 16px 112px" : "18px 12px 32px",
         }}
       >
         {children}

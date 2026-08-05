@@ -1,20 +1,18 @@
 import React from "react";
-import { CalendarDays, CreditCard, Dumbbell, Home, LineChart, User } from "lucide-react";
+import { CalendarDays, CreditCard, Dumbbell, Home, LineChart } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { bottomNavItemStyle } from "./styles";
 
-type NavItem = "home" | "train" | "membership" | "progress" | "schedule" | "profile" | "none";
+type NavItem = "home" | "train" | "membership" | "progress" | "schedule" | "none";
 
 export function MainMenuBottomNav({
-  profileHref,
   trainHref = "/exercises",
   membershipHref = "/membership",
   progressHref = "/progress",
   scheduleHref = "/schedule",
   activeItem = "home",
 }: {
-  profileHref: string;
   trainHref?: string;
   membershipHref?: string;
   progressHref?: string;
@@ -28,10 +26,10 @@ export function MainMenuBottomNav({
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(6,6,6,0.96)",
-        borderTop: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(5,5,5,0.96)",
+        borderTop: "1px solid #2a2a2a",
         boxShadow: "0 -16px 32px rgba(0,0,0,0.35)",
-        padding: "10px 16px 14px",
+        padding: "10px 16px calc(14px + env(safe-area-inset-bottom))",
         zIndex: 10,
       }}
     >
@@ -40,7 +38,7 @@ export function MainMenuBottomNav({
           maxWidth: 1440,
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
           gap: 8,
           alignItems: "center",
         }}
@@ -68,12 +66,6 @@ export function MainMenuBottomNav({
           icon={<LineChart size={21} />}
           to={progressHref}
           active={activeItem === "progress"}
-        />
-        <MainMenuBottomNavLink
-          label="Profile"
-          icon={<User size={21} />}
-          to={profileHref}
-          active={activeItem === "profile"}
         />
         <MainMenuBottomNavButton
           label="Schedule"
@@ -149,7 +141,6 @@ export function MainMenuBottomNavButton({
       onClick={onClick}
       style={{
         ...bottomNavItemStyle(active),
-        width: "100%",
         border: "none",
         background: "transparent",
         color: active ? "#ff7a1a" : "rgba(255,255,255,0.28)",

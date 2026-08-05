@@ -67,9 +67,15 @@ export function bottomNavItemStyle(active: boolean): React.CSSProperties {
     justifyItems: "center",
     alignContent: "center",
     gap: 6,
-    fontSize: 12,
+    width: "100%",
+    padding: "0 2px",
+    fontSize: 10,
+    lineHeight: 1.15,
+    textAlign: "center",
+    whiteSpace: "normal",
+    wordBreak: "break-word",
     fontWeight: active ? 800 : 600,
     textTransform: "uppercase",
-    letterSpacing: "0.03em",
+    letterSpacing: "0.01em",
   };
 }

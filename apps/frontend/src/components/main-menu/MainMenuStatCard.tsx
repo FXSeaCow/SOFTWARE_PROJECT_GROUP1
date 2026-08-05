@@ -1,6 +1,7 @@
 import React from "react";
 
 import { panelStyle } from "./styles";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 export function MainMenuStatCard({
   label,
@@ -13,8 +14,13 @@ export function MainMenuStatCard({
   icon: React.ReactNode;
   note: string;
 }) {
+  const isMobile = useIsMobile(768);
+
   return (
-    <div className="interactive-card dashboard-card-enter" style={{ ...panelStyle, minHeight: 132, padding: 20 }}>
+    <div
+      className="interactive-card dashboard-card-enter"
+      style={{ ...panelStyle, minHeight: isMobile ? 176 : 132, padding: 20, display: "flex", alignItems: "center" }}
+    >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
         <div
           style={{

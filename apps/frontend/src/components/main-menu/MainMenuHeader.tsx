@@ -1,7 +1,9 @@
 import React from "react";
+import { ChevronDown } from "lucide-react";
 
 import { iconButtonStyle } from "./styles";
 import { NotificationBell } from "../NotificationBell";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 export function MainMenuHeader({
   displayName,
@@ -28,6 +30,8 @@ export function MainMenuHeader({
   showAdminEntry?: boolean;
   onLogoutClick: () => void;
 }) {
+  const isMobile = useIsMobile(768);
+
   return (
     <header
       style={{
@@ -35,6 +39,7 @@ export function MainMenuHeader({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 16,
+        flexWrap: "wrap",
         paddingBottom: 18,
         borderBottom: "1px solid rgba(255,255,255,0.08)",
         marginBottom: 18,
@@ -55,7 +60,7 @@ export function MainMenuHeader({
         <h1
           style={{
             margin: 0,
-            fontSize: "clamp(2rem, 3.6vw, 3rem)",
+            fontSize: isMobile ? "clamp(2.2rem, 9vw, 2.6rem)" : "clamp(2rem, 3.6vw, 3rem)",
             lineHeight: 0.92,
             fontWeight: 900,
             letterSpacing: "-0.05em",
@@ -65,6 +70,57 @@ export function MainMenuHeader({
           {displayName}
         </h1>
       </div>
+
+      {isMobile ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onAccountClick}
+            style={{
+              minHeight: 44,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "0 18px",
+              borderRadius: 999,
+              border: "1px solid #2a2a2a",
+              background: "#171717",
+              color: "#f5f5f5",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            <span>Account</span>
+            <ChevronDown size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onLogoutClick}
+            style={{
+              minHeight: 44,
+              padding: "0 18px",
+              borderRadius: 999,
+              border: "none",
+              background: "#ff7a1a",
+              color: "#111111",
+              fontSize: 14,
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Log out
+          </button>
+        </div>
+      ) : null}
 
       {hideActions ? null : (
         <div

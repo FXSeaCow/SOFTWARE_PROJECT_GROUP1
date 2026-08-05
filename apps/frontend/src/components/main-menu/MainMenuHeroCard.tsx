@@ -3,6 +3,7 @@ import { Flame, Play, Timer } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { heroMetaStyle, panelStyle, startButtonStyle } from "./styles";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 export function MainMenuHeroCard({
   startHref,
@@ -11,6 +12,8 @@ export function MainMenuHeroCard({
   startHref: string;
   membershipHref?: string;
 }) {
+  const isMobile = useIsMobile(768);
+
   return (
     <section
       className="interactive-card dashboard-card-enter"
@@ -118,12 +121,29 @@ export function MainMenuHeroCard({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: 12,
+            flexWrap: "wrap",
+            marginTop: 18,
+          }}
+        >
           <Link
             to={startHref}
-            style={{ textDecoration: "none", display: "inline-block" }}
+            style={{ textDecoration: "none", display: isMobile ? "block" : "inline-block" }}
           >
-            <button type="button" style={{ ...startButtonStyle, minHeight: 46, padding: "0 24px" }}>
+            <button
+              type="button"
+              style={{
+                ...startButtonStyle,
+                minHeight: 46,
+                padding: "0 24px",
+                width: isMobile ? "100%" : undefined,
+                justifyContent: isMobile ? "center" : "flex-start",
+              }}
+            >
               <Play size={18} fill="currentColor" />
               <span>Start workout</span>
             </button>
@@ -131,7 +151,7 @@ export function MainMenuHeroCard({
 
           <Link
             to={membershipHref}
-            style={{ textDecoration: "none", display: "inline-block" }}
+            style={{ textDecoration: "none", display: isMobile ? "block" : "inline-block" }}
           >
             <button
               type="button"
@@ -144,11 +164,13 @@ export function MainMenuHeroCard({
                 color: "#f8fafc",
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: isMobile ? "center" : "flex-start",
                 gap: 10,
                 fontSize: 14,
                 fontWeight: 900,
                 textTransform: "uppercase",
                 cursor: "pointer",
+                width: isMobile ? "100%" : undefined,
               }}
             >
               <span>View membership plans</span>
