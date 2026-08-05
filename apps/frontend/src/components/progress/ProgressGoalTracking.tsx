@@ -23,6 +23,11 @@ export function ProgressGoalTracking({ goals }: { goals: GoalEntry[] }) {
         Goal Tracking
       </div>
 
+      {goals.length === 0 ? (
+        <div style={{ color: "#8d98a7", fontSize: 14 }}>
+          Goal tracking is coming soon — you'll be able to set and track personal goals here.
+        </div>
+      ) : (
       <div style={{ display: "grid", gap: 18 }}>
         {goals.map((goal) => (
           <div key={goal.label}>
@@ -68,6 +73,7 @@ export function ProgressGoalTracking({ goals }: { goals: GoalEntry[] }) {
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }

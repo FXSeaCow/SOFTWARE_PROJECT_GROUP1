@@ -15,7 +15,7 @@ export function MainMenuCategoryCard({
   subtitle: string;
   icon: React.ReactNode;
   accent: string;
-  metric: string;
+  metric?: string;
   onClick?: () => void;
 }) {
   return (
@@ -65,9 +65,11 @@ export function MainMenuCategoryCard({
               {title}
             </div>
             <div style={{ color: "#8d98a7", fontSize: 14, lineHeight: 1.45 }}>{subtitle}</div>
-            <div style={{ color: accent, fontSize: 14, fontWeight: 800, marginTop: 10 }}>
-              {metric}
-            </div>
+            {metric ? (
+              <div style={{ color: accent, fontSize: 14, fontWeight: 800, marginTop: 10 }}>
+                {metric}
+              </div>
+            ) : null}
           </div>
           <div style={{ alignSelf: "end", color: "#d0d5dd" }}>
             <ChevronRight size={18} />

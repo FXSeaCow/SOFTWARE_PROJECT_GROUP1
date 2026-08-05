@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Activity, CalendarDays, ChevronRight, Dumbbell, Flame, Target, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -10,6 +10,7 @@ import { MainMenuWeeklyGoal } from "../components/main-menu/MainMenuWeeklyGoal";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
+import { getMyCheckinsInRange, getMyStreak, StreakSummary } from "../services/streakService";
 
 type StatItem = {
   label: string;
@@ -18,20 +19,33 @@ type StatItem = {
   note: string;
 };
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentWeekDates() {
+  const today = new Date();
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(today.getDate() - mondayOffset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return date;
+  });
+}
+
 type CategoryItem = {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   accent: string;
-  metric: string;
 };
-
-const stats: StatItem[] = [
-  { label: "Workouts completed", value: "128", icon: <Activity size={18} />, note: "12% this month" },
-  { label: "This week", value: "5", icon: <CalendarDays size={18} />, note: "25% vs last week" },
-  { label: "Streak", value: "14d", icon: <Flame size={18} />, note: "Keep it up!" },
-  { label: "Best", value: "3", icon: <Trophy size={18} />, note: "Personal best" },
-];
 
 const categories: CategoryItem[] = [
   {
@@ -39,25 +53,21 @@ const categories: CategoryItem[] = [
     subtitle: "Build muscle and get stronger",
     icon: <Dumbbell size={20} />,
     accent: "#ff7a1a",
-    metric: "24 workouts",
   },
   {
     title: "Cardio",
     subtitle: "Improve endurance and stamina",
     icon: <Activity size={20} />,
     accent: "#ff9a3d",
-    metric: "18 sessions",
   },
   {
     title: "Mobility",
     subtitle: "Enhance flexibility and recovery",
     icon: <Target size={20} />,
     accent: "#ffb15f",
-    metric: "15 routines",
   },
 ];
 
-const weeklyGoal = [true, true, true, true, true, false, false];
 const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function MainMenuPage() {
@@ -66,11 +76,64 @@ export function MainMenuPage() {
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role === "admin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [streakSummary, setStreakSummary] = useState<StreakSummary | null>(null);
+  const [weekCheckinDates, setWeekCheckinDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const weekDates = getCurrentWeekDates();
+    const fromDate = formatDateKey(weekDates[0]);
+    const toDate = formatDateKey(weekDates[6]);
+
+    void getMyStreak().then(setStreakSummary);
+    void getMyCheckinsInRange(fromDate, toDate).then((checkins) => {
+      setWeekCheckinDates(new Set(checkins.map((checkin) => checkin.checkin_date)));
+    });
+  }, [currentUser?.id]);
+
+  const weeklyGoal = getCurrentWeekDates().map((date) => weekCheckinDates.has(formatDateKey(date)));
+  const daysCompletedThisWeek = weeklyGoal.filter(Boolean).length;
+  const weeklyProgressPercent = Math.round((daysCompletedThisWeek / 7) * 100);
+
+  const stats: StatItem[] = [
+    {
+      label: "Workouts completed",
+      value: streakSummary ? String(streakSummary.total_checkins) : "—",
+      icon: <Activity size={18} />,
+      note: "All-time check-ins",
+    },
+    {
+      label: "This week",
+      value: String(daysCompletedThisWeek),
+      icon: <CalendarDays size={18} />,
+      note: `${daysCompletedThisWeek} of 7 days`,
+    },
+    {
+      label: "Streak",
+      value: streakSummary ? `${streakSummary.current_streak}d` : "—",
+      icon: <Flame size={18} />,
+      note:
+        streakSummary?.status === "at_risk"
+          ? "At risk — check in today"
+          : streakSummary?.status === "active"
+            ? "Keep it up!"
+            : "Start today!",
+    },
+    {
+      label: "Best",
+      value: streakSummary ? `${streakSummary.longest_streak}d` : "—",
+      icon: <Trophy size={18} />,
+      note: "Longest streak",
+    },
+  ];
   const displayName = currentUser?.name?.trim()
     ? currentUser.name.toUpperCase()
     : currentUser?.email
       ? currentUser.email.split("@")[0].replace(/[._-]+/g, " ").toUpperCase()
-      : "ALEX CARTER";
+      : "ACCOUNT";
   const profileInitials = currentUser?.name
     ? currentUser.name
         .split(" ")
@@ -139,10 +202,10 @@ export function MainMenuPage() {
       />
 
       <MainMenuWeeklyGoal
-        goalDays="5 / 6 days"
+        goalDays={`${daysCompletedThisWeek} / 7 days`}
         completedDays={weeklyGoal}
         labels={weeklyLabels}
-        progressPercent={83}
+        progressPercent={weeklyProgressPercent}
       />
 
       <section>
@@ -198,7 +261,6 @@ export function MainMenuPage() {
               subtitle={category.subtitle}
               icon={category.icon}
               accent={category.accent}
-              metric={category.metric}
               onClick={() => navigate("/exercises")}
             />
           ))}

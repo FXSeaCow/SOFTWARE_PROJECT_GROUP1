@@ -208,6 +208,19 @@ export function AdminUsersPage() {
     });
   }, [roleFilter, statusFilter, users]);
 
+  const USERS_PAGE_SIZE = 10;
+  const [currentUsersPage, setCurrentUsersPage] = useState(1);
+  const totalUsersPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentUsersPage(1);
+  }, [roleFilter, statusFilter, users]);
+
+  const pagedUsers = useMemo(() => {
+    const start = (currentUsersPage - 1) * USERS_PAGE_SIZE;
+    return filteredUsers.slice(start, start + USERS_PAGE_SIZE);
+  }, [filteredUsers, currentUsersPage]);
+
   const selectedUser =
     filteredUsers.find((user) => user.id === selectedUserId) ??
     users.find((user) => user.id === selectedUserId) ??
@@ -807,7 +820,7 @@ export function AdminUsersPage() {
               </div>
             ) : null}
 
-            {!isLoading && filteredUsers.map((user) => {
+            {!isLoading && pagedUsers.map((user) => {
               const isSelected = selectedUser?.id === user.id;
               return (
                 <button
@@ -931,45 +944,53 @@ export function AdminUsersPage() {
             }}
           >
             <span>
-              Showing {filteredUsers.length} / {filteredUsers.length} members
+              Showing {pagedUsers.length} of {filteredUsers.length} members
             </span>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
+                onClick={() => setCurrentUsersPage((current) => Math.max(1, current - 1))}
+                disabled={currentUsersPage === 1}
                 style={{
                   width: 32,
                   height: 32,
                   borderRadius: 8,
                   border: "1px solid rgba(255,255,255,0.08)",
                   background: "rgba(255,255,255,0.02)",
-                  color: "#9ca8b7",
+                  color: currentUsersPage === 1 ? "#4b5563" : "#9ca8b7",
+                  cursor: currentUsersPage === 1 ? "not-allowed" : "pointer",
                 }}
               >
                 {"<"}
               </button>
-              <button
-                type="button"
+              <span
                 style={{
-                  width: 32,
+                  minWidth: 32,
                   height: 32,
                   borderRadius: 8,
                   border: "1px solid rgba(255,122,26,0.24)",
                   background: "rgba(255,122,26,0.18)",
                   color: "#ffb15f",
                   fontWeight: 800,
+                  display: "grid",
+                  placeItems: "center",
+                  padding: "0 8px",
                 }}
               >
-                1
-              </button>
+                {currentUsersPage} / {totalUsersPages}
+              </span>
               <button
                 type="button"
+                onClick={() => setCurrentUsersPage((current) => Math.min(totalUsersPages, current + 1))}
+                disabled={currentUsersPage === totalUsersPages}
                 style={{
                   width: 32,
                   height: 32,
                   borderRadius: 8,
                   border: "1px solid rgba(255,255,255,0.08)",
                   background: "rgba(255,255,255,0.02)",
-                  color: "#9ca8b7",
+                  color: currentUsersPage === totalUsersPages ? "#4b5563" : "#9ca8b7",
+                  cursor: currentUsersPage === totalUsersPages ? "not-allowed" : "pointer",
                 }}
               >
                 {">"}
