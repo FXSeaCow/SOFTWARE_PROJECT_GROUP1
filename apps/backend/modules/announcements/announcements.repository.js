@@ -22,57 +22,6 @@ const listAnnouncementHistory = async () => {
   return rows;
 };
 
-const listUserNotifications = async (userId) => {
-  const { rows } = await db.query(
-    `SELECT
-       n.id,
-       n.user_id,
-       n.announcement_id,
-       n.type,
-       n.title,
-       n.body,
-       n.is_read,
-       n.sent_at,
-       n.read_at,
-       a.published_at,
-       COALESCE(u.full_name, u.email, 'System') AS created_by_name
-     FROM notifications n
-     LEFT JOIN announcements a ON a.id = n.announcement_id
-     LEFT JOIN users u ON u.id = a.created_by
-     WHERE n.user_id = $1
-     ORDER BY n.sent_at DESC
-     LIMIT 20`,
-    [userId]
-  );
-
-  return rows;
-};
-
-const markNotificationAsRead = async (notificationId, userId) => {
-  const { rows } = await db.query(
-    `UPDATE notifications
-     SET is_read = true,
-         read_at = COALESCE(read_at, now())
-     WHERE id = $1 AND user_id = $2
-     RETURNING id, user_id, announcement_id, type, title, body, is_read, sent_at, read_at`,
-    [notificationId, userId]
-  );
-
-  return rows[0] || null;
-};
-
-const markAllNotificationsAsRead = async (userId) => {
-  const { rowCount } = await db.query(
-    `UPDATE notifications
-     SET is_read = true,
-         read_at = COALESCE(read_at, now())
-     WHERE user_id = $1 AND is_read = false`,
-    [userId]
-  );
-
-  return rowCount;
-};
-
 const findRecipientUsers = async (userIds, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
@@ -142,9 +91,6 @@ const createNotifications = async ({ announcementId, recipients, title, body, ty
 
 module.exports = {
   listAnnouncementHistory,
-  listUserNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
   findRecipientUsers,
   findAllRecipientUsers,
   createAnnouncement,

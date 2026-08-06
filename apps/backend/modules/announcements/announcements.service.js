@@ -1,28 +1,10 @@
 const repo = require('./announcements.repository');
-const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
+const ApiError = require('../../utils/Apierror');
 const { withTransaction } = require('../../utils/Transaction');
 
 const listAnnouncementHistory = async () => {
   return repo.listAnnouncementHistory();
-};
-
-const listMyNotifications = async (userId) => {
-  return repo.listUserNotifications(userId);
-};
-
-const markMyNotificationAsRead = async (notificationId, userId) => {
-  const notification = await repo.markNotificationAsRead(notificationId, userId);
-  if (!notification) {
-    throw ApiError.notFound('Notification');
-  }
-
-  return notification;
-};
-
-const markAllMyNotificationsAsRead = async (userId) => {
-  const updatedCount = await repo.markAllNotificationsAsRead(userId);
-  return { updated_count: updatedCount };
 };
 
 const createAnnouncement = async (adminUser, payload) => {
@@ -89,8 +71,5 @@ const createAnnouncement = async (adminUser, payload) => {
 
 module.exports = {
   listAnnouncementHistory,
-  listMyNotifications,
-  markMyNotificationAsRead,
-  markAllMyNotificationsAsRead,
   createAnnouncement,
 };

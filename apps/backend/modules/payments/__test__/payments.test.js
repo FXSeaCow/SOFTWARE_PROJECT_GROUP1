@@ -94,7 +94,7 @@ const seedPayment = async (userId, membershipId, overrides = {}) => {
 };
 
 beforeEach(async () => {
-  await global.truncateAll();
+  await truncateAll();
 });
 
 // =============================================================================

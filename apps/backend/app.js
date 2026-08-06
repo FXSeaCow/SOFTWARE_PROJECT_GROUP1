@@ -43,6 +43,7 @@ app.use((req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   app.use(requestLogger);
   app.use('/api', generalLimiter);
+  app.use(ensureAppReady);
 }
 
 app.use(cors({
@@ -51,8 +52,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-app.use(ensureAppReady);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);

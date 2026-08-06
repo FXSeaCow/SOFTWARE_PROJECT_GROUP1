@@ -13,7 +13,6 @@
 
 const repo                       = require('./payments.repository');
 const membershipRepo             = require('../memberships/memberships.repository');
-const membershipService          = require('../memberships/memberships.service');
 const { withTransaction }        = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError                   = require('../../utils/Apierror');
@@ -39,9 +38,6 @@ const requestPayment = async (userId, { membership_id, provider, transfer_note }
   const membership = await membershipRepo.findById(membership_id);
   if (!membership)                       throw ApiError.notFound('Membership');
   if (membership.user_id !== userId)     throw ApiError.forbidden();
-  if (membership.status !== 'suspended') {
-    throw ApiError.badRequest('Only memberships waiting for payment can be submitted');
-  }
 
   // 2. Check for an existing completed payment
   const db = require('../../config/db');
@@ -108,17 +104,17 @@ const confirmPayment = async (paymentId, adminId, note) => {
     // Mark payment completed
     const paid = await repo.markCompleted(paymentId, adminId, note, client);
 
-    const membership = await membershipService.issueMembershipActivationCode(
-      payment.membership_id,
-      adminId,
-      client
+    await client.query(
+      `UPDATE memberships
+       SET status = 'active',
+           activated_at = now(),
+           updated_at = now(),
+           updated_by = $1
+       WHERE id = $2`,
+      [adminId, payment.membership_id]
     );
 
-    return {
-      ...paid,
-      activation_code: membership.activation_code,
-      activation_code_issued_at: membership.activation_code_issued_at,
-    };
+    return paid;
   });
 
   logger.info('Payment confirmed by admin', {

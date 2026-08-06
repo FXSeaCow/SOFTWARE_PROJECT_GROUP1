@@ -1,12 +1,5 @@
 const Joi = require('joi');
 
-const notificationIdParam = Joi.object({
-  notificationId: Joi.string().uuid().required().messages({
-    'string.uuid': 'notificationId must be a valid UUID',
-    'any.required': 'notificationId is required',
-  }),
-});
-
 const createAnnouncementSchema = Joi.object({
   title: Joi.string().trim().min(3).max(160).required().messages({
     'string.empty': 'title is required',
@@ -36,6 +29,5 @@ const createAnnouncementSchema = Joi.object({
 });
 
 module.exports = {
-  notificationIdParam,
   createAnnouncementSchema,
 };

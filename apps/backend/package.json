@@ -8,6 +8,7 @@
     "test:watch": "jest --watch --runInBand",
     "test:coverage": "jest --coverage --runInBand --forceExit",
     "test:auth": "jest --testPathPatterns=modules/auth --runInBand --forceExit",
+    "test:announcements": "jest --testPathPatterns=modules/announcements --runInBand --forceExit",
     "test:users": "jest --testPathPatterns=modules/users --runInBand --forceExit",
     "test:memberships": "jest --testPathPatterns=modules/memberships --runInBand --forceExit",
     "test:workouts": "jest --testPathPatterns=modules/workouts --runInBand --forceExit",

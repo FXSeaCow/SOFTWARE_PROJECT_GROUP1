@@ -74,7 +74,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
     req.user.id,
     req.body.note || null
   );
-  res.json(ApiResponse.success(payment, 'Payment confirmed. Activation code issued.'));
+  res.json(ApiResponse.success(payment, 'Payment confirmed. Membership activated.'));
 });
 
 /**

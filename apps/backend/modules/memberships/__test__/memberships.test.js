@@ -291,7 +291,7 @@ describe('GET /api/memberships/me/history', () => {
 // =============================================================================
 describe('POST /api/memberships/renew', () => {
 
-  it('should create a new active membership for a user without one', async () => {
+  it('should create a new suspended membership for a user without one (Wait for admin to confirm payment to activate membership)', async () => {
     const { user, accessToken } = await registerAndLogin();
     const plan = await seedPlan({ duration_days: 30 });
 
@@ -304,12 +304,12 @@ describe('POST /api/memberships/renew', () => {
     expect(res.body.data).toMatchObject({
       user_id:   user.id,
       plan_id:   plan.id,
-      status:    'active',
+      status:    'suspended',
     });
 
     // Confirm in DB
     const { rows } = await db.query(
-      `SELECT * FROM memberships WHERE user_id = $1 AND status = 'active'`,
+      `SELECT * FROM memberships WHERE user_id = $1 AND status = 'suspended'`,
       [user.id]
     );
     expect(rows).toHaveLength(1);
