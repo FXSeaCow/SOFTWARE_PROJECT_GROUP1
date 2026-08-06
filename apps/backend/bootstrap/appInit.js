@@ -245,8 +245,8 @@ async function seedExerciseCatalog() {
   for (const exercise of exercises) {
     await db.query(
       `INSERT INTO exercises (name, muscle_group, equipment, difficulty, description, goal_tags)
-       SELECT $1, $2, $3, $4, $5, $6
-       WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE LOWER(name) = LOWER($1))`,
+      SELECT $1::text, $2::muscle_group, $3::text, $4::difficulty_level, $5::text, $6::text[]
+      WHERE NOT EXISTS (SELECT 1 FROM exercises WHERE LOWER(name) = LOWER($1::text))`,
       exercise
     );
   }
