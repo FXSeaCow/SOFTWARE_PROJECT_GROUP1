@@ -4,7 +4,7 @@ import { BriefcaseBusiness, Eye, EyeOff, Lock, Mail } from "lucide-react";
 
 import { Button } from "../../components/Button";
 import { Input } from "../../components/Input";
-import { login } from "../../services/authService";
+import { login, startGoogleLogin } from "../../services/authService";
 
 type FormState = {
   email: string;
@@ -58,6 +58,7 @@ export function LoginForm() {
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -290,21 +291,6 @@ export function LoginForm() {
           </div>
         ) : null}
 
-        {successMessage ? (
-          <div
-            style={{
-              borderRadius: 12,
-              padding: "12px 14px",
-              background: "#dcfce7",
-              color: "#166534",
-              fontSize: 14,
-              marginBottom: 16,
-            }}
-          >
-            {successMessage}
-          </div>
-        ) : null}
-
         {/* Sign in */}
         <Button type="submit" isLoading={isSubmitting}>
           Sign in
@@ -351,6 +337,7 @@ export function LoginForm() {
         <Button
           type="button"
           variant="outline"
+          isLoading={isGoogleSubmitting}
           leftIcon={
             <span
               style={{
@@ -364,7 +351,8 @@ export function LoginForm() {
             </span>
           }
           onClick={() => {
-            // Sau này gọi API đăng nhập Google ở đây.
+            setIsGoogleSubmitting(true);
+            startGoogleLogin();
           }}
         >
           Continue with Google

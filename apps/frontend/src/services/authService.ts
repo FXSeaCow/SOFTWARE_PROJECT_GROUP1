@@ -22,6 +22,11 @@ type ResetPasswordPayload = {
   confirm_password: string;
 };
 
+type GoogleLoginPayload = {
+  code: string;
+  redirect_uri: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -51,6 +56,8 @@ type BackendAuthResponse = {
 
 const STORAGE_KEY = "gym-web.auth-session";
 const USERS_STORAGE_KEY = "gym-web.users";
+const GOOGLE_STATE_KEY = "gym-web.google-oauth-state";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "/api";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -93,24 +100,76 @@ type BackendMessageResponse = {
   data: unknown;
 };
 
+type ForgotPasswordResult = {
+  message: string;
+  resetLink?: string;
+};
+
+function toSession(response: BackendAuthResponse): AuthSession {
+  return {
+    accessToken: response.data.accessToken,
+    user: {
+      id: response.data.user.id,
+      email: response.data.user.email,
+      name: response.data.user.full_name,
+      role: response.data.user.role as User["role"],
+    },
+  };
+}
+
+function saveSession(session: AuthSession): AuthSession {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  return session;
+}
+
+function createGoogleState(): string {
+  const bytes = new Uint8Array(24);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function getGoogleRedirectUri(): string {
+  return `${window.location.origin}/auth/google/callback`;
+}
+
 export async function login(payload: LoginPayload): Promise<AuthSession> {
   const response = await apiClient<BackendAuthResponse>("/auth/login", {
     method: "POST",
     body: payload,
   });
 
-  const session: AuthSession = {
-    accessToken: response.data.accessToken,
-    user: {
-      id: response.data.user.id,
-      email: response.data.user.email,
-      name: response.data.user.full_name, // Mapping full_name -> name
-      role: response.data.user.role as User["role"],
-    },
-  };
+  return saveSession(toSession(response));
+}
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-  return session;
+export function startGoogleLogin() {
+  const state = createGoogleState();
+  sessionStorage.setItem(GOOGLE_STATE_KEY, state);
+
+  const url = new URL(`${API_BASE_URL}/auth/google`, window.location.origin);
+  url.searchParams.set("redirect_uri", getGoogleRedirectUri());
+  url.searchParams.set("state", state);
+
+  window.location.assign(url.toString());
+}
+
+export async function loginWithGoogle(payload: GoogleLoginPayload): Promise<AuthSession> {
+  const response = await apiClient<BackendAuthResponse>("/auth/google", {
+    method: "POST",
+    body: payload,
+  });
+
+  return saveSession(toSession(response));
+}
+
+export function validateGoogleState(state: string | null): boolean {
+  const expectedState = sessionStorage.getItem(GOOGLE_STATE_KEY);
+  sessionStorage.removeItem(GOOGLE_STATE_KEY);
+
+  return !!state && !!expectedState && state === expectedState;
+}
+
+export function getGoogleCallbackRedirectUri(): string {
+  return getGoogleRedirectUri();
 }
 
 export async function register(payload: RegisterPayload): Promise<User> {
@@ -134,13 +193,30 @@ export async function register(payload: RegisterPayload): Promise<User> {
   };
 }
 
-export async function forgotPassword(payload: ForgotPasswordPayload): Promise<string> {
+function getResetLinkFromForgotPasswordData(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+
+  const candidate = data as {
+    mailResult?: { resetLink?: unknown };
+  };
+
+  return typeof candidate.mailResult?.resetLink === "string"
+    ? candidate.mailResult.resetLink
+    : undefined;
+}
+
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResult> {
   const response = await apiClient<BackendMessageResponse>("/auth/forgot-password", {
     method: "POST",
     body: payload,
   });
 
-  return response.message;
+  return {
+    message: response.message,
+    resetLink: getResetLinkFromForgotPasswordData(response.data),
+  };
 }
 
 export async function resetPassword(payload: ResetPasswordPayload): Promise<string> {

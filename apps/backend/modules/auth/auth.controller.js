@@ -76,6 +76,37 @@ const login = asyncHandler(async (req, res) => {
   );
 });
 
+const redirectToGoogle = asyncHandler(async (req, res) => {
+  const authUrl = authService.getGoogleAuthUrl({
+    redirectUri: req.query.redirect_uri,
+    state: req.query.state,
+  });
+
+  res.redirect(authUrl);
+});
+
+const loginWithGoogle = asyncHandler(async (req, res) => {
+  const { code, redirect_uri } = req.body;
+  const { user, accessToken, refreshToken } = await authService.loginWithGoogle({
+    code,
+    redirectUri: redirect_uri,
+  });
+
+  res.cookie('refreshToken', refreshToken, cookieOptions());
+
+  if (user) {
+    delete user.password_hash;
+    delete user.qr_code_token;
+  }
+
+  res.status(200).json(
+    ApiResponse.success(
+      { user, accessToken },
+      'Google login successful'
+    )
+  );
+});
+
 // ─── POST /api/auth/refresh-token ─────────────────────────────────────────────
 
 /**
@@ -177,6 +208,8 @@ const cookieOptions = () => ({
 module.exports = {
   register,
   login,
+  redirectToGoogle,
+  loginWithGoogle,
   refreshToken,
   logout,
   getMe,

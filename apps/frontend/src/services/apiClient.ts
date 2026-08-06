@@ -77,12 +77,12 @@ function setStoredAccessToken(accessToken: string) {
 
 async function refreshAccessToken(): Promise<string> {
   const refreshUrl = `${API_BASE_URL}/auth/refresh-token`;
-  const response = await fetch(refreshUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "same-origin",
+    const response = await fetch(refreshUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
   });
 
   const rawBody = await response.text();
@@ -142,7 +142,7 @@ export async function apiClient<T>(
       method: options.method ?? "GET",
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
-      credentials: "same-origin",
+      credentials: "include",
     });
 
     const rawBody = await response.text();

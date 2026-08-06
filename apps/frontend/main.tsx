@@ -15,6 +15,7 @@ import { ProgressPage } from "./src/pages/ProgressPage";
 import { RegisterPage } from "./src/pages/RegisterPage";
 import { ForgotPasswordPage } from "./src/pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./src/pages/ResetPasswordPage";
+import { GoogleCallbackPage } from "./src/pages/GoogleCallbackPage";
 import { ChangePasswordPage } from "./src/pages/ChangePasswordPage";
 import { MembershipPage } from "./src/pages/MembershipPage";
 import { AccountPage } from "./src/pages/AccountPage";
@@ -75,6 +76,7 @@ function AppRouter() {
         <Route path="/signup" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
         <Route
           path="/membership"
           element={

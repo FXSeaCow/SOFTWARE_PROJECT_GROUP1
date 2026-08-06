@@ -10,12 +10,14 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    setResetLink(null);
 
     if (!email.trim()) {
       setError("Email is required");
@@ -25,8 +27,9 @@ export function ForgotPasswordPage() {
     setIsSubmitting(true);
 
     try {
-      const message = await forgotPassword({ email: email.trim() });
-      setSuccess(message);
+      const result = await forgotPassword({ email: email.trim() });
+      setSuccess(result.message);
+      setResetLink(result.resetLink ?? null);
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -91,6 +94,25 @@ export function ForgotPasswordPage() {
             }}
           >
             {success}
+          </div>
+        ) : null}
+
+        {resetLink ? (
+          <div
+            style={{
+              borderRadius: 12,
+              padding: "12px 14px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: 14,
+              lineHeight: 1.5,
+              wordBreak: "break-word",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Development reset link</div>
+            <a href={resetLink} style={{ color: "#1d4ed8" }}>
+              {resetLink}
+            </a>
           </div>
         ) : null}
 

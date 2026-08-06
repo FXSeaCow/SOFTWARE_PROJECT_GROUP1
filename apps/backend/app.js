@@ -53,6 +53,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+app.get('/health', ensureAppReady, (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(ensureAppReady);
 
 app.use('/api/auth', authRoutes);
