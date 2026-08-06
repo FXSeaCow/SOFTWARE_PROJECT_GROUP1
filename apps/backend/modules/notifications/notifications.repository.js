@@ -371,6 +371,56 @@ const findStreaksAtRisk = async (warningAfterDays = 1) => {
 };
 
 /**
+ * Find members who should receive today's workout reminder.
+ *
+ * A member qualifies only when they have an active membership and an active
+ * workout plan selected for today's non-rest day, but no workout check-in yet
+ * today. The active workout plan is the user's selected plan.
+ *
+ * @returns {Promise<object[]>}
+ */
+const findWorkoutReminderRecipients = async () => {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (u.id)
+            u.id AS user_id,
+            u.full_name,
+            u.email,
+            wp.id AS workout_plan_id,
+            wp.title AS workout_plan_title,
+            wd.id AS workout_day_id,
+            wd.day_label,
+            wd.day_of_week
+     FROM users u
+     JOIN workout_plans wp
+       ON wp.user_id = u.id
+      AND wp.is_active = true
+     JOIN workout_days wd
+       ON wd.workout_plan_id = wp.id
+      AND wd.day_of_week = EXTRACT(ISODOW FROM CURRENT_DATE)::INT
+      AND wd.is_rest_day = false
+     WHERE u.role = 'member'
+       AND COALESCE(u.account_status, 'active') = 'active'
+       AND EXISTS (
+         SELECT 1
+         FROM memberships m
+         WHERE m.user_id = u.id
+           AND m.status = 'active'
+           AND m.start_date <= CURRENT_DATE
+           AND m.end_date >= CURRENT_DATE
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM workout_checkins wc
+         WHERE wc.user_id = u.id
+           AND wc.checkin_date = CURRENT_DATE
+       )
+     ORDER BY u.id, wp.updated_at DESC, wp.created_at DESC`
+  );
+
+  return rows;
+};
+
+/**
  * Reset streaks that have been inactive past the configured threshold.
  *
  * @param {number} thresholdDays
@@ -425,6 +475,7 @@ module.exports = {
   findRecentByType,
   findMembershipsExpiringSoon,
   findStreaksAtRisk,
+  findWorkoutReminderRecipients,
   resetStreaksPastThreshold,
   deleteOldReadNotifications,
 };

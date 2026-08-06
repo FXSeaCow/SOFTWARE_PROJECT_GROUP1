@@ -7,6 +7,12 @@ type ApiResponse<T> = {
 };
 
 export type AnnouncementType = "announcement" | "system" | "membership" | "schedule";
+export type UserNotificationType =
+  | AnnouncementType
+  | "workout_reminder"
+  | "membership_expiry"
+  | "occupancy_alert"
+  | "streak_warning";
 export type AnnouncementTarget = "all" | "selected";
 
 export type AdminAnnouncementRecord = {
@@ -33,7 +39,7 @@ export type UserNotificationRecord = {
   id: string;
   user_id: string;
   announcement_id?: string | null;
-  type: AnnouncementType;
+  type: UserNotificationType;
   title: string;
   body: string;
   is_read: boolean;

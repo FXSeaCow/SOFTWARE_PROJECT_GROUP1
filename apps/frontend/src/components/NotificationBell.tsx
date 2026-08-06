@@ -31,6 +31,22 @@ function typeAccent(type: UserNotificationRecord["type"]): React.CSSProperties {
     return { background: "rgba(59,130,246,0.18)", color: "#93c5fd" };
   }
 
+  if (type === "membership_expiry") {
+    return { background: "rgba(59,130,246,0.18)", color: "#bfdbfe" };
+  }
+
+  if (type === "workout_reminder") {
+    return { background: "rgba(34,197,94,0.16)", color: "#bbf7d0" };
+  }
+
+  if (type === "streak_warning") {
+    return { background: "rgba(20,184,166,0.16)", color: "#99f6e4" };
+  }
+
+  if (type === "occupancy_alert") {
+    return { background: "rgba(239,68,68,0.16)", color: "#fca5a5" };
+  }
+
   if (type === "schedule") {
     return { background: "rgba(245,158,11,0.16)", color: "#fde68a" };
   }

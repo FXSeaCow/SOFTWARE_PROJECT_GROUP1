@@ -14,6 +14,9 @@ const NOTIFICATION_TYPE = {
   MEMBERSHIP_EXPIRY: 'membership_expiry',
   OCCUPANCY_ALERT: 'occupancy_alert',
   ANNOUNCEMENT: 'announcement',
+  SYSTEM: 'system',
+  MEMBERSHIP: 'membership',
+  SCHEDULE: 'schedule',
   STREAK_WARNING: 'streak_warning',
 };
 
@@ -60,6 +63,8 @@ const NOTIFICATION_SCHEDULER = {
   STREAK_RESET_THRESHOLD_DAYS: Number.parseInt(process.env.STREAK_RESET_THRESHOLD_DAYS, 10) || 4,
   MEMBERSHIP_JOB_MS: Number.parseInt(process.env.NOTIFICATION_MEMBERSHIP_JOB_MS, 10) || 3600000,
   STREAK_JOB_MS: Number.parseInt(process.env.NOTIFICATION_STREAK_JOB_MS, 10) || 3600000,
+  WORKOUT_REMINDER_DAILY_TIME: process.env.NOTIFICATION_WORKOUT_REMINDER_DAILY_TIME || '00:00',
+  WORKOUT_REMINDER_JOB_MS: Number.parseInt(process.env.NOTIFICATION_WORKOUT_REMINDER_JOB_MS, 10) || 86400000,
   CLEANUP_JOB_MS: Number.parseInt(process.env.NOTIFICATION_CLEANUP_JOB_MS, 10) || 86400000,
 };
 

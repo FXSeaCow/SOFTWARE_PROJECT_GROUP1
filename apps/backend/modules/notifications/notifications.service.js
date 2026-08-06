@@ -34,6 +34,17 @@ const hoursAgo = (hours) => {
 };
 
 /**
+ * Return a Date object at the start of the current local day.
+ *
+ * @returns {Date}
+ */
+const startOfToday = () => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+/**
  * Normalize a notification payload before persistence.
  *
  * @param {object} data
@@ -412,6 +423,57 @@ const sendStreakRiskWarnings = async () => {
 };
 
 /**
+ * Send workout reminders to members who have not checked in today.
+ *
+ * Only the active workout plan is considered because that is the selected plan
+ * for each member.
+ *
+ * @returns {Promise<object>}
+ */
+const sendWorkoutReminderNotifications = async () => {
+  const recipients = await repo.findWorkoutReminderRecipients();
+  const since = startOfToday();
+  const created = [];
+  let skipped = 0;
+
+  for (const recipient of recipients) {
+    const recent = await repo.findRecentByType(
+      recipient.user_id,
+      NOTIFICATION_TYPE.WORKOUT_REMINDER,
+      since
+    );
+
+    if (recent) {
+      skipped += 1;
+      continue;
+    }
+
+    const notification = await createFromTemplate(
+      recipient.user_id,
+      NOTIFICATION_TEMPLATE.WORKOUT_REMINDER,
+      {
+        plan_title: recipient.workout_plan_title,
+        day_label: recipient.day_label,
+      }
+    );
+    created.push(notification);
+  }
+
+  logger.info('Workout reminder notification job completed', {
+    scanned: recipients.length,
+    created: created.length,
+    skipped,
+  });
+
+  return {
+    scanned_count: recipients.length,
+    created_count: created.length,
+    skipped_count: skipped,
+    notifications: created,
+  };
+};
+
+/**
  * Delete old read notifications.
  *
  * @param {number} retentionDays
@@ -453,6 +515,10 @@ const runNotificationJobs = async (options = {}) => {
     result.streak_risk = await sendStreakRiskWarnings();
   }
 
+  if (job === 'workout_reminder' || job === 'all') {
+    result.workout_reminder = await sendWorkoutReminderNotifications();
+  }
+
   if (job === 'cleanup' || job === 'all') {
     result.cleanup = await cleanupOldReadNotifications(options.retention_days);
   }
@@ -476,9 +542,11 @@ module.exports = {
   broadcastNotification,
   sendMembershipExpiryWarnings,
   sendStreakRiskWarnings,
+  sendWorkoutReminderNotifications,
   cleanupOldReadNotifications,
   runNotificationJobs,
 
   // Exported for focused unit tests.
   normalizeNotification,
+  startOfToday,
 };

@@ -122,7 +122,7 @@ const broadcastNotificationSchema = Joi.object({
  */
 const runJobsSchema = Joi.object({
   job: Joi.string()
-    .valid('membership_expiry', 'streak_risk', 'cleanup', 'all')
+    .valid('membership_expiry', 'streak_risk', 'workout_reminder', 'cleanup', 'all')
     .default('all'),
   retention_days: Joi.number()
     .integer()

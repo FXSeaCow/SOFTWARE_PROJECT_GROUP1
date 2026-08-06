@@ -19,6 +19,28 @@ let schedulerState = {
 };
 
 /**
+ * Calculate how many milliseconds remain until the next configured HH:mm time.
+ *
+ * @param {string} dailyTime
+ * @param {Date} now
+ * @returns {number}
+ */
+const millisecondsUntilDailyTime = (dailyTime, now = new Date()) => {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(dailyTime || '');
+  const hour = match ? Number(match[1]) : 0;
+  const minute = match ? Number(match[2]) : 0;
+  const target = new Date(now);
+
+  target.setHours(hour, minute, 0, 0);
+
+  if (target <= now) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  return target.getTime() - now.getTime();
+};
+
+/**
  * Wrap an async scheduled job so errors are logged instead of crashing Node.
  *
  * @param {string} jobName
@@ -56,6 +78,15 @@ const streakRiskJob = async () => {
 };
 
 /**
+ * Run the workout reminder notification job once.
+ *
+ * @returns {Promise<object>}
+ */
+const workoutReminderJob = async () => {
+  return service.sendWorkoutReminderNotifications();
+};
+
+/**
  * Run read notification cleanup once.
  *
  * @returns {Promise<object>}
@@ -67,9 +98,34 @@ const cleanupJob = async () => {
 };
 
 /**
+ * Schedule a job for the next configured daily time, then repeat daily.
+ *
+ * @param {string} jobName
+ * @param {Function} job
+ * @param {string} dailyTime
+ * @returns {NodeJS.Timeout}
+ */
+const scheduleDailyJob = (jobName, job, dailyTime) => {
+  const run = safeJob(jobName, job);
+  const delay = millisecondsUntilDailyTime(dailyTime);
+
+  return setTimeout(async () => {
+    await run();
+
+    if (!schedulerState.started) {
+      return;
+    }
+
+    schedulerState.handles.push(
+      setInterval(run, NOTIFICATION_SCHEDULER.WORKOUT_REMINDER_JOB_MS)
+    );
+  }, delay);
+};
+
+/**
  * Start optional notification background jobs.
  *
- * @param {{ membershipExpiry?: boolean, streakRisk?: boolean, cleanup?: boolean }} options
+ * @param {{ membershipExpiry?: boolean, streakRisk?: boolean, workoutReminder?: boolean, cleanup?: boolean }} options
  * @returns {{ stop: Function, state: object }}
  */
 const startNotificationScheduler = (options = {}) => {
@@ -83,6 +139,7 @@ const startNotificationScheduler = (options = {}) => {
   const config = {
     membershipExpiry: options.membershipExpiry !== false,
     streakRisk: options.streakRisk !== false,
+    workoutReminder: options.workoutReminder !== false,
     cleanup: options.cleanup !== false,
   };
 
@@ -103,6 +160,16 @@ const startNotificationScheduler = (options = {}) => {
       setInterval(
         safeJob('streakRiskJob', streakRiskJob),
         NOTIFICATION_SCHEDULER.STREAK_JOB_MS
+      )
+    );
+  }
+
+  if (config.workoutReminder) {
+    schedulerState.handles.push(
+      scheduleDailyJob(
+        'workoutReminderJob',
+        workoutReminderJob,
+        NOTIFICATION_SCHEDULER.WORKOUT_REMINDER_DAILY_TIME
       )
     );
   }
@@ -138,9 +205,11 @@ const stopNotificationScheduler = () => {
 };
 
 module.exports = {
+  millisecondsUntilDailyTime,
   startNotificationScheduler,
   stopNotificationScheduler,
   membershipExpiryJob,
   streakRiskJob,
+  workoutReminderJob,
   cleanupJob,
 };

@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   announcement_id UUID REFERENCES announcements(id) ON DELETE SET NULL,
-  type TEXT NOT NULL DEFAULT 'announcement' CHECK (type IN ('announcement', 'system', 'membership', 'schedule')),
+  type TEXT NOT NULL DEFAULT 'announcement' CHECK (type IN ('announcement', 'system', 'membership', 'schedule', 'workout_reminder', 'membership_expiry', 'occupancy_alert', 'streak_warning')),
   title VARCHAR(160) NOT NULL,
   body TEXT NOT NULL,
   is_read BOOLEAN NOT NULL DEFAULT false,

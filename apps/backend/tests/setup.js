@@ -31,6 +31,61 @@ const ensureTestSchema = async () => {
     CREATE INDEX IF NOT EXISTS idx_exercises_goal_tags
     ON exercises USING GIN (goal_tags)
   `);
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF to_regtype('public.notification_type') IS NOT NULL THEN
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'system';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'membership';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'schedule';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'workout_reminder';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'membership_expiry';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'occupancy_alert';
+        ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'streak_warning';
+      END IF;
+    END $$;
+  `);
+
+  await db.query(`
+    DO $$
+    DECLARE
+      constraint_name text;
+    BEGIN
+      IF to_regclass('public.notifications') IS NOT NULL THEN
+        SELECT c.conname
+        INTO constraint_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        WHERE t.relname = 'notifications'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%type%'
+        LIMIT 1;
+
+        IF constraint_name IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE notifications DROP CONSTRAINT %I', constraint_name);
+        END IF;
+
+        BEGIN
+          ALTER TABLE notifications
+          ADD CONSTRAINT notifications_type_check
+          CHECK (type IN (
+            'announcement',
+            'system',
+            'membership',
+            'schedule',
+            'workout_reminder',
+            'membership_expiry',
+            'occupancy_alert',
+            'streak_warning'
+          ));
+        EXCEPTION
+          WHEN duplicate_object THEN
+            NULL;
+        END;
+      END IF;
+    END $$;
+  `);
 };
 
 beforeAll(async () => {

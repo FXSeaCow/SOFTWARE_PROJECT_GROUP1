@@ -22,6 +22,7 @@ jest.mock('../notifications.repository', () => ({
   findRecentByType: jest.fn(),
   findMembershipsExpiringSoon: jest.fn(),
   findStreaksAtRisk: jest.fn(),
+  findWorkoutReminderRecipients: jest.fn(),
   resetStreaksPastThreshold: jest.fn(),
   deleteOldReadNotifications: jest.fn(),
 }));
@@ -40,6 +41,7 @@ const routes = require('../notifications.routes');
 const {
   createNotificationSchema,
   broadcastNotificationSchema,
+  runJobsSchema,
 } = require('../notifications.validation');
 const {
   NOTIFICATION_TYPE,
@@ -97,6 +99,9 @@ describe('notifications module', () => {
         reason: 'full',
       }
     );
+    const workoutReminder = templates.renderTemplate(
+      NOTIFICATION_TEMPLATE.WORKOUT_REMINDER
+    );
     const fallback = templates.renderTemplate('unknown_template', {
       title: 'Fallback title',
       body: 'Fallback body',
@@ -114,6 +119,12 @@ describe('notifications module', () => {
       title: 'Central Branch is crowded',
     });
     expect(occupancy.body).toContain('full capacity');
+    expect(workoutReminder).toMatchObject({
+      type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
+      severity: NOTIFICATION_SEVERITY.INFO,
+      title: 'Workout reminder',
+      body: "Don't forget your workout today! Keep your streak going.",
+    });
     expect(fallback).toMatchObject({
       type: NOTIFICATION_TYPE.ANNOUNCEMENT,
       title: 'Fallback title',
@@ -138,6 +149,15 @@ describe('notifications module', () => {
     ).toBe(true);
     expect(validBroadcast.error).toBeUndefined();
     expect(validBroadcast.value.type).toBe(NOTIFICATION_TYPE.ANNOUNCEMENT);
+  });
+
+  it('validates workout reminder as a runnable notification job', () => {
+    const valid = runJobsSchema.validate({ job: 'workout_reminder' });
+    const invalid = runJobsSchema.validate({ job: 'workout' });
+
+    expect(valid.error).toBeUndefined();
+    expect(valid.value.job).toBe('workout_reminder');
+    expect(invalid.error).toBeDefined();
   });
 
   it('normalizes notification payload defaults', () => {
@@ -419,6 +439,55 @@ describe('notifications module', () => {
     expect(result.created_count).toBe(1);
   });
 
+  it('sends workout reminders while skipping reminders already sent today', async () => {
+    repo.findWorkoutReminderRecipients.mockResolvedValue([
+      {
+        user_id: 'user-1',
+        workout_plan_id: 'plan-active-1',
+        workout_plan_title: 'Selected Plan',
+        day_label: 'Push day',
+      },
+      {
+        user_id: 'user-2',
+        workout_plan_id: 'plan-active-2',
+        workout_plan_title: 'Other Selected Plan',
+        day_label: 'Leg day',
+      },
+    ]);
+    repo.findRecentByType
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'recent-reminder' });
+    repo.findUserById.mockResolvedValue(user);
+    repo.createNotification.mockImplementation(async (payload) => ({
+      ...notification,
+      ...payload,
+      id: 'created-workout-reminder',
+    }));
+
+    const result = await service.sendWorkoutReminderNotifications();
+
+    expect(repo.findWorkoutReminderRecipients).toHaveBeenCalledTimes(1);
+    expect(repo.findRecentByType).toHaveBeenCalledWith(
+      'user-1',
+      NOTIFICATION_TYPE.WORKOUT_REMINDER,
+      expect.any(Date)
+    );
+    expect(repo.createNotification).toHaveBeenCalledTimes(1);
+    expect(repo.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
+        title: 'Workout reminder',
+        body: "Don't forget your workout today! Keep your streak going.",
+      })
+    );
+    expect(result).toMatchObject({
+      scanned_count: 2,
+      created_count: 1,
+      skipped_count: 1,
+    });
+  });
+
   it('cleans up old read notifications and runs selected jobs', async () => {
     repo.deleteOldReadNotifications.mockResolvedValue(6);
 
@@ -443,20 +512,49 @@ describe('notifications module', () => {
     const cleanupSpy = jest
       .spyOn(service, 'cleanupOldReadNotifications')
       .mockResolvedValue({ deleted_count: 3 });
+    const workoutReminderSpy = jest
+      .spyOn(service, 'sendWorkoutReminderNotifications')
+      .mockResolvedValue({ created_count: 4 });
 
     await scheduler.membershipExpiryJob();
     await scheduler.streakRiskJob();
+    await scheduler.workoutReminderJob();
     await scheduler.cleanupJob();
 
     expect(membershipSpy).toHaveBeenCalled();
     expect(streakSpy).toHaveBeenCalled();
+    expect(workoutReminderSpy).toHaveBeenCalled();
     expect(cleanupSpy).toHaveBeenCalled();
+  });
+
+  it('calculates the delay until the configured daily workout reminder time', () => {
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        '09:30',
+        new Date(2026, 7, 6, 8, 0, 0)
+      )
+    ).toBe(90 * 60 * 1000);
+
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        '09:30',
+        new Date(2026, 7, 6, 10, 0, 0)
+      )
+    ).toBe((23 * 60 + 30) * 60 * 1000);
+
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        'not-a-time',
+        new Date(2026, 7, 6, 23, 45, 0)
+      )
+    ).toBe(15 * 60 * 1000);
   });
 
   it('starts and stops the scheduler without jobs when all options are disabled', () => {
     const started = scheduler.startNotificationScheduler({
       membershipExpiry: false,
       streakRisk: false,
+      workoutReminder: false,
       cleanup: false,
     });
 

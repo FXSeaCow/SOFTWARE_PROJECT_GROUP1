@@ -5,7 +5,7 @@
  */
 
 const usersService = require('./users.service');
-const announcementsService = require('../announcements/announcements.service');
+const notificationsService = require('../notifications/notifications.service');
 const asyncHandler = require('../../utils/Asynchandler');
 const ApiResponse  = require('../../utils/Apiresponse');
 
@@ -60,12 +60,15 @@ const regenerateMyQrCode = asyncHandler(async (req, res) => {
 });
 
 const listMyNotifications = asyncHandler(async (req, res) => {
-  const notifications = await announcementsService.listMyNotifications(req.user.id);
+  const { notifications } = await notificationsService.listMyNotifications(
+    req.user.id,
+    req.query
+  );
   res.json(ApiResponse.success(notifications));
 });
 
 const markMyNotificationAsRead = asyncHandler(async (req, res) => {
-  const notification = await announcementsService.markMyNotificationAsRead(
+  const notification = await notificationsService.markAsRead(
     req.params.notificationId,
     req.user.id
   );
@@ -73,7 +76,7 @@ const markMyNotificationAsRead = asyncHandler(async (req, res) => {
 });
 
 const markAllMyNotificationsAsRead = asyncHandler(async (req, res) => {
-  const result = await announcementsService.markAllMyNotificationsAsRead(req.user.id);
+  const result = await notificationsService.markAllAsRead(req.user.id);
   res.json(ApiResponse.success(result, 'All notifications marked as read'));
 });
 

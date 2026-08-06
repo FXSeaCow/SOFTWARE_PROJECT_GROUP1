@@ -10,11 +10,12 @@
  *   3. PATCH  /api/users/me/password
  *   4. GET    /api/users/me/qr
  *   5. POST   /api/users/me/qr/regenerate
- *   6. GET    /api/users             [admin]
- *   7. GET    /api/users/:userId     [admin]
- *   8. PATCH  /api/users/:userId/role
- *   9. PATCH  /api/users/:userId/account-status
- *  10. DELETE /api/users/:userId     [admin]
+ *   6. GET    /api/users/me/notifications
+ *   7. GET    /api/users             [admin]
+ *   8. GET    /api/users/:userId     [admin]
+ *   9. PATCH  /api/users/:userId/role
+ *  10. PATCH  /api/users/:userId/account-status
+ *  11. DELETE /api/users/:userId     [admin]
  */
 
 const request = require('supertest');
@@ -448,7 +449,40 @@ describe('POST /api/users/me/qr/regenerate', () => {
 
 
 // =============================================================================
-// 6. GET /api/users  [admin]
+// 6. GET /api/users/me/notifications
+// =============================================================================
+describe('GET /api/users/me/notifications', () => {
+
+  it('should list workout reminder notifications for the authenticated user', async () => {
+    const { user, accessToken } = await registerAndLogin();
+
+    await db.query(
+      `INSERT INTO notifications (user_id, type, title, body)
+       VALUES ($1, 'workout_reminder', 'Workout reminder', $2)`,
+      [user.id, "Don't forget your workout today! Keep your streak going."]
+    );
+
+    const res = await request(app)
+      .get('/api/users/me/notifications')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          user_id: user.id,
+          type: 'workout_reminder',
+          title: 'Workout reminder',
+          body: "Don't forget your workout today! Keep your streak going.",
+          is_read: false,
+        }),
+      ])
+    );
+  });
+});
+
+// =============================================================================
+// 7. GET /api/users  [admin]
 // =============================================================================
 describe('GET /api/users (admin)', () => {
 
@@ -563,7 +597,7 @@ describe('GET /api/users (admin)', () => {
 
 
 // =============================================================================
-// 7. GET /api/users/:userId  [admin]
+// 8. GET /api/users/:userId  [admin]
 // =============================================================================
 describe('GET /api/users/:userId (admin)', () => {
 
@@ -613,7 +647,7 @@ describe('GET /api/users/:userId (admin)', () => {
 
 
 // =============================================================================
-// 8. PATCH /api/users/:userId/role [admin]
+// 9. PATCH /api/users/:userId/role [admin]
 // =============================================================================
 describe('PATCH /api/users/:userId/role (admin)', () => {
 
@@ -644,7 +678,7 @@ describe('PATCH /api/users/:userId/role (admin)', () => {
 
 
 // =============================================================================
-// 9. PATCH /api/users/:userId/account-status [admin]
+// 10. PATCH /api/users/:userId/account-status [admin]
 // =============================================================================
 describe('PATCH /api/users/:userId/account-status (admin)', () => {
 
@@ -691,7 +725,7 @@ describe('PATCH /api/users/:userId/account-status (admin)', () => {
 
 
 // =============================================================================
-// 10. DELETE /api/users/:userId  [admin]
+// 11. DELETE /api/users/:userId  [admin]
 // =============================================================================
 describe('DELETE /api/users/:userId (admin)', () => {
 
