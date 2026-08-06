@@ -5,7 +5,6 @@
  */
 
 const usersService = require('./users.service');
-const announcementsService = require('../announcements/announcements.service');
 const asyncHandler = require('../../utils/Asynchandler');
 const ApiResponse  = require('../../utils/Apiresponse');
 
@@ -58,26 +57,6 @@ const regenerateMyQrCode = asyncHandler(async (req, res) => {
   const result = await usersService.regenerateQrCode(req.user.id);
   res.json(ApiResponse.success(result, 'QR code regenerated successfully'));
 });
-
-const listMyNotifications = asyncHandler(async (req, res) => {
-  const notifications = await announcementsService.listMyNotifications(req.user.id);
-  res.json(ApiResponse.success(notifications));
-});
-
-const markMyNotificationAsRead = asyncHandler(async (req, res) => {
-  const notification = await announcementsService.markMyNotificationAsRead(
-    req.params.notificationId,
-    req.user.id
-  );
-  res.json(ApiResponse.success(notification, 'Notification marked as read'));
-});
-
-const markAllMyNotificationsAsRead = asyncHandler(async (req, res) => {
-  const result = await announcementsService.markAllMyNotificationsAsRead(req.user.id);
-  res.json(ApiResponse.success(result, 'All notifications marked as read'));
-});
-
-
 
 //////////////////////////////////////////////////////////////////////////////////
 // ─── Admin: manage all users ──────────────────────────────────────────────────
@@ -134,9 +113,6 @@ module.exports = {
   changePassword,
   getMyQrCode,
   regenerateMyQrCode,
-  listMyNotifications,
-  markMyNotificationAsRead,
-  markAllMyNotificationsAsRead,
   listUsers,
   getUserById,
   updateUserRole,

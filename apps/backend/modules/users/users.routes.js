@@ -25,7 +25,6 @@ const { requireRole, requireSelf } = require('../../middlewares/Role.middleware'
 const { validate }               = require('../../middlewares/Validate.middleware');
 const {
   uuidParam,
-  notificationIdParam,
   updateProfileSchema,
   changePasswordSchema,
   listUsersQuerySchema,
@@ -50,16 +49,6 @@ router.patch(
   '/me/password',
   validate(changePasswordSchema),
   ctrl.changePassword
-);
-
-router.get('/me/notifications', ctrl.listMyNotifications);
-
-router.patch('/me/notifications/read-all', ctrl.markAllMyNotificationsAsRead);
-
-router.patch(
-  '/me/notifications/:notificationId/read',
-  validate(null, notificationIdParam),
-  ctrl.markMyNotificationAsRead
 );
 
 // ── Member: QR code ───────────────────────────────────────────────────────────

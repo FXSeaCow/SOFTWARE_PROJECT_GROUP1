@@ -122,8 +122,12 @@ const createBulkNotifications = async (userIds, data) => {
  */
 const findByIdAndUser = async (notificationId, userId) => {
   const { rows } = await db.query(
-    `SELECT ${notificationSelect('n')}
+    `SELECT ${notificationSelect('n')},
+            a.published_at,
+            COALESCE(cu.full_name, cu.email, 'System') AS created_by_name
      FROM notifications n
+     LEFT JOIN announcements a ON a.id = n.announcement_id
+     LEFT JOIN users cu ON cu.id = a.created_by
      WHERE n.id = $1
        AND n.user_id = $2`,
     [notificationId, userId]
@@ -141,9 +145,13 @@ const findById = async (notificationId) => {
   const { rows } = await db.query(
     `SELECT ${notificationSelect('n')},
             u.full_name AS user_name,
-            u.email AS user_email
+            u.email AS user_email,
+            a.published_at,
+            COALESCE(cu.full_name, cu.email, 'System') AS created_by_name
      FROM notifications n
      JOIN users u ON u.id = n.user_id
+     LEFT JOIN announcements a ON a.id = n.announcement_id
+     LEFT JOIN users cu ON cu.id = a.created_by
      WHERE n.id = $1`,
     [notificationId]
   );
@@ -202,9 +210,13 @@ const findAll = async (opts) => {
   const { rows } = await db.query(
     `SELECT ${notificationSelect('n')},
             u.full_name AS user_name,
-            u.email AS user_email
+            u.email AS user_email,
+            a.published_at,
+            COALESCE(cu.full_name, cu.email, 'System') AS created_by_name
      FROM notifications n
      JOIN users u ON u.id = n.user_id
+     LEFT JOIN announcements a ON a.id = n.announcement_id
+     LEFT JOIN users cu ON cu.id = a.created_by
      ${where}
      ORDER BY n.sent_at DESC
      LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
