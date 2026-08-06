@@ -1,5 +1,6 @@
 const repo = require('./announcements.repository');
 const logger = require('../../utils/Logger');
+const ApiError = require('../../utils/Apierror');
 const { withTransaction } = require('../../utils/Transaction');
 
 const listAnnouncementHistory = async () => {
