@@ -77,6 +77,21 @@ const passwordLimiter = rateLimit({
 });
 
 /**
+ * GetExercisesLimiter
+ * Loose limit applied to all API routes as a baseline DDoS guard.
+ */
+const getExercisesLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 20000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+  // Opt-in via ENABLE_RATE_LIMITER=true when a test needs real rate limiting.
+  skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_RATE_LIMITER !== 'true',
+});
+
+
+/**
  * generalLimiter
  * Loose limit applied to all API routes as a baseline DDoS guard.
  */
@@ -90,4 +105,4 @@ const generalLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === 'test' && process.env.ENABLE_RATE_LIMITER !== 'true',
 });
 
-module.exports = { authLimiter, passwordLimiter, generalLimiter };
+module.exports = { authLimiter, passwordLimiter, getExercisesLimiter, generalLimiter };

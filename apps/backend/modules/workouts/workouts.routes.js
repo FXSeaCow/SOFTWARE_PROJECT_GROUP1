@@ -32,6 +32,7 @@ const { authenticate }            = require('../../middlewares/Auth.middleware')
 const { requireRole }             = require('../../middlewares/Role.middleware');
 const { requireActiveMembership } = require('../../middlewares/Membership.middleware');
 const { validate }                = require('../../middlewares/Validate.middleware');
+const {getExercisesLimiter} = require('../../middlewares/RateLimiter.middleware');
 const {
   uuidParam,
   createExerciseSchema,
@@ -51,6 +52,7 @@ router.use(authenticate);
 router.get('/exercises',              ctrl.listExercises);
 router.get(
   '/exercises/:exerciseId',
+  getExercisesLimiter,
   validate(null, uuidParam('exerciseId')),
   ctrl.getExerciseById
 );
