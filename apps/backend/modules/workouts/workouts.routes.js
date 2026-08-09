@@ -32,7 +32,7 @@ const { authenticate }            = require('../../middlewares/Auth.middleware')
 const { requireRole }             = require('../../middlewares/Role.middleware');
 const { requireActiveMembership } = require('../../middlewares/Membership.middleware');
 const { validate }                = require('../../middlewares/Validate.middleware');
-const {getExercisesLimiter} = require('../../middlewares/RateLimiter.middleware');
+const { getExercisesLimiter } = require('../../middlewares/rateLimiter.middleware');
 const {
   uuidParam,
   createExerciseSchema,
