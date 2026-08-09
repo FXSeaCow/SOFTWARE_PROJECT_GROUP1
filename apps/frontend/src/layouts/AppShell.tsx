@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { MainMenuBottomNav } from "../components/main-menu/MainMenuBottomNav";
+import { MainMenuMobileHeader, MobileNavLink } from "../components/main-menu/MainMenuMobileHeader";
 import { Sidebar, SidebarItemId } from "../components/Sidebar";
 import { TopBarActions } from "../components/TopBarActions";
 import { DashboardLayout } from "./DashboardLayout";
@@ -18,6 +19,7 @@ export function AppShell({
 }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
+  const isAdmin = currentUser?.role === "admin";
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => window.innerWidth >= 1100);
 
   useEffect(() => {
@@ -29,6 +31,26 @@ export function AppShell({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const profileInitials = currentUser?.name
+    ? currentUser.name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? "")
+        .join("")
+    : currentUser?.email
+      ? currentUser.email.slice(0, 2).toUpperCase()
+      : "AC";
+
+  const mobileNavLinks: MobileNavLink[] = [
+    { id: "home", label: "Home", to: "/", active: activeItem === "home" },
+    { id: "train", label: "Train", to: "/exercises", active: activeItem === "train" },
+    { id: "membership", label: "Membership", to: "/membership", active: activeItem === "membership" },
+    { id: "progress", label: "Progress", to: "/progress", active: activeItem === "progress" },
+    { id: "schedule", label: "Schedule", to: "/schedule", active: activeItem === "schedule" },
+    ...(isAdmin ? [{ id: "admin", label: "Admin Console", to: "/admin", active: activeItem === "none" }] : []),
+  ];
+
   return (
     <DashboardLayout
       bottomNav={
@@ -36,7 +58,6 @@ export function AppShell({
           undefined
         ) : (
           <MainMenuBottomNav
-            profileHref={currentUser ? "/" : "/login"}
             activeItem={
               activeItem === "home" ||
               activeItem === "train" ||
@@ -68,9 +89,15 @@ export function AppShell({
             onProgressClick={() => navigate("/progress")}
             onScheduleClick={() => navigate("/schedule")}
             onAdminClick={() => navigate("/admin")}
-            showAdminEntry={currentUser?.role === "admin"}
+            showAdminEntry={isAdmin}
           />
-        ) : null}
+        ) : (
+          <MainMenuMobileHeader
+            navLinks={mobileNavLinks}
+            profileInitials={profileInitials}
+            profileHref={currentUser ? "/account" : "/login"}
+          />
+        )}
 
         <div>{children}</div>
       </div>

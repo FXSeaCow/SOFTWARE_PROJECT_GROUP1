@@ -50,13 +50,13 @@ export type UserNotificationRecord = {
 };
 
 export async function listMyNotifications(): Promise<UserNotificationRecord[]> {
-  const response = await apiClient<ApiResponse<UserNotificationRecord[]>>("/users/me/notifications");
+  const response = await apiClient<ApiResponse<UserNotificationRecord[]>>("/notifications/me");
   return response.data;
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<UserNotificationRecord> {
   const response = await apiClient<ApiResponse<UserNotificationRecord>>(
-    `/users/me/notifications/${notificationId}/read`,
+    `/notifications/${notificationId}/read`,
     {
       method: "PATCH",
     },
@@ -67,7 +67,7 @@ export async function markNotificationAsRead(notificationId: string): Promise<Us
 
 export async function markAllNotificationsAsRead(): Promise<{ updated_count: number }> {
   const response = await apiClient<ApiResponse<{ updated_count: number }>>(
-    "/users/me/notifications/read-all",
+    "/notifications/read-all",
     {
       method: "PATCH",
     },

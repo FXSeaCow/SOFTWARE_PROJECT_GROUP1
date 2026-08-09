@@ -18,6 +18,7 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const { generalLimiter } = require('./middlewares/rateLimiter.middleware');
 
 const cors = require('cors');
+const env = require('./config/env');
 const app = express();
 
 app.use(express.json());
@@ -43,15 +44,22 @@ app.use((req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   app.use(requestLogger);
   app.use('/api', generalLimiter);
-  app.use(ensureAppReady);
 }
 
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: env.FRONTEND_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.get('/health', ensureAppReady, (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+if (process.env.NODE_ENV !== 'test') {
+  app.use(ensureAppReady);
+}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);

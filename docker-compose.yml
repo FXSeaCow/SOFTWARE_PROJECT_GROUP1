@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: gymhub-db
     environment:
-      POSTGRES_DB: gymhub
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: passs
+      POSTGRES_DB: ${POSTGRES_DB:-gymhub}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-passs}
     ports:
       - "5432:5432"
     volumes:
@@ -22,6 +22,8 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     container_name: gymhub-backend
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -29,18 +31,33 @@ services:
       PORT: 3000
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: passs
-      DB_NAME: gymhub
-      JWT_ACCESS_SECRET: 4f0e0a2c470d3de5869815c4d84d9e68712295e101c92580fbc08f74eba0bbf8b8a0b668dedb0884514d8c9ecd55f63f3c93f46dc1b1fadd1791c400686593cf
-      JWT_REFRESH_SECRET: 85331c629f08c0974645d7efbc56a7567a6358b1bc6b8f615ad1dbc2b903d39277f8d0eb149f87550f9a6903bcd8da010350e177a011042a090aca0515e59a92
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-passs}
+      DB_NAME: ${POSTGRES_DB:-gymhub}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-dev-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-dev-refresh-secret-change-me}
       NODE_ENV: development
-      ADMIN_EMAIL: admin@gym.com
-      ADMIN_PASSWORD: Admin123
-      ADMIN_FULL_NAME: System Admin
-      ADMIN_PHONE: ""
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/auth/google/callback}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@gym.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-System Admin}
+      ADMIN_PHONE: ${ADMIN_PHONE:-}
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build:
@@ -48,7 +65,8 @@ services:
       dockerfile: apps/frontend/Dockerfile
     container_name: gymhub-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       VITE_API_PROXY_TARGET: http://backend:3000
     ports:

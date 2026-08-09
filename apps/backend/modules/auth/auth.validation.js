@@ -78,10 +78,30 @@ const refreshTokenSchema = Joi.object({
   }),
 });
 
+const googleAuthUrlQuerySchema = Joi.object({
+  redirect_uri: Joi.string().uri().required().messages({
+    'any.required': 'Google redirect URI is required',
+    'string.uri': 'Google redirect URI must be a valid URL',
+  }),
+  state: Joi.string().min(16).max(256).optional(),
+});
+
+const googleLoginSchema = Joi.object({
+  code: Joi.string().required().messages({
+    'any.required': 'Google authorization code is required',
+  }),
+  redirect_uri: Joi.string().uri().required().messages({
+    'any.required': 'Google redirect URI is required',
+    'string.uri': 'Google redirect URI must be a valid URL',
+  }),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshTokenSchema,
+  googleAuthUrlQuerySchema,
+  googleLoginSchema,
 };

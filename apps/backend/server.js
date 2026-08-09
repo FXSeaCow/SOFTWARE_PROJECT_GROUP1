@@ -5,7 +5,7 @@ const { startNotificationScheduler } = require('./modules/notifications/notifica
 const PORT = env.PORT || 4000;
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 
     if (process.env.ENABLE_NOTIFICATION_SCHEDULER !== 'false') {

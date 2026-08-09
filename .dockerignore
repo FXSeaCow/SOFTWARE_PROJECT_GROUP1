@@ -7,3 +7,6 @@ apps/backend/coverage
 .git
 .vscode
 npm-debug.log
+.env
+.env.*
+!.env.example

@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 
 import { panelStyle, searchBarStyle, startButtonStyle } from "../components/main-menu/styles";
+import { MonthCalendarPicker } from "../components/schedule/MonthCalendarPicker";
+import { ScheduleSection } from "../components/schedule/ScheduleSection";
+import { WeekDateSelector } from "../components/schedule/WeekDateSelector";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser } from "../services/authService";
@@ -111,6 +114,25 @@ function getWeekDates(weekOffset = 0) {
   });
 }
 
+function getMondayOf(date: Date) {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  const mondayOffset = (normalized.getDay() + 6) % 7;
+  normalized.setDate(normalized.getDate() - mondayOffset);
+  return normalized;
+}
+
+function computeWeekOffsetAndIndex(target: Date) {
+  const thisMonday = getMondayOf(new Date());
+  const targetMonday = getMondayOf(target);
+  const diffDays = Math.round((targetMonday.getTime() - thisMonday.getTime()) / (1000 * 60 * 60 * 24));
+
+  return {
+    offset: Math.round(diffDays / 7),
+    dayIndex: (target.getDay() + 6) % 7,
+  };
+}
+
 const calendarDayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 // The backend still requires a fitness_level enum on generate/save calls,
@@ -127,9 +149,13 @@ const GOAL_SUGGESTIONS = [
 
 export function SchedulePage() {
   const isMobile = useIsMobile();
+  const isCompactLayout = useIsMobile(1100);
   const currentUser = getCurrentUser();
   const scheduleGridRef = useRef<HTMLElement | null>(null);
+  const calendarSectionsRef = useRef<HTMLDivElement | null>(null);
+  const exerciseLibraryRef = useRef<HTMLDivElement | null>(null);
   const skipNextScheduleSaveRef = useRef(false);
+  const pendingDayIndexRef = useRef<number | null>(null);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const initialWeekStartKey = formatDateKey(getWeekDates(0)[0]);
@@ -154,6 +180,7 @@ export function SchedulePage() {
   const [smartError, setSmartError] = useState<string | null>(null);
   const [smartMessage, setSmartMessage] = useState<string | null>(null);
   const [isSmartPanelOpen, setIsSmartPanelOpen] = useState(false);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -196,6 +223,31 @@ export function SchedulePage() {
   const weekRangeLabel = useMemo(() => {
     return `${formatShortDate(weekDates[0])} - ${formatShortDate(weekDates[6])}`;
   }, [weekDates]);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+
+  useEffect(() => {
+    if (pendingDayIndexRef.current !== null) {
+      setSelectedDayIndex(pendingDayIndexRef.current);
+      pendingDayIndexRef.current = null;
+      return;
+    }
+
+    const todayIndex = weekDates.findIndex((date) => formatDateKey(date) === todayKey);
+    setSelectedDayIndex(todayIndex >= 0 ? todayIndex : 0);
+  }, [weekStartKey]);
+
+  function handlePickDateFromCalendar(date: Date) {
+    const { offset, dayIndex } = computeWeekOffsetAndIndex(date);
+
+    if (offset === weekOffset) {
+      setSelectedDayIndex(dayIndex);
+    } else {
+      pendingDayIndexRef.current = dayIndex;
+      setWeekOffset(offset);
+    }
+
+    setIsMonthPickerOpen(false);
+  }
 
   useEffect(() => {
     skipNextScheduleSaveRef.current = true;
@@ -296,7 +348,20 @@ export function SchedulePage() {
     }
 
     addExerciseToCell(day, periodValue, exerciseId);
-    scheduleGridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const scrollTarget = isCompactLayout ? calendarSectionsRef.current : scheduleGridRef.current;
+    scrollTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function handleSelectDay(index: number) {
+    setSelectedDayIndex(index);
+    const currentPeriod = selectedCellKey.split("-")[1] as SchedulePeriod;
+    const period: SchedulePeriod = currentPeriod === "afternoon" ? "afternoon" : "morning";
+    setSelectedCellKey(getScheduleCellKey(scheduleDays[index].value, period));
+  }
+
+  function handleAddSessionForPeriod(period: SchedulePeriod) {
+    setSelectedCellKey(getScheduleCellKey(scheduleDays[selectedDayIndex].value, period));
+    exerciseLibraryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function moveEntryInCell(day: number, period: SchedulePeriod, entryId: string, direction: -1 | 1) {
@@ -561,9 +626,21 @@ export function SchedulePage() {
             >
               <ChevronLeft size={16} />
             </button>
-            <span style={{ minWidth: 178, textAlign: "center" }}>
+            <button
+              type="button"
+              onClick={() => setIsMonthPickerOpen(true)}
+              style={{
+                minWidth: 178,
+                textAlign: "center",
+                border: "none",
+                background: "transparent",
+                color: "inherit",
+                font: "inherit",
+                cursor: "pointer",
+              }}
+            >
               {weekRangeLabel}
-            </span>
+            </button>
             <button
               type="button"
               onClick={() => setWeekOffset((current) => current + 1)}
@@ -795,6 +872,58 @@ export function SchedulePage() {
         </div>
       ) : null}
 
+      {isCompactLayout ? (
+        <div ref={calendarSectionsRef} style={{ maxWidth: 720, margin: "0 auto", width: "100%" }}>
+          <WeekDateSelector
+            weekDates={weekDates}
+            selectedIndex={selectedDayIndex}
+            todayKey={todayKey}
+            weekOffset={weekOffset}
+            onSelectDay={handleSelectDay}
+            onPrevWeek={() => setWeekOffset((current) => current - 1)}
+            onNextWeek={() => setWeekOffset((current) => current + 1)}
+            onResetWeek={() => setWeekOffset(0)}
+            formatDateKey={formatDateKey}
+          />
+
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: "#ffffff",
+              marginBottom: 18,
+            }}
+          >
+            {weekDates[selectedDayIndex].toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+
+          {schedulePeriods.map((period) => {
+            const key = getScheduleCellKey(scheduleDays[selectedDayIndex].value, period.value);
+            const cell = schedule[key];
+
+            return (
+              <ScheduleSection
+                key={period.value}
+                label={period.label}
+                time={cell.time}
+                entries={cell.entries}
+                getExercise={(exerciseId) => getExerciseById(exercises, exerciseId)}
+                onAddSession={() => handleAddSessionForPeriod(period.value)}
+                onRemoveEntry={(entryId) =>
+                  removeEntry(scheduleDays[selectedDayIndex].value, period.value, entryId)
+                }
+                onMoveEntry={(entryId, direction) =>
+                  moveEntryInCell(scheduleDays[selectedDayIndex].value, period.value, entryId, direction)
+                }
+              />
+            );
+          })}
+        </div>
+      ) : (
       <section ref={scheduleGridRef} style={{ marginBottom: 22, overflowX: "auto", paddingBottom: 4 }}>
         <div
           style={{
@@ -1042,7 +1171,9 @@ export function SchedulePage() {
           ))}
         </div>
       </section>
+      )}
 
+      <div ref={exerciseLibraryRef}>
       <section style={{ ...panelStyle, marginBottom: 18 }}>
         <div
           style={{
@@ -1138,16 +1269,28 @@ export function SchedulePage() {
           ))}
         </section>
       )}
+      </div>
+
+      {isMonthPickerOpen ? (
+        <MonthCalendarPicker
+          initialMonth={weekDates[selectedDayIndex]}
+          selectedDate={weekDates[selectedDayIndex]}
+          todayKey={todayKey}
+          formatDateKey={formatDateKey}
+          onSelectDate={handlePickDateFromCalendar}
+          onClose={() => setIsMonthPickerOpen(false)}
+        />
+      ) : null}
 
       {isSmartPanelOpen ? (
         <div
           style={{
             position: "fixed",
             right: 24,
-            bottom: 96,
+            bottom: isCompactLayout ? 172 : 96,
             width: 340,
             maxWidth: "calc(100vw - 32px)",
-            maxHeight: "min(560px, calc(100vh - 140px))",
+            maxHeight: isCompactLayout ? "min(560px, calc(100vh - 216px))" : "min(560px, calc(100vh - 140px))",
             display: "flex",
             flexDirection: "column",
             borderRadius: 18,
@@ -1300,7 +1443,7 @@ export function SchedulePage() {
         style={{
           position: "fixed",
           right: 24,
-          bottom: 24,
+          bottom: isCompactLayout ? 100 : 24,
           width: 56,
           height: 56,
           borderRadius: "50%",

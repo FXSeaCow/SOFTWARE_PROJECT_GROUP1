@@ -35,13 +35,9 @@ const SELF_CHECKIN_ENABLED = false;
 const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 const muscleAccentPalette = ["#ff7a1a", "#4fa3ff", "#3ddc97", "#ffd166", "#f04a4a", "#c084fc", "#38bdf8"];
 
-// Goal tracking has no backing API yet (no goals module on the backend) — kept as
-// placeholder data until that endpoint exists.
-const goals: GoalEntry[] = [
-  { label: "Complete 20 workouts this month", currentLabel: "14 / 20", progressPercent: 70 },
-  { label: "Bench press 80kg", currentLabel: "72 / 80 kg", progressPercent: 90 },
-  { label: "Run 50km this month", currentLabel: "31 / 50 km", progressPercent: 62 },
-];
+// Goal tracking has no backing API yet (no goals module on the backend) — the
+// section renders its own empty state until that endpoint exists.
+const goals: GoalEntry[] = [];
 
 function formatLabel(value: string): string {
   return value

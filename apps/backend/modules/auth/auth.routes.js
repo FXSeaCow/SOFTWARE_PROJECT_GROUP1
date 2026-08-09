@@ -28,6 +28,8 @@ const {
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshTokenSchema,
+  googleAuthUrlQuerySchema,
+  googleLoginSchema,
 } = require('./auth.validation');
 
 // ── Public routes ─────────────────────────────────────────────────────────────
@@ -46,6 +48,20 @@ router.post(
   authLimiter,
   validate(loginSchema),
   ctrl.login
+);
+
+router.get(
+  '/google',
+  authLimiter,
+  validate(null, null, googleAuthUrlQuerySchema),
+  ctrl.redirectToGoogle
+);
+
+router.post(
+  '/google',
+  authLimiter,
+  validate(googleLoginSchema),
+  ctrl.loginWithGoogle
 );
 
 // Refresh access token

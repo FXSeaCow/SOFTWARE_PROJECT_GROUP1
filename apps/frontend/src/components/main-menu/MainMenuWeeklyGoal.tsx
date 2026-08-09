@@ -1,6 +1,7 @@
 import React from "react";
 
 import { panelStyle } from "./styles";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 export function MainMenuWeeklyGoal({
   goalDays,
@@ -13,6 +14,8 @@ export function MainMenuWeeklyGoal({
   labels: string[];
   progressPercent: number;
 }) {
+  const isMobile = useIsMobile(768);
+
   return (
     <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>
       <div
@@ -43,7 +46,7 @@ export function MainMenuWeeklyGoal({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+          gridTemplateColumns: isMobile ? "repeat(4, minmax(0, 1fr))" : "repeat(7, minmax(0, 1fr))",
           gap: 10,
           marginBottom: 8,
         }}

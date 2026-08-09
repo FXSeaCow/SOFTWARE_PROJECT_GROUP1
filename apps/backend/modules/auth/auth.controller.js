@@ -76,6 +76,37 @@ const login = asyncHandler(async (req, res) => {
   );
 });
 
+const redirectToGoogle = asyncHandler(async (req, res) => {
+  const authUrl = authService.getGoogleAuthUrl({
+    redirectUri: req.query.redirect_uri,
+    state: req.query.state,
+  });
+
+  res.redirect(authUrl);
+});
+
+const loginWithGoogle = asyncHandler(async (req, res) => {
+  const { code, redirect_uri } = req.body;
+  const { user, accessToken, refreshToken } = await authService.loginWithGoogle({
+    code,
+    redirectUri: redirect_uri,
+  });
+
+  res.cookie('refreshToken', refreshToken, cookieOptions());
+
+  if (user) {
+    delete user.password_hash;
+    delete user.qr_code_token;
+  }
+
+  res.status(200).json(
+    ApiResponse.success(
+      { user, accessToken },
+      'Google login successful'
+    )
+  );
+});
+
 // ─── POST /api/auth/refresh-token ─────────────────────────────────────────────
 
 /**
@@ -167,16 +198,26 @@ const getMe = asyncHandler(async (req, res) => {
  * secure  : chỉ HTTPS ở production
  * sameSite: giảm rủi ro CSRF
  */
-const cookieOptions = () => ({
-  httpOnly: true,
-  secure:   process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
-  maxAge:   7 * 24 * 60 * 60 * 1000, // 7 ngày (phù hợp với JWT_REFRESH_EXPIRES_IN)
-});
+const cookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = process.env.COOKIE_SECURE
+    ? process.env.COOKIE_SECURE === 'true'
+    : isProduction;
+  const sameSite = process.env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'strict');
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+};
 
 module.exports = {
   register,
   login,
+  redirectToGoogle,
+  loginWithGoogle,
   refreshToken,
   logout,
   getMe,

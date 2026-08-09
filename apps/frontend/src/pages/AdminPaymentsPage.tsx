@@ -266,7 +266,7 @@ export function AdminPaymentsPage() {
             iconColor: "#fde68a",
           },
           {
-            label: "Shown value",
+            label: `${STATUS_TABS.find((tab) => tab.id === statusFilter)?.label ?? ""} value`,
             value: formatCurrency(stats.totalAmount),
             icon: <CreditCard size={18} />,
             iconBg: "rgba(255,122,26,0.12)",
