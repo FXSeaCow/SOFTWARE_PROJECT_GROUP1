@@ -97,7 +97,7 @@ const getExercisesLimiter = rateLimit({
  */
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 4000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
