@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Bell, CheckCheck } from "lucide-react";
 
 import { iconButtonStyle } from "./main-menu/styles";
 import {
+  getUnreadNotificationCount,
   listMyNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
   UserNotificationRecord,
 } from "../services/announcementService";
+
+const NOTIFICATION_REFRESH_INTERVAL_MS = 15000;
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -57,38 +60,80 @@ function typeAccent(type: UserNotificationRecord["type"]): React.CSSProperties {
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<UserNotificationRecord[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => !notification.is_read).length,
-    [notifications],
-  );
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const nextUnreadCount = await getUnreadNotificationCount();
+      setUnreadCount(nextUnreadCount);
+    } catch {
+      // Keep the previous badge state during transient refresh errors.
+    }
+  }, []);
+
+  const loadNotifications = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) {
+      setIsLoading(true);
+    }
+    setErrorMessage(null);
+
+    try {
+      const nextNotifications = await listMyNotifications();
+      setNotifications(nextNotifications);
+      setUnreadCount(nextNotifications.filter((notification) => !notification.is_read).length);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to load notifications.",
+      );
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUnreadCount();
+
+    const refreshUnreadCount = () => {
+      if (document.visibilityState === "visible") {
+        void loadUnreadCount();
+      }
+    };
+
+    const intervalId = window.setInterval(
+      refreshUnreadCount,
+      NOTIFICATION_REFRESH_INTERVAL_MS,
+    );
+
+    window.addEventListener("focus", refreshUnreadCount);
+    document.addEventListener("visibilitychange", refreshUnreadCount);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshUnreadCount);
+      document.removeEventListener("visibilitychange", refreshUnreadCount);
+    };
+  }, [loadUnreadCount]);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    async function loadNotifications() {
-      setIsLoading(true);
-      setErrorMessage(null);
+    void loadNotifications({ showLoading: notifications.length === 0 });
 
-      try {
-        const nextNotifications = await listMyNotifications();
-        setNotifications(nextNotifications);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load notifications.",
-        );
-      } finally {
-        setIsLoading(false);
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
       }
-    }
+    }, NOTIFICATION_REFRESH_INTERVAL_MS);
 
-    void loadNotifications();
-  }, [isOpen]);
+    return () => window.clearInterval(intervalId);
+  }, [isOpen, loadNotifications, notifications.length]);
 
   async function handleNotificationClick(notification: UserNotificationRecord) {
     if (notification.is_read) {
@@ -100,6 +145,7 @@ export function NotificationBell() {
       setNotifications((current) =>
         current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
       );
+      setUnreadCount((current) => Math.max(0, current - 1));
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to update notification state.",
@@ -120,6 +166,7 @@ export function NotificationBell() {
           read_at: item.read_at ?? new Date().toISOString(),
         })),
       );
+      setUnreadCount(0);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to mark notifications as read.",

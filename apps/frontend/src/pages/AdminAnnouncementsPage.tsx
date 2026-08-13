@@ -137,6 +137,27 @@ export function AdminAnnouncementsPage() {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    if (form.title.trim().length < 3) {
+      setErrorMessage("Title must be at least 3 characters.");
+      return;
+    }
+
+    if (form.body.trim().length < 10) {
+      setErrorMessage("Message must be at least 10 characters.");
+      return;
+    }
+
+    if (form.send_to === "all" && users.length === 0) {
+      setErrorMessage("There are no active recipients available.");
+      return;
+    }
+
+    if (form.send_to === "selected" && form.user_ids.length === 0) {
+      setErrorMessage("Please select at least one recipient before sending.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

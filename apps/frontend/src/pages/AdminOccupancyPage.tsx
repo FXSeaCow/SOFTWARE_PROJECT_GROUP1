@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, Camera, LogIn, LogOut, RotateCcw, TrendingUp, Users } from "lucide-react";
+import {
+  Activity,
+  Calendar,
+  Camera,
+  Clock,
+  LogIn,
+  LogOut,
+  MapPin,
+  Phone,
+  RotateCcw,
+  TrendingUp,
+  UserCheck,
+  Users,
+} from "lucide-react";
 
 import { QrScannerModal } from "../components/QrScannerModal";
 import { Skeleton } from "../components/Skeleton";
@@ -64,6 +77,25 @@ function formatDuration(minutes: number | null) {
   if (minutes === null) return "In progress";
   if (minutes < 60) return `${minutes}m`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function formatBranchTime(value?: string | null) {
+  if (!value) return "Not set";
+  return value.slice(0, 5);
+}
+
+function formatBranchLocation(branch: BranchOccupancy) {
+  return [branch.address, branch.city].filter(Boolean).join(", ") || "No address provided";
+}
+
+function formatBranchHours(branch: BranchOccupancy) {
+  if (!branch.opening_time && !branch.closing_time) return "Hours not set";
+  return `${formatBranchTime(branch.opening_time)} - ${formatBranchTime(branch.closing_time)}`;
+}
+
+function formatBranchOption(branch: BranchOccupancy) {
+  const city = branch.city ? ` - ${branch.city}` : "";
+  return `${branch.branch_name}${city} (${branch.current_occupancy}/${branch.capacity})`;
 }
 
 export function AdminOccupancyPage() {
@@ -259,7 +291,7 @@ export function AdminOccupancyPage() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 22, fontWeight: 900 }}>
             <Activity size={20} color="#86efac" />
-            Live occupancy
+            Gym branches
           </div>
           <button
             type="button"
@@ -306,8 +338,24 @@ export function AdminOccupancyPage() {
                     padding: 16,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>{branch.branch_name}</div>
+                  <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>{branch.branch_name}</div>
+                      <div style={{ display: "grid", gap: 6, color: "#9ca8b7", fontSize: 12, lineHeight: 1.35 }}>
+                        <div style={{ display: "flex", alignItems: "start", gap: 7 }}>
+                          <MapPin size={13} style={{ flex: "0 0 auto", marginTop: 2 }} />
+                          <span>{formatBranchLocation(branch)}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <Clock size={13} />
+                          <span>{formatBranchHours(branch)}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <Phone size={13} />
+                          <span>{branch.phone || "No phone provided"}</span>
+                        </div>
+                      </div>
+                    </div>
                     <span
                       style={{
                         borderRadius: 999,
@@ -321,9 +369,38 @@ export function AdminOccupancyPage() {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 26, fontWeight: 900, marginBottom: 4 }}>
-                    {branch.current_occupancy}
-                    <span style={{ fontSize: 15, color: "#8d98a7", fontWeight: 700 }}> / {branch.capacity}</span>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      gap: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.03)",
+                        padding: 10,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#8d98a7", fontSize: 11, marginBottom: 5 }}>
+                        <UserCheck size={13} />
+                        Active members
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 900 }}>{branch.current_occupancy}</div>
+                    </div>
+
+                    <div
+                      style={{
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.03)",
+                        padding: 10,
+                      }}
+                    >
+                      <div style={{ color: "#8d98a7", fontSize: 11, marginBottom: 5 }}>Capacity</div>
+                      <div style={{ fontSize: 22, fontWeight: 900 }}>{branch.capacity}</div>
+                    </div>
                   </div>
 
                   <div
@@ -401,7 +478,7 @@ export function AdminOccupancyPage() {
             {branchOptions.length === 0 ? <option value="">No active branches</option> : null}
             {branchOptions.map((branch) => (
               <option key={branch.branch_id} value={branch.branch_id}>
-                {branch.branch_name}
+                {formatBranchOption(branch)}
               </option>
             ))}
           </select>
@@ -503,7 +580,7 @@ export function AdminOccupancyPage() {
               <option value="">All branches</option>
               {branchOptions.map((branch) => (
                 <option key={branch.branch_id} value={branch.branch_id}>
-                  {branch.branch_name}
+                  {formatBranchOption(branch)}
                 </option>
               ))}
             </select>
@@ -605,7 +682,7 @@ export function AdminOccupancyPage() {
             <option value="">All branches</option>
             {branchOptions.map((branch) => (
               <option key={branch.branch_id} value={branch.branch_id}>
-                {branch.branch_name}
+                {formatBranchOption(branch)}
               </option>
             ))}
           </select>

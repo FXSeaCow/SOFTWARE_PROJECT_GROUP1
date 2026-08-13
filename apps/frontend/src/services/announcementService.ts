@@ -54,6 +54,13 @@ export async function listMyNotifications(): Promise<UserNotificationRecord[]> {
   return response.data;
 }
 
+export async function getUnreadNotificationCount(): Promise<number> {
+  const response = await apiClient<ApiResponse<{ unread_count: number }>>(
+    "/notifications/me/unread-count",
+  );
+  return response.data.unread_count;
+}
+
 export async function markNotificationAsRead(notificationId: string): Promise<UserNotificationRecord> {
   const response = await apiClient<ApiResponse<UserNotificationRecord>>(
     `/notifications/${notificationId}/read`,
