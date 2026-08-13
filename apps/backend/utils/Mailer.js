@@ -15,6 +15,10 @@ const logger = require('./Logger');
 const sendPasswordResetEmail = async ({ to, token, fullName }) => {
   const frontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
   const resetLink = `${frontend.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
 
   // Never actually send when running tests — keep tests hermetic
   if (process.env.NODE_ENV === 'test') {
@@ -23,7 +27,7 @@ const sendPasswordResetEmail = async ({ to, token, fullName }) => {
   }
 
   // If SMTP is not configured just log the reset link in dev and return
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  if (!smtpHost || !smtpUser || !smtpPass) {
     logger.warn('SMTP not configured — password reset email not sent', { to, resetLink });
     if (process.env.NODE_ENV === 'development') {
       // Helpful for local development — show link in logs
@@ -42,16 +46,20 @@ const sendPasswordResetEmail = async ({ to, token, fullName }) => {
   }
 
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
+    host: smtpHost,
+    port: smtpPort,
     secure: process.env.SMTP_SECURE === 'true',
+    family: 4,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: smtpUser,
+      pass: smtpPass,
     },
   });
 
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  const from = process.env.EMAIL_FROM?.trim() || smtpUser;
 
   const mailOptions = {
     from,
