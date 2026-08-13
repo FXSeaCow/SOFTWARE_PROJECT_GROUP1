@@ -11,6 +11,20 @@
  */
 
 const logger = require('./Logger');
+const dns = require('dns').promises;
+
+const resolveSmtpHost = async (host) => {
+  try {
+    const addresses = await dns.resolve4(host);
+    return addresses[0] || host;
+  } catch (err) {
+    logger.warn('Unable to resolve SMTP host to IPv4; using configured host', {
+      host,
+      error: err.message,
+    });
+    return host;
+  }
+};
 
 const sendPasswordResetEmail = async ({ to, token, fullName }) => {
   const frontend = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
@@ -45,14 +59,19 @@ const sendPasswordResetEmail = async ({ to, token, fullName }) => {
     return { error: 'nodemailer not installed', resetLink };
   }
 
+  const smtpHostForConnection = await resolveSmtpHost(smtpHost);
+
   const transporter = nodemailer.createTransport({
-    host: smtpHost,
+    host: smtpHostForConnection,
     port: smtpPort,
     secure: process.env.SMTP_SECURE === 'true',
     family: 4,
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 30000,
+    tls: {
+      servername: smtpHost,
+    },
     auth: {
       user: smtpUser,
       pass: smtpPass,
