@@ -168,7 +168,7 @@ export function ResetPasswordPage() {
           </div>
         ) : null}
 
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" isLoading={isSubmitting} loadingText="Saving new password...">
           Save new password
         </Button>
 

@@ -116,7 +116,7 @@ export function ForgotPasswordPage() {
           </div>
         ) : null}
 
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" isLoading={isSubmitting} loadingText="Sending reset link...">
           Send reset link
         </Button>
 
