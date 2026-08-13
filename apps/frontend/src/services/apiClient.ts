@@ -75,14 +75,18 @@ function setStoredAccessToken(accessToken: string) {
   );
 }
 
+function isRecoverableAuthError(message: string): boolean {
+  return message === "Access token expired" || message === "Access token missing";
+}
+
 async function refreshAccessToken(): Promise<string> {
   const refreshUrl = `${API_BASE_URL}/auth/refresh-token`;
-    const response = await fetch(refreshUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
+  const response = await fetch(refreshUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
   });
 
   const rawBody = await response.text();
@@ -100,11 +104,9 @@ async function refreshAccessToken(): Promise<string> {
     const backendMessage = parsed?.message?.trim();
 
     if (
-      backendMessage === "Invalid ID format — must be a valid UUID" ||
-      backendMessage === "Invalid ID format â€” must be a valid UUID" ||
+      backendMessage === "Refresh token missing" ||
       backendMessage === "Invalid refresh token" ||
-      backendMessage === "Refresh token expired — please log in again" ||
-      backendMessage === "Refresh token expired â€” please log in again" ||
+      backendMessage?.startsWith("Refresh token expired") ||
       backendMessage === "Account no longer exists"
     ) {
       throw new Error("Session expired. Please log in again.");
@@ -146,7 +148,7 @@ export async function apiClient<T>(
     });
 
     const rawBody = await response.text();
-    let data: (T | { message?: string } | null) = null;
+    let data: T | { message?: string } | null = null;
 
     if (rawBody) {
       try {
@@ -176,7 +178,7 @@ export async function apiClient<T>(
   try {
     return await sendRequest();
   } catch (error) {
-    if (!(error instanceof Error) || error.message !== "Access token expired") {
+    if (!(error instanceof Error) || !isRecoverableAuthError(error.message)) {
       throw error;
     }
 
