@@ -36,6 +36,18 @@ const initialForm: FormState = {
   user_ids: [],
 };
 
+function formatRecipientsLabel(announcement: AdminAnnouncementRecord): string {
+  if (announcement.send_to === "all") {
+    return "Everyone";
+  }
+
+  if (announcement.recipient_names.length === 0) {
+    return `${announcement.recipient_count} selected member${announcement.recipient_count === 1 ? "" : "s"}`;
+  }
+
+  return announcement.recipient_names.join(", ");
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -666,8 +678,12 @@ export function AdminAnnouncementsPage() {
                   </span>
                 </div>
 
-                <div style={{ color: "#d4d4d8", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
+                <div style={{ color: "#d4d4d8", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>
                   {announcement.body}
+                </div>
+
+                <div style={{ color: "#9ca8b7", fontSize: 13, marginBottom: 12 }}>
+                  Sent to: <span style={{ color: "#f5f5f5", fontWeight: 700 }}>{formatRecipientsLabel(announcement)}</span>
                 </div>
 
                 <div

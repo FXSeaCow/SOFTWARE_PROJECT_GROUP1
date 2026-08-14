@@ -311,10 +311,19 @@ async function seedExerciseCatalog() {
   logger.info('Exercise catalog seeded', { count: exercises.length });
 }
 
+async function ensureAnnouncementsSchema() {
+  await db.query(`
+    ALTER TABLE announcements
+    ADD COLUMN IF NOT EXISTS send_to TEXT NOT NULL DEFAULT 'all'
+    CHECK (send_to IN ('all', 'selected'))
+  `);
+}
+
 async function initializeApp() {
   await ensureUsersSchema();
   await ensureMembershipsAndPaymentsSchema();
   await ensureNotificationsSchema();
+  await ensureAnnouncementsSchema();
   await ensureWorkoutsSchema();
   await seedExerciseCatalog();
   await ensureDevelopmentAdmin();

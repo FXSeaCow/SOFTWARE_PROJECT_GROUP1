@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 
 export type ChartPoint = {
   label: string;
@@ -14,6 +14,7 @@ export function FitnessMetricsChart({
   unit: string;
   accent?: string;
 }) {
+  const gradientId = `fitness-chart-fill-${useId()}`;
   if (points.length < 2) {
     return (
       <div style={{ color: "#8d98a7", fontSize: 14, padding: "24px 0" }}>
@@ -55,13 +56,13 @@ export function FitnessMetricsChart({
         preserveAspectRatio="none"
       >
         <defs>
-          <linearGradient id="fitness-chart-fill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={accent} stopOpacity="0.35" />
             <stop offset="100%" stopColor={accent} stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        <path d={areaPath} fill="url(#fitness-chart-fill)" stroke="none" />
+        <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
         <path d={linePath} fill="none" stroke={accent} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
 
         {coords.map((coord, index) => (

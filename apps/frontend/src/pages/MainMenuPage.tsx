@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Activity, CalendarDays, ChevronRight, Dumbbell, Flame, Target, Trophy } from "lucide-react";
+import { Activity, CalendarDays, Flame, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { MainMenuCategoryCard } from "../components/main-menu/MainMenuCategoryCard";
+import { MainMenuBranchCard } from "../components/main-menu/MainMenuBranchCard";
 import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
-import { MainMenuHeroCard } from "../components/main-menu/MainMenuHeroCard";
 import { MainMenuStatCard } from "../components/main-menu/MainMenuStatCard";
 import { MainMenuWeeklyGoal } from "../components/main-menu/MainMenuWeeklyGoal";
+import { MainMenuWelcomeCard } from "../components/main-menu/MainMenuWelcomeCard";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
 import { getCurrentUser, logout } from "../services/authService";
+import { BranchOccupancy, getCurrentOccupancy } from "../services/occupancyService";
 import { getMyCheckinsInRange, getMyStreak, StreakSummary } from "../services/streakService";
 
 type StatItem = {
@@ -40,34 +41,6 @@ function getCurrentWeekDates() {
   });
 }
 
-type CategoryItem = {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  accent: string;
-};
-
-const categories: CategoryItem[] = [
-  {
-    title: "Strength",
-    subtitle: "Build muscle and get stronger",
-    icon: <Dumbbell size={20} />,
-    accent: "#ff7a1a",
-  },
-  {
-    title: "Cardio",
-    subtitle: "Improve endurance and stamina",
-    icon: <Activity size={20} />,
-    accent: "#ff9a3d",
-  },
-  {
-    title: "Mobility",
-    subtitle: "Enhance flexibility and recovery",
-    icon: <Target size={20} />,
-    accent: "#ffb15f",
-  },
-];
-
 const weeklyLabels = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function MainMenuPage() {
@@ -78,6 +51,7 @@ export function MainMenuPage() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [streakSummary, setStreakSummary] = useState<StreakSummary | null>(null);
   const [weekCheckinDates, setWeekCheckinDates] = useState<Set<string>>(new Set());
+  const [branches, setBranches] = useState<BranchOccupancy[]>([]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -91,6 +65,9 @@ export function MainMenuPage() {
     void getMyStreak().then(setStreakSummary);
     void getMyCheckinsInRange(fromDate, toDate).then((checkins) => {
       setWeekCheckinDates(new Set(checkins.map((checkin) => checkin.checkin_date)));
+    });
+    void getCurrentOccupancy().then((result) => {
+      setBranches("branches" in result ? result.branches : [result]);
     });
   }, [currentUser?.id]);
 
@@ -177,6 +154,12 @@ export function MainMenuPage() {
         Home dashboard
       </div>
 
+      <MainMenuWelcomeCard
+        currentStreak={streakSummary ? streakSummary.current_streak : null}
+        daysCompletedThisWeek={daysCompletedThisWeek}
+        weeklyProgressPercent={weeklyProgressPercent}
+      />
+
       <section
         style={{
           display: "grid",
@@ -195,11 +178,6 @@ export function MainMenuPage() {
           />
         ))}
       </section>
-
-      <MainMenuHeroCard
-        startHref={currentUser ? "/" : "/login"}
-        membershipHref={currentUser ? "/membership" : "/login"}
-      />
 
       <MainMenuWeeklyGoal
         goalDays={`${daysCompletedThisWeek} / 7 days`}
@@ -226,25 +204,8 @@ export function MainMenuPage() {
               letterSpacing: "-0.03em",
             }}
           >
-            Categories
+            Gym Branches
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/exercises")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              border: "none",
-              background: "transparent",
-              color: "#9ca8b7",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            <span>See all</span>
-            <ChevronRight size={16} />
-          </button>
         </div>
 
         <div
@@ -254,16 +215,11 @@ export function MainMenuPage() {
             gap: 12,
           }}
         >
-          {categories.map((category) => (
-            <MainMenuCategoryCard
-              key={category.title}
-              title={category.title}
-              subtitle={category.subtitle}
-              icon={category.icon}
-              accent={category.accent}
-              onClick={() => navigate("/exercises")}
-            />
-          ))}
+          {branches.length > 0 ? (
+            branches.map((branch) => <MainMenuBranchCard key={branch.branch_id} branch={branch} />)
+          ) : (
+            <div style={{ color: "#8d98a7", fontSize: 14 }}>No branches available.</div>
+          )}
         </div>
       </section>
     </AppShell>

@@ -7,19 +7,25 @@ import {
   LogIn,
   LogOut,
   MapPin,
+  Pencil,
   Phone,
+  Plus,
+  Power,
   RotateCcw,
   TrendingUp,
   UserCheck,
   Users,
 } from "lucide-react";
 
+import { BranchFormModal } from "../components/BranchFormModal";
 import { QrScannerModal } from "../components/QrScannerModal";
 import { Skeleton } from "../components/Skeleton";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { AdminPageLayout } from "../layouts/AdminPageLayout";
 import {
+  AdminBranch,
+  BranchInput,
   BranchOccupancy,
   CurrentOccupancy,
   DailyOccupancyReport,
@@ -27,10 +33,14 @@ import {
   OccupancyStatus,
   checkInGym,
   checkOutGym,
+  createBranch,
   getAdminDailyReport,
   getCurrentOccupancy,
   listAdminGymSessions,
+  listAllBranches,
   resetOpenSessions,
+  setBranchActive,
+  updateBranch,
 } from "../services/occupancyService";
 
 type SessionStatusFilter = "open" | "closed" | "all";
@@ -84,7 +94,7 @@ function formatBranchTime(value?: string | null) {
   return value.slice(0, 5);
 }
 
-function formatBranchLocation(branch: BranchOccupancy) {
+function formatBranchLocation(branch: { address?: string | null; city?: string | null }) {
   return [branch.address, branch.city].filter(Boolean).join(", ") || "No address provided";
 }
 
@@ -122,6 +132,25 @@ export function AdminOccupancyPage() {
   const [isCheckInScannerOpen, setIsCheckInScannerOpen] = useState(false);
   const [isCheckOutScannerOpen, setIsCheckOutScannerOpen] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+
+  const [allBranches, setAllBranches] = useState<AdminBranch[]>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<AdminBranch | null>(null);
+  const [branchActionId, setBranchActionId] = useState<string | null>(null);
+
+  async function loadAllBranches() {
+    setIsLoadingBranches(true);
+
+    try {
+      const result = await listAllBranches();
+      setAllBranches(result);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to load branches.");
+    } finally {
+      setIsLoadingBranches(false);
+    }
+  }
 
   async function loadOccupancy() {
     setIsLoadingOccupancy(true);
@@ -165,6 +194,7 @@ export function AdminOccupancyPage() {
 
   useEffect(() => {
     void loadOccupancy();
+    void loadAllBranches();
   }, []);
 
   useEffect(() => {
@@ -190,6 +220,46 @@ export function AdminOccupancyPage() {
     if (!report) return 1;
     return Math.max(...report.hourly_occupancy.map((point) => point.occupancy), 1);
   }, [report]);
+
+  function openCreateBranchModal() {
+    setEditingBranch(null);
+    setIsBranchModalOpen(true);
+  }
+
+  function openEditBranchModal(branch: AdminBranch) {
+    setEditingBranch(branch);
+    setIsBranchModalOpen(true);
+  }
+
+  async function handleSaveBranch(data: BranchInput) {
+    if (editingBranch) {
+      await updateBranch(editingBranch.branch_id, data);
+      setFeedback(`${data.name} updated.`);
+    } else {
+      await createBranch(data);
+      setFeedback(`${data.name} added.`);
+    }
+
+    setError(null);
+    setIsBranchModalOpen(false);
+    await Promise.all([loadAllBranches(), loadOccupancy()]);
+  }
+
+  async function handleToggleBranchActive(branch: AdminBranch) {
+    setBranchActionId(branch.branch_id);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      await setBranchActive(branch.branch_id, !branch.is_active);
+      setFeedback(`${branch.branch_name} ${branch.is_active ? "deactivated" : "reactivated"}.`);
+      await Promise.all([loadAllBranches(), loadOccupancy()]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Unable to update this branch.");
+    } finally {
+      setBranchActionId(null);
+    }
+  }
 
   async function handleResetOpenSessions(branchId?: string) {
     setIsResetting(true);
@@ -447,6 +517,128 @@ export function AdminOccupancyPage() {
             {branchOptions.length === 0 ? (
               <div style={{ color: "#9ca8b7", fontSize: 14 }}>No active branches.</div>
             ) : null}
+          </div>
+        )}
+      </section>
+
+      <section className="dashboard-card-enter" style={{ ...panelStyle, marginBottom: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 18,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 900 }}>Manage branches</div>
+          <button
+            type="button"
+            onClick={openCreateBranchModal}
+            style={{ ...startButtonStyle, width: "auto" }}
+          >
+            <Plus size={18} />
+            Add branch
+          </button>
+        </div>
+
+        {isLoadingBranches ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {Array.from({ length: 2 }).map((_, index) => (
+              <Skeleton key={index} height={64} width="100%" radius={12} />
+            ))}
+          </div>
+        ) : allBranches.length === 0 ? (
+          <div style={{ color: "#9ca8b7", fontSize: 14 }}>No branches yet. Add one to get started.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {allBranches.map((branch) => (
+              <div
+                key={branch.branch_id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(255,255,255,0.02)",
+                  padding: 14,
+                  opacity: branch.is_active ? 1 : 0.6,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 800, fontSize: 15 }}>{branch.branch_name}</span>
+                    {!branch.is_active ? (
+                      <span
+                        style={{
+                          borderRadius: 999,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          background: "rgba(148,163,184,0.16)",
+                          color: "#cbd5e1",
+                        }}
+                      >
+                        Inactive
+                      </span>
+                    ) : null}
+                  </div>
+                  <div style={{ color: "#9ca8b7", fontSize: 12, marginTop: 4 }}>
+                    {formatBranchLocation(branch)} &middot; Capacity {branch.capacity}
+                    {branch.phone ? ` · ${branch.phone}` : ""}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => openEditBranchModal(branch)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.02)",
+                      color: "#d3dae5",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Pencil size={14} />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleBranchActive(branch)}
+                    disabled={branchActionId === branch.branch_id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.02)",
+                      color: branch.is_active ? "#fca5a5" : "#86efac",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      padding: "8px 12px",
+                      cursor: branchActionId === branch.branch_id ? "not-allowed" : "pointer",
+                      opacity: branchActionId === branch.branch_id ? 0.6 : 1,
+                    }}
+                  >
+                    <Power size={14} />
+                    {branch.is_active ? "Deactivate" : "Reactivate"}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -801,6 +993,13 @@ export function AdminOccupancyPage() {
         title="Scan to check out"
         onClose={() => setIsCheckOutScannerOpen(false)}
         onScan={(token) => void handleScanCheckOut(token)}
+      />
+
+      <BranchFormModal
+        isOpen={isBranchModalOpen}
+        branch={editingBranch}
+        onClose={() => setIsBranchModalOpen(false)}
+        onSubmit={handleSaveBranch}
       />
     </AdminPageLayout>
   );

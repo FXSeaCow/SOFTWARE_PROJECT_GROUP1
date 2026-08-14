@@ -237,6 +237,18 @@ export function getCurrentUser(): User | null {
   return session?.user ?? null;
 }
 
+export function updateStoredUserName(name: string) {
+  const session = getSession();
+  if (!session) {
+    return;
+  }
+
+  saveSession({
+    ...session,
+    user: { ...session.user, name },
+  });
+}
+
 export function getAccessToken(): string | null {
   const session = getSession();
   return session?.accessToken ?? null;

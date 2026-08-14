@@ -271,8 +271,17 @@ const issueMembershipActivationCode = async (membershipId, adminId, client) => {
   throw ApiError.internal('Unable to generate a unique activation code');
 };
 
+/**
+ * Redeem an activation code and transfer the membership to the redeeming
+ * account. Codes are not tied to the original payer — anyone with a valid
+ * code can activate it under their own account.
+ *
+ * @param {string} userId - the redeeming account
+ * @param {string} activationCode
+ * @returns {Promise<object>}
+ */
 const activateMembershipByCode = async (userId, activationCode) => {
-  const membership = await repo.findByActivationCode(userId, activationCode);
+  const membership = await repo.findByActivationCode(activationCode);
   if (!membership) {
     throw ApiError.badRequest('Activation code is invalid or no longer available');
   }
@@ -341,6 +350,13 @@ const adminCreateMembership = async ({ user_id, plan_id, start_date }, adminId) 
 /**
  * Admin updates a membership's status (suspend / cancel / re-activate).
  *
+ * Re-activating a membership whose end_date has already passed (whether its
+ * status is 'expired' or it just went stale while 'suspended') would flip
+ * status to 'active' but still fail requireActiveMembership's
+ * end_date >= CURRENT_DATE check — the member sees no change. So reactivating
+ * a lapsed membership extends it forward from today using its plan's
+ * duration_days, the same way a fresh renewal would.
+ *
  * @param {string} membershipId
  * @param {string} status
  * @param {string} adminId
@@ -350,16 +366,22 @@ const updateMembershipStatus = async (membershipId, status, adminId) => {
   const existing = await repo.findById(membershipId);
   if (!existing) throw ApiError.notFound('Membership');
 
-  // Guard: cannot re-activate an expired membership
-  if (existing.status === 'expired' && status === 'active') {
-    throw ApiError.badRequest(
-      'Expired memberships cannot be re-activated. Please create a new one.'
-    );
+  let dates;
+
+  if (status === 'active') {
+    const todayStr = formatDateOnly(new Date());
+    const endDateStr = formatDateOnly(existing.end_date);
+
+    if (endDateStr < todayStr) {
+      const newStart = new Date();
+      const newEnd = computeEndDate(newStart, existing.duration_days);
+      dates = { startDate: formatDateOnly(newStart), endDate: formatDateOnly(newEnd) };
+    }
   }
 
-  const updated = await repo.updateStatus(membershipId, status, adminId);
-  logger.info('Membership status updated', { membershipId, status, adminId });
-  return updated;
+  const updated = await repo.updateStatus(membershipId, status, adminId, dates);
+  logger.info('Membership status updated', { membershipId, status, adminId, extended: Boolean(dates) });
+  return normalizeMembershipDates(updated);
 };
 
 /**

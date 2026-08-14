@@ -72,6 +72,52 @@ export type CheckOutResult = {
   occupancy: BranchOccupancy;
 };
 
+export type AdminBranch = BranchMetadata & {
+  capacity: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BranchInput = {
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
+  capacity?: number;
+};
+
+export async function listAllBranches(): Promise<AdminBranch[]> {
+  const response = await apiClient<ApiResponse<AdminBranch[]>>("/occupancy/admin/branches");
+  return response.data;
+}
+
+export async function createBranch(data: BranchInput): Promise<AdminBranch> {
+  const response = await apiClient<ApiResponse<AdminBranch>>("/occupancy/admin/branches", {
+    method: "POST",
+    body: data,
+  });
+  return response.data;
+}
+
+export async function updateBranch(branchId: string, data: Partial<BranchInput>): Promise<AdminBranch> {
+  const response = await apiClient<ApiResponse<AdminBranch>>(`/occupancy/admin/branches/${branchId}`, {
+    method: "PATCH",
+    body: data,
+  });
+  return response.data;
+}
+
+export async function setBranchActive(branchId: string, isActive: boolean): Promise<AdminBranch> {
+  const response = await apiClient<ApiResponse<AdminBranch>>(`/occupancy/admin/branches/${branchId}/status`, {
+    method: "PATCH",
+    body: { is_active: isActive },
+  });
+  return response.data;
+}
+
 export async function getCurrentOccupancy(branchId?: string): Promise<CurrentOccupancy | BranchOccupancy> {
   const query = branchId ? `?branch_id=${branchId}` : "";
   const response = await apiClient<ApiResponse<CurrentOccupancy | BranchOccupancy>>(

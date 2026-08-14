@@ -23,6 +23,8 @@ export type AdminAnnouncementRecord = {
   body: string;
   published_at: string;
   created_at: string;
+  send_to: AnnouncementTarget;
+  recipient_names: string[];
   recipient_count: number;
   read_count: number;
 };

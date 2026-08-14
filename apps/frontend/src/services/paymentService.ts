@@ -38,12 +38,13 @@ export type PaymentRecord = {
 export async function requestMembershipPayment(
   membershipId: string,
   transferNote: string,
+  provider: "banking" | "cash" = "banking",
 ): Promise<PaymentRecord> {
   const response = await apiClient<ApiResponse<PaymentRecord>>("/payments/request", {
     method: "POST",
     body: {
       membership_id: membershipId,
-      provider: "banking",
+      provider,
       transfer_note: transferNote,
     },
   });

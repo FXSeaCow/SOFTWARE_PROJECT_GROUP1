@@ -31,6 +31,20 @@ export async function getMyProfile(): Promise<UserProfile> {
   return response.data;
 }
 
+export type UpdateProfilePayload = {
+  full_name?: string;
+  phone?: string | null;
+};
+
+export async function updateMyProfile(payload: UpdateProfilePayload): Promise<UserProfile> {
+  const response = await apiClient<ApiResponse<UserProfile>>("/users/me", {
+    method: "PATCH",
+    body: payload,
+  });
+
+  return response.data;
+}
+
 export async function getMyQrCode(): Promise<UserQrCode> {
   const response = await apiClient<ApiResponse<UserQrCode>>("/users/me/qr");
   return response.data;

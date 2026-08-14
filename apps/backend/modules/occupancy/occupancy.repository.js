@@ -58,6 +58,90 @@ const findBranchById = async (branchId, client) => {
 };
 
 /**
+ * Find all branches regardless of active status, for admin management.
+ *
+ * @returns {Promise<object[]>}
+ */
+const findAllBranches = async () => {
+  const { rows } = await db.query(
+    `SELECT id, name, address, city, phone, opening_time, closing_time,
+            capacity, is_active, created_at, updated_at
+     FROM gym_branches
+     ORDER BY name ASC`
+  );
+  return rows;
+};
+
+/**
+ * Find one branch by ID regardless of active status, for admin management.
+ *
+ * @param {string} branchId
+ * @returns {Promise<object|null>}
+ */
+const findBranchByIdAny = async (branchId) => {
+  const { rows } = await db.query(
+    `SELECT id, name, address, city, phone, opening_time, closing_time,
+            capacity, is_active, created_at, updated_at
+     FROM gym_branches
+     WHERE id = $1`,
+    [branchId]
+  );
+  return rows[0] || null;
+};
+
+/**
+ * Create a gym branch.
+ *
+ * @param {{ name: string, address?: string, city?: string, phone?: string, opening_time?: string, closing_time?: string, capacity: number }} data
+ * @returns {Promise<object>}
+ */
+const createBranch = async (data) => {
+  const { rows } = await db.query(
+    `INSERT INTO gym_branches (name, address, city, phone, opening_time, closing_time, capacity)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, address, city, phone, opening_time, closing_time,
+               capacity, is_active, created_at, updated_at`,
+    [
+      data.name,
+      data.address ?? null,
+      data.city ?? null,
+      data.phone ?? null,
+      data.opening_time ?? null,
+      data.closing_time ?? null,
+      data.capacity,
+    ]
+  );
+  return rows[0];
+};
+
+/**
+ * Update a gym branch. Only provided fields are changed.
+ *
+ * @param {string} branchId
+ * @param {object} fields
+ * @returns {Promise<object|null>}
+ */
+const updateBranch = async (branchId, fields) => {
+  const columns = Object.keys(fields);
+  if (columns.length === 0) {
+    return findBranchByIdAny(branchId);
+  }
+
+  const setClause = columns.map((column, index) => `${column} = $${index + 2}`).join(', ');
+  const values = columns.map((column) => fields[column]);
+
+  const { rows } = await db.query(
+    `UPDATE gym_branches
+     SET ${setClause}, updated_at = now()
+     WHERE id = $1
+     RETURNING id, name, address, city, phone, opening_time, closing_time,
+               capacity, is_active, created_at, updated_at`,
+    [branchId, ...values]
+  );
+  return rows[0] || null;
+};
+
+/**
  * Find current occupancy from the reporting view.
  *
  * @param {string|null} branchId
@@ -541,7 +625,11 @@ const updateWorkoutStreak = async (userId, stats, client) => {
 
 module.exports = {
   findActiveBranches,
+  findAllBranches,
   findBranchById,
+  findBranchByIdAny,
+  createBranch,
+  updateBranch,
   findCurrentOccupancy,
   findUserByQrToken,
   findUsersWithQrTokens,

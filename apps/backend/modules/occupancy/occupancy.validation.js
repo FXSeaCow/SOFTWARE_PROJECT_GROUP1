@@ -96,6 +96,48 @@ const checkOutSchema = Joi.object({
   notes: Joi.string().trim().max(250).allow('', null).optional(),
 });
 
+const timeOnly = Joi.string()
+  .pattern(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)
+  .messages({
+    'string.pattern.base': 'Time must use HH:MM (24-hour) format',
+  });
+
+/**
+ * POST /api/occupancy/admin/branches
+ */
+const createBranchSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(150).required().messages({
+    'string.empty': 'name is required',
+    'any.required': 'name is required',
+  }),
+  address: Joi.string().trim().max(250).allow('', null).optional(),
+  city: Joi.string().trim().max(120).allow('', null).optional(),
+  phone: Joi.string().trim().max(30).allow('', null).optional(),
+  opening_time: timeOnly.allow('', null).optional(),
+  closing_time: timeOnly.allow('', null).optional(),
+  capacity: Joi.number().integer().min(1).max(10000).optional(),
+});
+
+/**
+ * PATCH /api/occupancy/admin/branches/:branchId
+ */
+const updateBranchSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(150).optional(),
+  address: Joi.string().trim().max(250).allow('', null).optional(),
+  city: Joi.string().trim().max(120).allow('', null).optional(),
+  phone: Joi.string().trim().max(30).allow('', null).optional(),
+  opening_time: timeOnly.allow('', null).optional(),
+  closing_time: timeOnly.allow('', null).optional(),
+  capacity: Joi.number().integer().min(1).max(10000).optional(),
+}).min(1);
+
+/**
+ * PATCH /api/occupancy/admin/branches/:branchId/status
+ */
+const setBranchActiveSchema = Joi.object({
+  is_active: Joi.boolean().required(),
+});
+
 /**
  * Shared session listing filters.
  */
@@ -170,6 +212,9 @@ module.exports = {
   uuidParam,
   checkInSchema,
   checkOutSchema,
+  createBranchSchema,
+  updateBranchSchema,
+  setBranchActiveSchema,
   sessionsQuerySchema,
   adminSessionsQuerySchema,
   dailyReportQuerySchema,

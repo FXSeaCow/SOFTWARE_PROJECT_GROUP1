@@ -35,6 +35,7 @@ const createAnnouncement = async (adminUser, payload) => {
         title: payload.title,
         body: payload.body,
         publishedAt,
+        sendTo: payload.send_to,
       },
       client
     );

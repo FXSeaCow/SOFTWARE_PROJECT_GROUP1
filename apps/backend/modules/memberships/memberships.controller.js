@@ -61,7 +61,8 @@ const renewMembership = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/memberships/activate
- * Member activates a paid membership using the issued code.
+ * Activates a paid membership using the issued code. Any authenticated
+ * account may redeem a code — the redeeming account becomes the owner.
  */
 const activateMembershipByCode = asyncHandler(async (req, res) => {
   const membership = await service.activateMembershipByCode(req.user.id, req.body.activation_code);

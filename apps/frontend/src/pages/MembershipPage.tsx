@@ -6,6 +6,8 @@ import { MembershipComparePlans } from "../features/membership/MembershipCompare
 import { MembershipFeaturedPlan } from "../features/membership/MembershipFeaturedPlan";
 import { MembershipHeader } from "../features/membership/MembershipHeader";
 import { MembershipHero } from "../features/membership/MembershipHero";
+import { MembershipPaymentHistory } from "../features/membership/MembershipPaymentHistory";
+import { MembershipStatusCard } from "../features/membership/MembershipStatusCard";
 import { benefitCards, tierContent } from "../features/membership/constants";
 import { getUserInitials, inferTier } from "../features/membership/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -145,7 +147,7 @@ export function MembershipPage() {
     }
   }
 
-  async function handlePaidConfirmation() {
+  async function handleSubmitPayment(provider: "banking" | "cash") {
     if (!pendingCheckout) {
       return;
     }
@@ -155,8 +157,12 @@ export function MembershipPage() {
     setFeedbackMessage(null);
 
     try {
-      await requestMembershipPayment(pendingCheckout.id, pendingCheckout.transfer_note);
-      setFeedbackMessage("Payment submitted. Admin will review your transfer shortly.");
+      await requestMembershipPayment(pendingCheckout.id, pendingCheckout.transfer_note, provider);
+      setFeedbackMessage(
+        provider === "cash"
+          ? "Cash payment requested. Pay at the front desk — admin will confirm shortly."
+          : "Payment submitted. Admin will review your transfer shortly.",
+      );
       setPendingCheckout(null);
       await loadMembershipData();
     } catch (error) {
@@ -223,6 +229,10 @@ export function MembershipPage() {
 
       <MembershipHero />
 
+      <div style={{ maxWidth: 1380, margin: "18px auto 0" }}>
+        <MembershipStatusCard membership={currentMembership} isLoading={isLoading} />
+      </div>
+
       {errorMessage ? <div className="dashboard-card-enter" style={statusCardStyle("rgba(127,29,29,0.32)", "#fecaca")}>{errorMessage}</div> : null}
       {feedbackMessage ? <div className="dashboard-card-enter" style={statusCardStyle("rgba(6,95,70,0.32)", "#bbf7d0")}>{feedbackMessage}</div> : null}
 
@@ -265,10 +275,14 @@ export function MembershipPage() {
                 <div>Transfer content: <strong style={{ color: "#fbbf24" }}>{pendingCheckout.transfer_note}</strong></div>
               </div>
 
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 18 }}>
+              <div style={{ margin: "18px 0 4px", color: "#9ca3af", fontSize: 13 }}>
+                Prefer to pay in person? Skip the transfer and pay cash at the front desk instead.
+              </div>
+
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
                 <button
                   type="button"
-                  onClick={() => void handlePaidConfirmation()}
+                  onClick={() => void handleSubmitPayment("banking")}
                   disabled={isSubmittingPayment}
                   style={{
                     border: "none",
@@ -281,6 +295,22 @@ export function MembershipPage() {
                   }}
                 >
                   {isSubmittingPayment ? "Submitting..." : "I paid"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSubmitPayment("cash")}
+                  disabled={isSubmittingPayment}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 14,
+                    padding: "14px 20px",
+                    background: "transparent",
+                    color: "#f8fafc",
+                    fontWeight: 800,
+                    cursor: isSubmittingPayment ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Pay with cash instead
                 </button>
                 <button
                   type="button"
@@ -375,6 +405,10 @@ export function MembershipPage() {
           </div>
         </section>
       ) : null}
+
+      <div style={{ maxWidth: 1380, margin: "0 auto" }}>
+        <MembershipPaymentHistory payments={payments} />
+      </div>
 
       <MembershipBenefits benefits={benefitCards} />
 

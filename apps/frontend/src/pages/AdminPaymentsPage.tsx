@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "../components/Button";
+import { Modal } from "../components/Modal";
 import { Skeleton } from "../components/Skeleton";
 import { Toast } from "../components/Toast";
 import { panelStyle } from "../components/main-menu/styles";
@@ -95,6 +96,14 @@ export function AdminPaymentsPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [rejectingPayment, setRejectingPayment] = useState<PaymentRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
+
+  const [refundingPayment, setRefundingPayment] = useState<PaymentRecord | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   const [revenue, setRevenue] = useState<RevenueReportRow[]>([]);
   const [isLoadingRevenue, setIsLoadingRevenue] = useState(true);
@@ -207,34 +216,82 @@ export function AdminPaymentsPage() {
     }
   }
 
-  async function handleReject(paymentId: string) {
-    setActivePaymentId(paymentId);
+  function openRejectModal(payment: PaymentRecord) {
+    setRejectingPayment(payment);
+    setRejectReason("");
+    setRejectError(null);
+  }
+
+  function closeRejectModal() {
+    setRejectingPayment(null);
+    setRejectReason("");
+    setRejectError(null);
+  }
+
+  async function handleReject() {
+    if (!rejectingPayment) {
+      return;
+    }
+
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError("Please explain why this payment is being rejected.");
+      return;
+    }
+
+    setActivePaymentId(rejectingPayment.id);
+    setRejectError(null);
     setError(null);
     setFeedback(null);
 
     try {
-      await rejectAdminPayment(paymentId, "Bank transfer details do not match");
+      await rejectAdminPayment(rejectingPayment.id, reason);
       setFeedback("Payment rejected.");
+      closeRejectModal();
       await loadPayments(statusFilter);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to reject payment.");
+      setRejectError(nextError instanceof Error ? nextError.message : "Unable to reject payment.");
     } finally {
       setActivePaymentId(null);
     }
   }
 
-  async function handleRefund(paymentId: string) {
-    setActivePaymentId(paymentId);
+  function openRefundModal(payment: PaymentRecord) {
+    setRefundingPayment(payment);
+    setRefundReason("");
+    setRefundError(null);
+  }
+
+  function closeRefundModal() {
+    setRefundingPayment(null);
+    setRefundReason("");
+    setRefundError(null);
+  }
+
+  async function handleRefund() {
+    if (!refundingPayment) {
+      return;
+    }
+
+    const reason = refundReason.trim();
+    if (!reason) {
+      setRefundError("Please explain why this payment is being refunded.");
+      return;
+    }
+
+    setActivePaymentId(refundingPayment.id);
+    setRefundError(null);
     setError(null);
     setFeedback(null);
 
     try {
-      await refundAdminPayment(paymentId, "Refunded by admin");
+      await refundAdminPayment(refundingPayment.id, reason);
       setFeedback("Payment refunded.");
+      closeRefundModal();
       await loadPayments(statusFilter);
       await loadRevenue();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to refund payment.");
+      setRefundError(nextError instanceof Error ? nextError.message : "Unable to refund payment.");
     } finally {
       setActivePaymentId(null);
     }
@@ -617,7 +674,7 @@ export function AdminPaymentsPage() {
                       <button
                         type="button"
                         disabled={activePaymentId === payment.id}
-                        onClick={() => void handleReject(payment.id)}
+                        onClick={() => openRejectModal(payment)}
                         style={{
                           border: "none",
                           borderRadius: 12,
@@ -640,7 +697,7 @@ export function AdminPaymentsPage() {
                     <button
                       type="button"
                       disabled={activePaymentId === payment.id}
-                      onClick={() => void handleRefund(payment.id)}
+                      onClick={() => openRefundModal(payment)}
                       style={{
                         border: "none",
                         borderRadius: 12,
@@ -667,6 +724,184 @@ export function AdminPaymentsPage() {
           </div>
         ) : null}
       </section>
+
+      <Modal isOpen={Boolean(rejectingPayment)} onClose={closeRejectModal}>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#f5f5f5" }}>Reject payment</div>
+
+          {rejectingPayment ? (
+            <div style={{ color: "#9ca8b7", fontSize: 14 }}>
+              {rejectingPayment.user_name ?? rejectingPayment.user_email} &middot; {rejectingPayment.plan_name ?? "Membership payment"} &middot;{" "}
+              {formatCurrency(Number(rejectingPayment.amount || 0))}
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#9ca8b7",
+                marginBottom: 6,
+                display: "block",
+              }}
+            >
+              Reason for rejection
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="e.g. Transfer amount doesn't match the plan price"
+              maxLength={200}
+              rows={3}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.02)",
+                color: "#f5f5f5",
+                padding: "10px 12px",
+                fontSize: 14,
+                boxSizing: "border-box",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          {rejectError ? (
+            <div style={{ borderRadius: 10, padding: 10, background: "rgba(127,29,29,0.28)", color: "#fecaca", fontSize: 13 }}>
+              {rejectError}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button
+              type="button"
+              onClick={closeRejectModal}
+              disabled={activePaymentId === rejectingPayment?.id}
+              style={{
+                minHeight: 44,
+                padding: "0 20px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "transparent",
+                color: "#d3dae5",
+                fontWeight: 700,
+                cursor: activePaymentId === rejectingPayment?.id ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleReject()}
+              disabled={activePaymentId === rejectingPayment?.id}
+              style={{
+                minHeight: 44,
+                padding: "0 22px",
+                borderRadius: 10,
+                border: "none",
+                background: "#ef4444",
+                color: "#fff7f7",
+                fontWeight: 900,
+                cursor: activePaymentId === rejectingPayment?.id ? "not-allowed" : "pointer",
+                opacity: activePaymentId === rejectingPayment?.id ? 0.6 : 1,
+              }}
+            >
+              {activePaymentId === rejectingPayment?.id ? "Rejecting..." : "Reject payment"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(refundingPayment)} onClose={closeRefundModal}>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#f5f5f5" }}>Refund payment</div>
+
+          {refundingPayment ? (
+            <div style={{ color: "#9ca8b7", fontSize: 14 }}>
+              {refundingPayment.user_name ?? refundingPayment.user_email} &middot; {refundingPayment.plan_name ?? "Membership payment"} &middot;{" "}
+              {formatCurrency(Number(refundingPayment.amount || 0))}
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#9ca8b7",
+                marginBottom: 6,
+                display: "block",
+              }}
+            >
+              Reason for refund
+            </label>
+            <textarea
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              placeholder="e.g. Member cancelled within the refund window"
+              maxLength={200}
+              rows={3}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.02)",
+                color: "#f5f5f5",
+                padding: "10px 12px",
+                fontSize: 14,
+                boxSizing: "border-box",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          {refundError ? (
+            <div style={{ borderRadius: 10, padding: 10, background: "rgba(127,29,29,0.28)", color: "#fecaca", fontSize: 13 }}>
+              {refundError}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button
+              type="button"
+              onClick={closeRefundModal}
+              disabled={activePaymentId === refundingPayment?.id}
+              style={{
+                minHeight: 44,
+                padding: "0 20px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "transparent",
+                color: "#d3dae5",
+                fontWeight: 700,
+                cursor: activePaymentId === refundingPayment?.id ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRefund()}
+              disabled={activePaymentId === refundingPayment?.id}
+              style={{
+                minHeight: 44,
+                padding: "0 22px",
+                borderRadius: 10,
+                border: "none",
+                background: "rgba(148,163,184,0.28)",
+                color: "#e2e8f0",
+                fontWeight: 900,
+                cursor: activePaymentId === refundingPayment?.id ? "not-allowed" : "pointer",
+                opacity: activePaymentId === refundingPayment?.id ? 0.6 : 1,
+              }}
+            >
+              {activePaymentId === refundingPayment?.id ? "Refunding..." : "Refund payment"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {toastMessage ? <Toast message={toastMessage} /> : null}
     </AdminPageLayout>

@@ -30,6 +30,45 @@ const getBranchActiveMembers = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/occupancy/admin/branches
+ * Admin lists every branch, including inactive ones, for management.
+ */
+const listAllBranches = asyncHandler(async (req, res) => {
+  const branches = await service.listAllBranches();
+  res.json(ApiResponse.success(branches, OCCUPANCY_MESSAGES.ADMIN_BRANCHES_FETCHED));
+});
+
+/**
+ * POST /api/occupancy/admin/branches
+ * Admin creates a new gym branch.
+ */
+const createBranch = asyncHandler(async (req, res) => {
+  const branch = await service.createBranch(req.body);
+  res.status(201).json(ApiResponse.created(branch, OCCUPANCY_MESSAGES.BRANCH_CREATED));
+});
+
+/**
+ * PATCH /api/occupancy/admin/branches/:branchId
+ * Admin updates a gym branch.
+ */
+const updateBranch = asyncHandler(async (req, res) => {
+  const branch = await service.updateBranch(req.params.branchId, req.body);
+  res.json(ApiResponse.success(branch, OCCUPANCY_MESSAGES.BRANCH_UPDATED));
+});
+
+/**
+ * PATCH /api/occupancy/admin/branches/:branchId/status
+ * Admin deactivates or reactivates a gym branch.
+ */
+const setBranchActive = asyncHandler(async (req, res) => {
+  const branch = await service.setBranchActive(req.params.branchId, req.body.is_active);
+  const message = req.body.is_active
+    ? OCCUPANCY_MESSAGES.BRANCH_REACTIVATED
+    : OCCUPANCY_MESSAGES.BRANCH_DEACTIVATED;
+  res.json(ApiResponse.success(branch, message));
+});
+
+/**
  * GET /api/occupancy/current
  * Return current gym occupancy for all branches or one branch.
  */
@@ -115,6 +154,10 @@ const resetOpenSessions = asyncHandler(async (req, res) => {
 
 module.exports = {
   listBranches,
+  listAllBranches,
+  createBranch,
+  updateBranch,
+  setBranchActive,
   getBranchActiveMembers,
   getCurrentOccupancy,
   checkIn,

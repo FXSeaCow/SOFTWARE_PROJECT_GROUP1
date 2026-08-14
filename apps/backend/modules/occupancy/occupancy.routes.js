@@ -13,6 +13,10 @@
  * Admin routes:
  *   POST /api/occupancy/checkin                    - check in scanned member
  *   POST /api/occupancy/checkout                   - check out scanned member
+ *   GET  /api/occupancy/admin/branches             - list every branch (incl. inactive)
+ *   POST /api/occupancy/admin/branches             - create a branch
+ *   PATCH /api/occupancy/admin/branches/:branchId          - update a branch
+ *   PATCH /api/occupancy/admin/branches/:branchId/status   - activate/deactivate a branch
  *   GET  /api/occupancy/admin/sessions             - all gym sessions
  *   GET  /api/occupancy/admin/daily-report         - daily occupancy report
  *   POST /api/occupancy/admin/reset-open-sessions  - close stale open sessions
@@ -33,6 +37,9 @@ const {
   uuidParam,
   checkInSchema,
   checkOutSchema,
+  createBranchSchema,
+  updateBranchSchema,
+  setBranchActiveSchema,
   sessionsQuerySchema,
   adminSessionsQuerySchema,
   dailyReportQuerySchema,
@@ -100,6 +107,33 @@ router.get(
 // ---------------------------------------------------------------------------
 // Admin routes
 // ---------------------------------------------------------------------------
+
+router.get(
+  '/admin/branches',
+  requireRole('admin'),
+  ctrl.listAllBranches
+);
+
+router.post(
+  '/admin/branches',
+  requireRole('admin'),
+  validate(createBranchSchema),
+  ctrl.createBranch
+);
+
+router.patch(
+  '/admin/branches/:branchId',
+  requireRole('admin'),
+  validate(updateBranchSchema, uuidParam('branchId')),
+  ctrl.updateBranch
+);
+
+router.patch(
+  '/admin/branches/:branchId/status',
+  requireRole('admin'),
+  validate(setBranchActiveSchema, uuidParam('branchId')),
+  ctrl.setBranchActive
+);
 
 router.get(
   '/admin/sessions',

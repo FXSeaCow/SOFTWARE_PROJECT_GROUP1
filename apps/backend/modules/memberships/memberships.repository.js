@@ -182,15 +182,21 @@ const createMembership = async (
   return rows[0];
 };
 
-const findByActivationCode = async (userId, activationCode) => {
+/**
+ * Find a membership by its activation code, regardless of who it was
+ * originally issued to. Activation codes are redeemable by any account.
+ *
+ * @param {string} activationCode
+ * @returns {Promise<object|null>}
+ */
+const findByActivationCode = async (activationCode) => {
   const { rows } = await db.query(
     `SELECT m.*, mp.name AS plan_name, mp.price, mp.duration_days
      FROM memberships m
      JOIN membership_plans mp ON mp.id = m.plan_id
-     WHERE m.user_id = $1
-       AND m.activation_code = $2
+     WHERE m.activation_code = $1
      LIMIT 1`,
-    [userId, activationCode]
+    [activationCode]
   );
   return rows[0] || null;
 };
@@ -212,11 +218,22 @@ const issueActivationCode = async (membershipId, activationCode, adminId, client
   return rows[0] || null;
 };
 
+/**
+ * Activate a membership by code and transfer ownership to whoever redeemed it.
+ * The redeeming account becomes the membership's owner — codes are meant to
+ * be shared and activated by any account, not just the original payer.
+ *
+ * @param {string} membershipId
+ * @param {string} userId - the redeeming account, becomes the new owner
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object|null>}
+ */
 const activateByCode = async (membershipId, userId, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
     `UPDATE memberships
      SET status = 'active',
+         user_id = $1,
          activated_at = now(),
          activation_code = NULL,
          updated_by = $1,
@@ -230,21 +247,30 @@ const activateByCode = async (membershipId, userId, client) => {
 
 /**
  * Update membership status (admin: suspend / cancel / re-activate).
+ * Optionally shifts start_date/end_date — used when re-activating a
+ * membership whose period already ended, so it gets a fresh date range
+ * instead of staying invisible to end_date-based active checks.
  *
  * @param {string} membershipId
  * @param {string} status
  * @param {string} adminId
+ * @param {{ startDate?: string, endDate?: string }} [dates]
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const updateStatus = async (membershipId, status, adminId, client) => {
+const updateStatus = async (membershipId, status, adminId, dates = {}, client) => {
   const runner = client || db;
+  const { startDate, endDate } = dates;
   const { rows } = await runner.query(
     `UPDATE memberships
-     SET status = $1, updated_by = $2, updated_at = now()
+     SET status = $1,
+         updated_by = $2,
+         updated_at = now(),
+         start_date = COALESCE($4, start_date),
+         end_date = COALESCE($5, end_date)
      WHERE id = $3
      RETURNING *`,
-    [status, adminId, membershipId]
+    [status, adminId, membershipId, startDate || null, endDate || null]
   );
   return rows[0] || null;
 };

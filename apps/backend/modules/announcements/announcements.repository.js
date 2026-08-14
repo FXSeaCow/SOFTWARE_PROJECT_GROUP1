@@ -9,12 +9,18 @@ const listAnnouncementHistory = async () => {
        a.published_at,
        a.created_at,
        a.created_by,
+       a.send_to,
        COALESCE(u.full_name, u.email, 'Unknown admin') AS created_by_name,
        COUNT(n.id)::int AS recipient_count,
-       COUNT(*) FILTER (WHERE n.is_read = true)::int AS read_count
+       COUNT(*) FILTER (WHERE n.is_read = true)::int AS read_count,
+       COALESCE(
+         array_agg(DISTINCT COALESCE(ru.full_name, ru.email)) FILTER (WHERE a.send_to = 'selected' AND ru.id IS NOT NULL),
+         ARRAY[]::text[]
+       ) AS recipient_names
      FROM announcements a
      LEFT JOIN users u ON u.id = a.created_by
      LEFT JOIN notifications n ON n.announcement_id = a.id
+     LEFT JOIN users ru ON ru.id = n.user_id
      GROUP BY a.id, u.full_name, u.email
      ORDER BY a.published_at DESC, a.created_at DESC`
   );
@@ -47,13 +53,13 @@ const findAllRecipientUsers = async (client) => {
   return rows;
 };
 
-const createAnnouncement = async ({ createdBy, title, body, publishedAt }, client) => {
+const createAnnouncement = async ({ createdBy, title, body, publishedAt, sendTo }, client) => {
   const runner = client || db;
   const { rows } = await runner.query(
-    `INSERT INTO announcements (created_by, title, body, published_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO announcements (created_by, title, body, published_at, send_to)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [createdBy, title, body, publishedAt]
+    [createdBy, title, body, publishedAt, sendTo]
   );
 
   return rows[0];

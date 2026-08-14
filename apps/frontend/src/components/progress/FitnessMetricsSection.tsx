@@ -123,6 +123,17 @@ export function FitnessMetricsSection() {
     [progress],
   );
 
+  const bodyFatSeries: ChartPoint[] = useMemo(
+    () =>
+      (progress?.trend ?? [])
+        .filter((point) => point.body_fat_pct !== null)
+        .map((point) => ({
+          label: formatDateLabel(point.recorded_date),
+          value: point.body_fat_pct as number,
+        })),
+    [progress],
+  );
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setFormError(null);
@@ -370,6 +381,14 @@ export function FitnessMetricsSection() {
         {loadError ? <div style={{ color: "#fca5a5", fontSize: 13, marginBottom: 14 }}>{loadError}</div> : null}
 
         <FitnessMetricsChart points={weightSeries} unit="kg" />
+      </section>
+
+      <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, textTransform: "uppercase", letterSpacing: "-0.03em", marginBottom: 18 }}>
+          Body Fat Trend
+        </div>
+
+        <FitnessMetricsChart points={bodyFatSeries} unit="%" accent="#4fa3ff" />
       </section>
 
       <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>

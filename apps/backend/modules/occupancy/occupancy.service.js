@@ -336,6 +336,21 @@ const syncWorkoutCheckinAndStreak = async (
 };
 
 /**
+ * Format a branch row for admin management screens, including fields that
+ * formatBranchMetadata omits (capacity, active status).
+ *
+ * @param {object} branch
+ * @returns {object}
+ */
+const formatBranchAdmin = (branch) => ({
+  ...formatBranchMetadata(branch),
+  capacity: branch.capacity,
+  is_active: branch.is_active,
+  created_at: branch.created_at,
+  updated_at: branch.updated_at,
+});
+
+/**
  * List active branches with their current occupancy summaries.
  *
  * @returns {Promise<object[]>}
@@ -343,6 +358,77 @@ const syncWorkoutCheckinAndStreak = async (
 const listBranches = async () => {
   const current = await getCurrentOccupancy();
   return current.branches;
+};
+
+/**
+ * Admin: list every branch (active and inactive) for management screens.
+ *
+ * @returns {Promise<object[]>}
+ */
+const listAllBranches = async () => {
+  const branches = await repo.findAllBranches();
+  return branches.map(formatBranchAdmin);
+};
+
+/**
+ * Admin: create a new gym branch.
+ *
+ * @param {{ name: string, address?: string, city?: string, phone?: string, opening_time?: string, closing_time?: string, capacity?: number }} data
+ * @returns {Promise<object>}
+ */
+const createBranch = async (data) => {
+  const branch = await repo.createBranch({
+    name: data.name,
+    address: data.address,
+    city: data.city,
+    phone: data.phone,
+    opening_time: data.opening_time,
+    closing_time: data.closing_time,
+    capacity: data.capacity ?? DEFAULT_GYM_CAPACITY,
+  });
+
+  logger.info('Gym branch created', { branchId: branch.id, name: branch.name });
+  return formatBranchAdmin(branch);
+};
+
+/**
+ * Admin: update an existing gym branch. Only provided fields change.
+ *
+ * @param {string} branchId
+ * @param {object} data
+ * @returns {Promise<object>}
+ */
+const updateBranch = async (branchId, data) => {
+  const existing = await repo.findBranchByIdAny(branchId);
+  if (!existing) throw ApiError.notFound('Gym branch');
+
+  const fields = {};
+  ['name', 'address', 'city', 'phone', 'opening_time', 'closing_time', 'capacity'].forEach((key) => {
+    if (data[key] !== undefined) fields[key] = data[key];
+  });
+
+  const branch = await repo.updateBranch(branchId, fields);
+  logger.info('Gym branch updated', { branchId, fields: Object.keys(fields) });
+  return formatBranchAdmin(branch);
+};
+
+/**
+ * Admin: deactivate or reactivate a gym branch.
+ *
+ * Branches are soft-deleted (is_active = false) so historical sessions and
+ * check-ins that reference the branch stay intact.
+ *
+ * @param {string} branchId
+ * @param {boolean} isActive
+ * @returns {Promise<object>}
+ */
+const setBranchActive = async (branchId, isActive) => {
+  const existing = await repo.findBranchByIdAny(branchId);
+  if (!existing) throw ApiError.notFound('Gym branch');
+
+  const branch = await repo.updateBranch(branchId, { is_active: isActive });
+  logger.info(isActive ? 'Gym branch reactivated' : 'Gym branch deactivated', { branchId });
+  return formatBranchAdmin(branch);
 };
 
 /**
@@ -686,6 +772,10 @@ const getOccupancyCache = () => occupancyCache;
 
 module.exports = {
   listBranches,
+  listAllBranches,
+  createBranch,
+  updateBranch,
+  setBranchActive,
   getBranchActiveMembers,
   getCurrentOccupancy,
   checkIn,

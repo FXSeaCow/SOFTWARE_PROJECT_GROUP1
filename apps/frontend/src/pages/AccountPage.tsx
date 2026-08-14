@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, Mail, QrCode, ShieldCheck, User } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Mail, Phone, QrCode, ShieldCheck, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
@@ -7,13 +7,39 @@ import { MainMenuHeader } from "../components/main-menu/MainMenuHeader";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import { panelStyle, startButtonStyle } from "../components/main-menu/styles";
 import { AppShell } from "../layouts/AppShell";
-import { getCurrentUser, logout } from "../services/authService";
+import { getCurrentUser, logout, updateStoredUserName } from "../services/authService";
 import {
   changeMyPassword,
   getMyProfile,
   getMyQrCode,
+  updateMyProfile,
   UserProfile,
 } from "../services/userService";
+
+type ProfileFormState = {
+  fullName: string;
+  phone: string;
+};
+
+type ProfileFormErrors = Partial<Record<keyof ProfileFormState, string>> & {
+  form?: string;
+};
+
+function validateProfileForm(values: ProfileFormState): ProfileFormErrors {
+  const errors: ProfileFormErrors = {};
+
+  if (!values.fullName.trim()) {
+    errors.fullName = "Full name is required";
+  } else if (values.fullName.trim().length < 2) {
+    errors.fullName = "Full name must be at least 2 characters";
+  }
+
+  if (values.phone.trim() && !/^\+?[0-9\s\-().]{7,20}$/.test(values.phone.trim())) {
+    errors.phone = "Please provide a valid phone number";
+  }
+
+  return errors;
+}
 
 type PasswordFormState = {
   currentPassword: string;
@@ -178,6 +204,10 @@ export function AccountPage() {
   const [errors, setErrors] = useState<PasswordFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState<ProfileFormState>({ fullName: "", phone: "" });
+  const [profileErrors, setProfileErrors] = useState<ProfileFormErrors>({});
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSuccessMessage, setProfileSuccessMessage] = useState<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -210,6 +240,7 @@ export function AccountPage() {
       try {
         const [nextProfile, nextQrCode] = await Promise.all([getMyProfile(), getMyQrCode()]);
         setProfile(nextProfile);
+        setProfileForm({ fullName: nextProfile.full_name || "", phone: nextProfile.phone || "" });
         setQrCode(nextQrCode.qrCode);
       } catch (error) {
         setErrors({
@@ -225,6 +256,42 @@ export function AccountPage() {
 
     void loadProfile();
   }, []);
+
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileSuccessMessage(null);
+
+    const nextErrors = validateProfileForm(profileForm);
+    setProfileErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    try {
+      const updated = await updateMyProfile({
+        full_name: profileForm.fullName.trim(),
+        phone: profileForm.phone.trim() || null,
+      });
+
+      setProfile(updated);
+      setProfileForm({ fullName: updated.full_name || "", phone: updated.phone || "" });
+      updateStoredUserName(updated.full_name);
+      setProfileSuccessMessage("Profile updated successfully");
+      setProfileErrors({});
+    } catch (error) {
+      setProfileErrors({
+        form:
+          error instanceof Error
+            ? error.message
+            : "Unable to update profile. Please try again.",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -390,7 +457,7 @@ export function AccountPage() {
                 gap: 14,
               }}
             >
-              <div
+              <section
                 style={{
                   padding: 16,
                   borderRadius: 16,
@@ -400,22 +467,83 @@ export function AccountPage() {
               >
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
                     color: "#9ca8b7",
                     fontSize: 13,
                     textTransform: "uppercase",
-                    marginBottom: 10,
+                    marginBottom: 14,
                   }}
                 >
-                  <User size={16} />
-                  <span>Full name</span>
+                  Personal details
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>
-                  {profile?.full_name || currentUser?.name || "Unknown"}
-                </div>
-              </div>
+
+                <form
+                  onSubmit={(event) => void handleProfileSubmit(event)}
+                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                >
+                  <DarkInput
+                    label="Full name"
+                    value={profileForm.fullName}
+                    onChange={(value) =>
+                      setProfileForm((current) => ({ ...current, fullName: value }))
+                    }
+                    placeholder="Enter your full name"
+                    error={profileErrors.fullName}
+                    leftIcon={<User size={18} />}
+                  />
+
+                  <DarkInput
+                    label="Phone number"
+                    type="tel"
+                    value={profileForm.phone}
+                    onChange={(value) =>
+                      setProfileForm((current) => ({ ...current, phone: value }))
+                    }
+                    placeholder="Enter your phone number"
+                    error={profileErrors.phone}
+                    leftIcon={<Phone size={18} />}
+                  />
+
+                  {profileErrors.form ? (
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        background: "rgba(127,29,29,0.32)",
+                        color: "#fecaca",
+                        fontSize: 14,
+                      }}
+                    >
+                      {profileErrors.form}
+                    </div>
+                  ) : null}
+
+                  {profileSuccessMessage ? (
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        background: "rgba(22,101,52,0.28)",
+                        color: "#bbf7d0",
+                        fontSize: 14,
+                      }}
+                    >
+                      {profileSuccessMessage}
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="submit"
+                    isLoading={isSavingProfile}
+                    loadingText="Saving..."
+                    style={{
+                      background: "#ff7a1a",
+                      color: "#111111",
+                    }}
+                  >
+                    Save changes
+                  </Button>
+                </form>
+              </section>
 
               <div
                 style={{
