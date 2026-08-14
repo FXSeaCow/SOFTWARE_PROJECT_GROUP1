@@ -147,6 +147,107 @@ const GOAL_SUGGESTIONS = [
   "I'm just starting out, I want to get healthier",
 ];
 
+type GuidedFitnessLevel = "beginner" | "intermediate" | "advanced";
+type GuidedGoal = "muscle_gain" | "weight_loss" | "endurance" | "flexibility" | "general_fitness";
+
+const GUIDED_GOALS: Array<{ value: GuidedGoal; label: string }> = [
+  { value: "muscle_gain", label: "Build muscle" },
+  { value: "weight_loss", label: "Lose weight" },
+  { value: "endurance", label: "Endurance" },
+  { value: "flexibility", label: "Flexibility" },
+  { value: "general_fitness", label: "General fitness" },
+];
+
+const GUIDED_FITNESS_LEVELS: Array<{ value: GuidedFitnessLevel; label: string }> = [
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+];
+
+const GUIDED_DEFAULT_SPLITS: Record<number, string[][]> = {
+  2: [["chest", "back", "legs"], ["shoulders", "arms", "core"]],
+  3: [["chest", "shoulders", "arms"], ["back", "arms"], ["legs", "core"]],
+  4: [["chest", "arms"], ["back", "arms"], ["legs", "core"], ["shoulders", "core"]],
+  5: [["chest", "arms"], ["back"], ["legs"], ["shoulders", "arms"], ["core", "cardio"]],
+  6: [["chest"], ["back"], ["legs"], ["shoulders"], ["arms", "core"], ["cardio", "core"]],
+};
+
+const GUIDED_FOCUS_GROUPS = [
+  "chest",
+  "back",
+  "legs",
+  "shoulders",
+  "arms",
+  "core",
+  "cardio",
+  "full_body",
+];
+
+const GUIDED_LEVEL_RANK: Record<GuidedFitnessLevel, number> = {
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+};
+
+const GUIDED_VOLUME: Record<GuidedGoal, Record<GuidedFitnessLevel, { sets: number; reps: number; restSeconds: number }>> = {
+  muscle_gain: {
+    beginner: { sets: 3, reps: 10, restSeconds: 90 },
+    intermediate: { sets: 4, reps: 8, restSeconds: 90 },
+    advanced: { sets: 5, reps: 6, restSeconds: 120 },
+  },
+  weight_loss: {
+    beginner: { sets: 3, reps: 15, restSeconds: 45 },
+    intermediate: { sets: 4, reps: 12, restSeconds: 40 },
+    advanced: { sets: 4, reps: 15, restSeconds: 30 },
+  },
+  endurance: {
+    beginner: { sets: 2, reps: 20, restSeconds: 30 },
+    intermediate: { sets: 3, reps: 20, restSeconds: 30 },
+    advanced: { sets: 4, reps: 20, restSeconds: 20 },
+  },
+  flexibility: {
+    beginner: { sets: 2, reps: 12, restSeconds: 60 },
+    intermediate: { sets: 3, reps: 12, restSeconds: 60 },
+    advanced: { sets: 3, reps: 15, restSeconds: 45 },
+  },
+  general_fitness: {
+    beginner: { sets: 3, reps: 12, restSeconds: 60 },
+    intermediate: { sets: 3, reps: 10, restSeconds: 60 },
+    advanced: { sets: 4, reps: 10, restSeconds: 60 },
+  },
+};
+
+function getExerciseDifficultyRank(difficulty?: string | null) {
+  if (difficulty === "advanced") return 3;
+  if (difficulty === "intermediate") return 2;
+  return 1;
+}
+
+function getGuidedGroupsForDay(
+  dayIndex: number,
+  daysPerWeekValue: number,
+  focusGroups: string[],
+  goal: GuidedGoal,
+) {
+  const template = GUIDED_DEFAULT_SPLITS[daysPerWeekValue] ?? GUIDED_DEFAULT_SPLITS[3];
+  const groups = focusGroups.length
+    ? [
+        focusGroups[dayIndex % focusGroups.length],
+        ...(focusGroups.length > 1 ? [focusGroups[(dayIndex + 1) % focusGroups.length]] : []),
+      ]
+    : template[dayIndex % template.length];
+
+  if ((goal === "weight_loss" || goal === "endurance") && !groups.includes("cardio")) {
+    groups.push("cardio");
+  }
+
+  if (goal === "flexibility" && !groups.includes("core")) {
+    groups.push("core");
+  }
+
+  return [...new Set(groups)];
+}
+
 export function SchedulePage() {
   const isMobile = useIsMobile();
   const isCompactLayout = useIsMobile(1100);
@@ -181,6 +282,11 @@ export function SchedulePage() {
   const [smartMessage, setSmartMessage] = useState<string | null>(null);
   const [isSmartPanelOpen, setIsSmartPanelOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [guidedFitnessLevel, setGuidedFitnessLevel] = useState<GuidedFitnessLevel>("beginner");
+  const [guidedGoal, setGuidedGoal] = useState<GuidedGoal>("general_fitness");
+  const [guidedFocusGroups, setGuidedFocusGroups] = useState<string[]>([]);
+  const [guidedDayPeriods, setGuidedDayPeriods] = useState<Partial<Record<number, SchedulePeriod>>>({});
+  const [guidedMessage, setGuidedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -323,6 +429,19 @@ export function SchedulePage() {
     });
   }, [exercises, searchTerm, selectedMuscleGroup]);
 
+  const availableGuidedFocusGroups = useMemo(() => {
+    const catalogGroups = new Set(exercises.map((exercise) => exercise.muscle_group).filter(Boolean));
+    return GUIDED_FOCUS_GROUPS.filter((group) => catalogGroups.has(group));
+  }, [exercises]);
+
+  const guidedSelectedDays = useMemo(
+    () =>
+      scheduleDays
+        .map((day) => day.value)
+        .filter((day) => guidedDayPeriods[day] === "morning" || guidedDayPeriods[day] === "afternoon"),
+    [guidedDayPeriods],
+  );
+
   function addExerciseToCell(day: number, period: SchedulePeriod, exerciseId: string) {
     const exercise = getExerciseById(exercises, exerciseId);
     if (!exercise) {
@@ -350,6 +469,147 @@ export function SchedulePage() {
     addExerciseToCell(day, periodValue, exerciseId);
     const scrollTarget = isCompactLayout ? calendarSectionsRef.current : scheduleGridRef.current;
     scrollTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleGuidedFocusGroup(group: string) {
+    setGuidedFocusGroups((current) =>
+      current.includes(group)
+        ? current.filter((item) => item !== group)
+        : [...current, group],
+    );
+    setGuidedMessage(null);
+  }
+
+  function toggleGuidedDayPeriod(day: number, period: SchedulePeriod) {
+    setGuidedDayPeriods((current) => {
+      const next = { ...current };
+
+      if (next[day] === period) {
+        delete next[day];
+      } else {
+        next[day] = period;
+      }
+
+      return next;
+    });
+    setGuidedMessage(null);
+  }
+
+  function selectGuidedTrainingDay(day: number) {
+    setGuidedDayPeriods((current) => {
+      if (current[day]) {
+        const next = { ...current };
+        delete next[day];
+        return next;
+      }
+
+      return {
+        ...current,
+        [day]: "morning",
+      };
+    });
+    setGuidedMessage(null);
+  }
+
+  function pickGuidedExercisesForGroup(group: string, usedExerciseIds: Set<string>, count: number) {
+    const maxDifficultyRank = GUIDED_LEVEL_RANK[guidedFitnessLevel];
+    const candidates = exercises
+      .filter((exercise) => exercise.muscle_group === group)
+      .filter((exercise) => getExerciseDifficultyRank(exercise.difficulty) <= maxDifficultyRank);
+
+    const fallbackCandidates = candidates.length > 0
+      ? candidates
+      : exercises.filter((exercise) => exercise.muscle_group === group);
+
+    return [...fallbackCandidates]
+      .map((exercise) => {
+        const tags = exercise.goal_tags ?? [];
+        const goalScore = tags.includes(guidedGoal) ? 4 : 0;
+        const unusedScore = usedExerciseIds.has(exercise.id) ? 0 : 2;
+        const exactLevelScore = exercise.difficulty === guidedFitnessLevel ? 1 : 0;
+        return { exercise, score: goalScore + unusedScore + exactLevelScore };
+      })
+      .sort((left, right) =>
+        right.score !== left.score
+          ? right.score - left.score
+          : left.exercise.name.localeCompare(right.exercise.name),
+      )
+      .slice(0, count)
+      .map(({ exercise }) => exercise);
+  }
+
+  function handleGenerateGuidedPlan() {
+    setGuidedMessage(null);
+    setSmartError(null);
+
+    if (isLoading) {
+      setGuidedMessage("Exercise catalog is still loading.");
+      return;
+    }
+
+    if (exercises.length === 0) {
+      setGuidedMessage("No exercises are available to generate a schedule.");
+      return;
+    }
+
+    if (guidedSelectedDays.length === 0) {
+      setGuidedMessage("Please select at least one training day.");
+      return;
+    }
+
+    const nextSchedule = createEmptySchedule();
+    const usedExerciseIds = new Set<string>();
+    const volume = GUIDED_VOLUME[guidedGoal][guidedFitnessLevel];
+    const guidedDaysPerWeek = Math.min(Math.max(guidedSelectedDays.length, 2), 6);
+    const exercisesPerSession =
+      guidedFitnessLevel === "advanced" ? 6 : guidedFitnessLevel === "intermediate" ? 5 : 4;
+
+    guidedSelectedDays.forEach((day, dayIndex) => {
+      const groups = getGuidedGroupsForDay(
+        dayIndex,
+        guidedDaysPerWeek,
+        guidedFocusGroups,
+        guidedGoal,
+      );
+      const perGroupCount = Math.max(1, Math.ceil(exercisesPerSession / groups.length));
+      const selectedExercises: Exercise[] = [];
+
+      groups.forEach((group) => {
+        pickGuidedExercisesForGroup(group, usedExerciseIds, perGroupCount).forEach((exercise) => {
+          if (selectedExercises.length < exercisesPerSession) {
+            selectedExercises.push(exercise);
+            usedExerciseIds.add(exercise.id);
+          }
+        });
+      });
+
+      const period = guidedDayPeriods[day] ?? "morning";
+      const key = getScheduleCellKey(day, period);
+      nextSchedule[key] = {
+        ...nextSchedule[key],
+        entries: selectedExercises.map((exercise) => ({
+          id: `${exercise.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          exerciseId: exercise.id,
+          sets: volume.sets,
+          reps: volume.reps,
+          restSeconds: volume.restSeconds,
+        })),
+      };
+    });
+
+    setSchedule(nextSchedule);
+    setSelectedCellKey(
+      getScheduleCellKey(
+        guidedSelectedDays[0],
+        guidedDayPeriods[guidedSelectedDays[0]] ?? "morning",
+      ),
+    );
+    setSaveMessage(null);
+    setGuidedMessage(
+      `Generated ${guidedSelectedDays.length} session(s). Review the schedule, then click Save to keep it as your active plan.`,
+    );
+    const scrollTarget = isCompactLayout ? calendarSectionsRef.current : scheduleGridRef.current;
+    window.setTimeout(() => scrollTarget?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   function handleSelectDay(index: number) {
@@ -871,6 +1131,225 @@ export function SchedulePage() {
           {saveMessage}
         </div>
       ) : null}
+
+      <section style={{ ...panelStyle, marginBottom: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "start",
+            justifyContent: "space-between",
+            gap: 14,
+            marginBottom: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 5 }}>Plan builder</div>
+            <div style={{ color: "#9ca8b7", fontSize: 13 }}>
+              Pick your training options and generate a schedule from the exercise catalog.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGenerateGuidedPlan}
+            disabled={isLoading}
+            style={{
+              ...startButtonStyle,
+              width: "auto",
+              opacity: isLoading ? 0.66 : 1,
+              cursor: isLoading ? "wait" : "pointer",
+            }}
+          >
+            <Sparkles size={17} />
+            Generate plan
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile
+              ? "minmax(0, 1fr)"
+              : "repeat(2, minmax(0, 1fr))",
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          <label style={{ display: "grid", gap: 7 }}>
+            <span style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase" }}>
+              Fitness level
+            </span>
+            <select
+              value={guidedFitnessLevel}
+              onChange={(event) => {
+                setGuidedFitnessLevel(event.target.value as GuidedFitnessLevel);
+                setGuidedMessage(null);
+              }}
+              style={{
+                minHeight: 44,
+                borderRadius: 12,
+                background: "#1f1f1f",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#f5f5f5",
+                padding: "0 12px",
+                fontSize: 14,
+              }}
+            >
+              {GUIDED_FITNESS_LEVELS.map((level) => (
+                <option key={level.value} value={level.value}>
+                  {level.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 7 }}>
+            <span style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase" }}>
+              Goal
+            </span>
+            <select
+              value={guidedGoal}
+              onChange={(event) => {
+                setGuidedGoal(event.target.value as GuidedGoal);
+                setGuidedMessage(null);
+              }}
+              style={{
+                minHeight: 44,
+                borderRadius: 12,
+                background: "#1f1f1f",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#f5f5f5",
+                padding: "0 12px",
+                fontSize: 14,
+              }}
+            >
+              {GUIDED_GOALS.map((goal) => (
+                <option key={goal.value} value={goal.value}>
+                  {goal.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          <div>
+            <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>
+              Focus areas
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {availableGuidedFocusGroups.map((group) => {
+                const isSelected = guidedFocusGroups.includes(group);
+                return (
+                  <button
+                    key={group}
+                    type="button"
+                    onClick={() => toggleGuidedFocusGroup(group)}
+                    style={{
+                      borderRadius: 999,
+                      border: isSelected
+                        ? "1px solid rgba(255,122,26,0.42)"
+                        : "1px solid rgba(255,255,255,0.08)",
+                      background: isSelected ? "rgba(255,122,26,0.14)" : "rgba(255,255,255,0.03)",
+                      color: isSelected ? "#ffb15f" : "#cfd5df",
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {formatLabel(group)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ color: "#9ca8b7", fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>
+              Training days ({guidedSelectedDays.length})
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+              {scheduleDays.map((day) => {
+                const selectedPeriod = guidedDayPeriods[day.value];
+                return (
+                  <div
+                    key={day.value}
+                    onClick={() => selectGuidedTrainingDay(day.value)}
+                    style={{
+                      minHeight: 74,
+                      borderRadius: 12,
+                      border: selectedPeriod
+                        ? "1px solid rgba(96,165,250,0.5)"
+                        : "1px solid rgba(255,255,255,0.08)",
+                      background: selectedPeriod ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.03)",
+                      padding: 7,
+                      display: "grid",
+                      gap: 6,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: selectedPeriod ? "#bfdbfe" : "#cfd5df",
+                        fontSize: 12,
+                        fontWeight: 900,
+                        textAlign: "center",
+                      }}
+                    >
+                      {day.shortLabel}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 5 }}>
+                      {schedulePeriods.map((period) => {
+                        const isPeriodSelected = selectedPeriod === period.value;
+                        return (
+                          <button
+                            key={period.value}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleGuidedDayPeriod(day.value, period.value);
+                            }}
+                            style={{
+                              minHeight: 30,
+                              borderRadius: 8,
+                              border: isPeriodSelected
+                                ? "1px solid rgba(255,122,26,0.5)"
+                                : "1px solid rgba(255,255,255,0.08)",
+                              background: isPeriodSelected
+                                ? "rgba(255,122,26,0.18)"
+                                : "rgba(255,255,255,0.03)",
+                              color: isPeriodSelected ? "#ffb15f" : "#9ca8b7",
+                              fontSize: 11,
+                              fontWeight: 900,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {period.value === "morning" ? "AM" : "PM"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {guidedMessage ? (
+          <div
+            style={{
+              marginTop: 12,
+              color: guidedMessage.startsWith("Generated") ? "#bbf7d0" : "#fecaca",
+              fontSize: 13,
+            }}
+          >
+            {guidedMessage}
+          </div>
+        ) : null}
+      </section>
 
       {isCompactLayout ? (
         <div ref={calendarSectionsRef} style={{ maxWidth: 720, margin: "0 auto", width: "100%" }}>
