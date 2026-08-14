@@ -186,7 +186,7 @@ export function ChangePasswordPage() {
             }}
           >
             <div style={{ flex: "1 1 220px" }}>
-              <Button type="submit" isLoading={isSubmitting}>
+              <Button type="submit" isLoading={isSubmitting} loadingText="Saving new password...">
                 Save new password
               </Button>
             </div>

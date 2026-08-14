@@ -35,7 +35,7 @@ export function Button({
   className,
   variant = "primary",
   leftIcon,
-  loadingText = "Signing in...",
+  loadingText = "Loading...",
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || isLoading;

@@ -292,7 +292,7 @@ export function LoginForm() {
         ) : null}
 
         {/* Sign in */}
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" isLoading={isSubmitting} loadingText="Signing in...">
           Sign in
         </Button>
 
@@ -338,6 +338,7 @@ export function LoginForm() {
           type="button"
           variant="outline"
           isLoading={isGoogleSubmitting}
+          loadingText="Signing in with Google..."
           leftIcon={
             <span
               style={{

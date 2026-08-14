@@ -317,7 +317,7 @@ export function RegisterForm() {
           <div style={{ height: 18 }} />
         )}
 
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" isLoading={isSubmitting} loadingText="Creating account...">
           Create account
         </Button>
 
