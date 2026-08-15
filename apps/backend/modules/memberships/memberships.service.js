@@ -366,9 +366,13 @@ const updateMembershipStatus = async (membershipId, status, adminId) => {
   const existing = await repo.findById(membershipId);
   if (!existing) throw ApiError.notFound('Membership');
 
-  let dates;
-
   if (status === 'active') {
+    if (existing.status === 'expired') {
+      throw ApiError.badRequest('Expired memberships cannot be re-activated');
+    }
+
+    let dates;
+
     const todayStr = formatDateOnly(new Date());
     const endDateStr = formatDateOnly(existing.end_date);
 
@@ -377,11 +381,28 @@ const updateMembershipStatus = async (membershipId, status, adminId) => {
       const newEnd = computeEndDate(newStart, existing.duration_days);
       dates = { startDate: formatDateOnly(newStart), endDate: formatDateOnly(newEnd) };
     }
+
+    const updated = await repo.updateStatus(membershipId, status, adminId, dates);
+    logger.info('Membership status updated', { membershipId, status, adminId, extended: Boolean(dates) });
+    return normalizeMembershipDates(updated);
   }
 
-  const updated = await repo.updateStatus(membershipId, status, adminId, dates);
-  logger.info('Membership status updated', { membershipId, status, adminId, extended: Boolean(dates) });
-  return normalizeMembershipDates(updated);
+  const updatedCount = await withTransaction(async (client) => {
+    return repo.updateStatusByUser(existing.user_id, status, adminId, client);
+  });
+
+  logger.info('Membership statuses updated for user', {
+    membershipId,
+    userId: existing.user_id,
+    status,
+    adminId,
+    updatedCount,
+  });
+
+  return {
+    ...normalizeMembershipDates(existing),
+    status,
+  };
 };
 
 /**

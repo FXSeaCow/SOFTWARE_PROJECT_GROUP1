@@ -721,6 +721,31 @@ describe('PATCH /api/memberships/admin/:membershipId/status', () => {
     expect(res.body.data.status).toBe('cancelled');
   });
 
+  it('should suspend all active stacked memberships for the same user', async () => {
+    const { user: member } = await registerAndLogin();
+    const plan = await seedPlan();
+    const firstMembership = await seedMembership(member.id, plan.id);
+    const secondMembership = await seedMembership(member.id, plan.id);
+    const { accessToken } = await registerAndLoginAdmin();
+
+    const res = await request(app)
+      .patch(`/api/memberships/admin/${secondMembership.id}/status`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'suspended' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('suspended');
+
+    const { rows } = await db.query(
+      `SELECT id, status FROM memberships WHERE user_id = $1 ORDER BY created_at ASC`,
+      [member.id]
+    );
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => expect(row.status).toBe('suspended'));
+    expect(rows.some((row) => row.id === firstMembership.id)).toBe(true);
+    expect(rows.some((row) => row.id === secondMembership.id)).toBe(true);
+  });
+
   it('should re-activate a suspended membership', async () => {
     const { user: member } = await registerAndLogin();
     const plan = await seedPlan();
