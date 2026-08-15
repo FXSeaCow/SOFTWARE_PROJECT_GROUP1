@@ -102,6 +102,13 @@ function pillStyle(colors: { background: string; color: string }): React.CSSProp
   };
 }
 
+function darkOptionStyle(): React.CSSProperties {
+  return {
+    color: "#f5f5f5",
+    backgroundColor: "#161616",
+  };
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -689,11 +696,12 @@ export function AdminUsersPage() {
                   padding: "0 34px 0 14px",
                   appearance: "none",
                   fontSize: 14,
+                  colorScheme: "dark",
                 }}
               >
-                <option value="all">Role</option>
-                <option value="admin">Admin</option>
-                <option value="member">Member</option>
+                <option value="all" style={darkOptionStyle()}>Role</option>
+                <option value="admin" style={darkOptionStyle()}>Admin</option>
+                <option value="member" style={darkOptionStyle()}>Member</option>
               </select>
               <ChevronDown
                 size={16}
@@ -717,11 +725,12 @@ export function AdminUsersPage() {
                   padding: "0 34px 0 14px",
                   appearance: "none",
                   fontSize: 14,
+                  colorScheme: "dark",
                 }}
               >
-                <option value="all">Status</option>
-                <option value="active">Active</option>
-                <option value="locked">Locked</option>
+                <option value="all" style={darkOptionStyle()}>Status</option>
+                <option value="active" style={darkOptionStyle()}>Active</option>
+                <option value="locked" style={darkOptionStyle()}>Locked</option>
               </select>
               <ChevronDown
                 size={16}
@@ -1598,8 +1607,7 @@ function SelectValue({
 
           return React.cloneElement(child as React.ReactElement<{ style?: React.CSSProperties }>, {
             style: {
-              color: "#111111",
-              backgroundColor: "#ffffff",
+              ...darkOptionStyle(),
               ...child.props.style,
             },
           });

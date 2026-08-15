@@ -108,6 +108,13 @@ function formatBranchOption(branch: BranchOccupancy) {
   return `${branch.branch_name}${city} (${branch.current_occupancy}/${branch.capacity})`;
 }
 
+function darkOptionStyle(): React.CSSProperties {
+  return {
+    color: "#f5f5f5",
+    backgroundColor: "#161616",
+  };
+}
+
 export function AdminOccupancyPage() {
   const isMobile = useIsMobile();
   const [occupancy, setOccupancy] = useState<CurrentOccupancy | null>(null);
@@ -665,11 +672,14 @@ export function AdminOccupancyPage() {
               color: "#f5f5f5",
               padding: "0 12px",
               fontSize: 13,
+              colorScheme: "dark",
             }}
           >
-            {branchOptions.length === 0 ? <option value="">No active branches</option> : null}
+            {branchOptions.length === 0 ? (
+              <option value="" style={darkOptionStyle()}>No active branches</option>
+            ) : null}
             {branchOptions.map((branch) => (
-              <option key={branch.branch_id} value={branch.branch_id}>
+              <option key={branch.branch_id} value={branch.branch_id} style={darkOptionStyle()}>
                 {formatBranchOption(branch)}
               </option>
             ))}
@@ -767,11 +777,12 @@ export function AdminOccupancyPage() {
                 color: "#f5f5f5",
                 padding: "0 12px",
                 fontSize: 13,
+                colorScheme: "dark",
               }}
             >
-              <option value="">All branches</option>
+              <option value="" style={darkOptionStyle()}>All branches</option>
               {branchOptions.map((branch) => (
-                <option key={branch.branch_id} value={branch.branch_id}>
+                <option key={branch.branch_id} value={branch.branch_id} style={darkOptionStyle()}>
                   {formatBranchOption(branch)}
                 </option>
               ))}
@@ -869,11 +880,12 @@ export function AdminOccupancyPage() {
               color: "#f5f5f5",
               padding: "0 12px",
               fontSize: 13,
+              colorScheme: "dark",
             }}
           >
-            <option value="">All branches</option>
+            <option value="" style={darkOptionStyle()}>All branches</option>
             {branchOptions.map((branch) => (
-              <option key={branch.branch_id} value={branch.branch_id}>
+              <option key={branch.branch_id} value={branch.branch_id} style={darkOptionStyle()}>
                 {formatBranchOption(branch)}
               </option>
             ))}

@@ -215,6 +215,46 @@ export type GenerateWorkoutPlanResponse = {
   schedule: GeneratedPlanDay[];
 };
 
+export type WorkoutPlanSummary = {
+  id: string;
+  title: string;
+  goal?: string | null;
+  fitness_level: string;
+  is_active: boolean;
+  is_customized: boolean;
+  created_at: string;
+};
+
+export type WorkoutPlanScheduleExercise = {
+  entry_id: string;
+  exercise_id: string;
+  sets: number;
+  reps: number;
+  rest_seconds?: number | null;
+  scheduled_period?: SchedulePeriod | null;
+  scheduled_time?: string | null;
+  order_index: number;
+};
+
+export type WorkoutPlanScheduleDay = {
+  day_id: string;
+  day_of_week: number;
+  day_label: string;
+  is_rest_day: boolean;
+  exercises: WorkoutPlanScheduleExercise[];
+};
+
+export type WorkoutPlanSchedule = {
+  plan: WorkoutPlanSummary;
+  schedule: WorkoutPlanScheduleDay[];
+};
+
+export type WorkoutPlanDayRef = {
+  id?: string;
+  day_id?: string;
+  day_of_week: number;
+};
+
 export async function generateSmartWorkoutPlan({
   title,
   goal,
@@ -282,6 +322,46 @@ export function applyGeneratedPlanToWeeklySchedule(
   return nextSchedule;
 }
 
+export function applySavedPlanToWeeklySchedule(savedDays: WorkoutPlanScheduleDay[]): WeeklySchedule {
+  const nextSchedule = createEmptySchedule();
+
+  savedDays.forEach((day) => {
+    const entriesByPeriod: Record<SchedulePeriod, ScheduleEntry[]> = {
+      morning: [],
+      afternoon: [],
+    };
+    const timesByPeriod: Partial<Record<SchedulePeriod, string>> = {};
+
+    [...day.exercises]
+      .sort((left, right) => left.order_index - right.order_index)
+      .forEach((item) => {
+        const period = item.scheduled_period ?? "morning";
+        entriesByPeriod[period].push({
+          id: item.entry_id,
+          exerciseId: item.exercise_id,
+          sets: item.sets,
+          reps: item.reps,
+          restSeconds: item.rest_seconds ?? 60,
+        });
+
+        if (item.scheduled_time) {
+          timesByPeriod[period] = item.scheduled_time.slice(0, 5);
+        }
+      });
+
+    schedulePeriods.forEach((period) => {
+      const key = getScheduleCellKey(day.day_of_week, period.value);
+      nextSchedule[key] = {
+        ...nextSchedule[key],
+        time: timesByPeriod[period.value] ?? nextSchedule[key].time,
+        entries: entriesByPeriod[period.value],
+      };
+    });
+  });
+
+  return nextSchedule;
+}
+
 export async function saveCustomWeeklySchedule({
   title,
   goal,
@@ -339,4 +419,71 @@ export async function saveCustomWeeklySchedule({
   }
 
   return created.data;
+}
+
+export async function updateSavedWeeklySchedule({
+  planId,
+  savedDays,
+  schedule,
+}: {
+  planId: string;
+  savedDays: WorkoutPlanDayRef[];
+  schedule: WeeklySchedule;
+}) {
+  for (const day of savedDays) {
+    const dayId = day.day_id || day.id;
+    if (!dayId) {
+      continue;
+    }
+
+    const entries = schedulePeriods.flatMap((period) => {
+      const cell = schedule[getScheduleCellKey(day.day_of_week, period.value)];
+
+      return cell.entries.map((entry) => ({
+        exercise_id: entry.exerciseId,
+        sets: entry.sets,
+        reps: entry.reps,
+        rest_seconds: entry.restSeconds,
+        scheduled_period: period.value,
+        scheduled_time: cell.time,
+      }));
+    });
+
+    await apiClient<ApiResponse<unknown>>(`/workouts/${planId}/days/${dayId}`, {
+      method: "PATCH",
+      body: {
+        is_rest_day: entries.length === 0,
+      },
+    });
+
+    await apiClient<ApiResponse<unknown>>(`/workouts/${planId}/days/${dayId}/exercises`, {
+      method: "PUT",
+      body: {
+        exercises: entries,
+      },
+    });
+  }
+}
+
+export async function listWorkoutPlans(): Promise<WorkoutPlanSummary[]> {
+  const response = await apiClient<ApiResponse<WorkoutPlanSummary[]>>("/workouts");
+  return response.data;
+}
+
+export async function getWorkoutPlanSchedule(planId: string): Promise<WorkoutPlanSchedule> {
+  const response = await apiClient<ApiResponse<WorkoutPlanSchedule>>(`/workouts/${planId}`);
+  return response.data;
+}
+
+export async function activateWorkoutPlan(planId: string): Promise<WorkoutPlanSummary> {
+  const response = await apiClient<ApiResponse<WorkoutPlanSummary>>(`/workouts/${planId}/activate`, {
+    method: "POST",
+  });
+  return response.data;
+}
+
+export async function deleteWorkoutPlan(planId: string): Promise<void> {
+  await apiClient<ApiResponse<null>>(`/workouts/${planId}`, {
+    method: "DELETE",
+  });
 }
