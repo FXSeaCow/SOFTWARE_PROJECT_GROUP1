@@ -34,6 +34,50 @@ const ensureTestSchema = async () => {
 
   await db.query(`
     DO $$
+    DECLARE
+      constraint_name text;
+    BEGIN
+      IF to_regclass('public.workout_checkins') IS NOT NULL THEN
+        ALTER TABLE workout_checkins
+        ADD COLUMN IF NOT EXISTS counted_for_streak BOOLEAN NOT NULL DEFAULT true;
+
+        FOR constraint_name IN
+          SELECT c.conname
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          WHERE t.relname = 'workout_checkins'
+            AND c.contype = 'u'
+            AND pg_get_constraintdef(c.oid) ILIKE '%UNIQUE (user_id, checkin_date)%'
+        LOOP
+          EXECUTE format('ALTER TABLE workout_checkins DROP CONSTRAINT %I', constraint_name);
+        END LOOP;
+
+        WITH ranked_checkins AS (
+          SELECT id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY user_id, checkin_date
+                   ORDER BY checked_in_at ASC, id ASC
+                 ) AS counted_rank
+          FROM workout_checkins
+          WHERE counted_for_streak = true
+        )
+        UPDATE workout_checkins wc
+        SET counted_for_streak = false
+        FROM ranked_checkins rc
+        WHERE wc.id = rc.id
+          AND rc.counted_rank > 1;
+      END IF;
+    END $$;
+  `);
+
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_checkins_user_date_counted_once
+    ON workout_checkins (user_id, checkin_date)
+    WHERE counted_for_streak = true
+  `);
+
+  await db.query(`
+    DO $$
     BEGIN
       IF to_regtype('public.notification_type') IS NOT NULL THEN
         ALTER TYPE public.notification_type ADD VALUE IF NOT EXISTS 'system';
