@@ -148,11 +148,13 @@ describe('streaks module', () => {
       last_active_date: null,
     });
     repo.findBranchById.mockResolvedValue(branch);
+    repo.findCheckinByUserAndDate.mockResolvedValue(null);
     repo.createCheckin.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
       branch_id: branch.id,
       checkin_date: today,
+      counted_for_streak: true,
     });
     repo.findCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateStreak.mockResolvedValue({
@@ -176,6 +178,7 @@ describe('streaks module', () => {
       branch.id,
       today,
       expect.any(Date),
+      true,
       expect.any(Object)
     );
     expect(repo.updateStreak).toHaveBeenCalledWith(
@@ -198,11 +201,19 @@ describe('streaks module', () => {
       last_active_date: today,
     });
     repo.findBranchById.mockResolvedValue(branch);
+    repo.findCheckinByUserAndDate.mockResolvedValue({
+      id: 'checkin-1',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checkin_date: today,
+      counted_for_streak: true,
+    });
     repo.createCheckin.mockResolvedValue({
       id: 'checkin-2',
       user_id: 'user-1',
       branch_id: branch.id,
       checkin_date: today,
+      counted_for_streak: false,
     });
     repo.findCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateStreak.mockResolvedValue({
@@ -212,7 +223,7 @@ describe('streaks module', () => {
       longest_streak: 4,
       last_active_date: today,
     });
-    repo.countCheckinsByUser.mockResolvedValue(5);
+    repo.countCheckinsByUser.mockResolvedValue(1);
 
     const result = await service.recordCheckin('user-1', {
       branch_id: branch.id,
@@ -224,6 +235,7 @@ describe('streaks module', () => {
       branch.id,
       today,
       expect.any(Date),
+      false,
       expect.any(Object)
     );
     expect(repo.updateStreak).toHaveBeenCalledWith(
@@ -232,8 +244,9 @@ describe('streaks module', () => {
       expect.any(Object)
     );
     expect(result.already_checked_in).toBe(false);
+    expect(result.checkin.counted_for_streak).toBe(false);
     expect(result.streak.current_streak).toBe(1);
-    expect(result.streak.total_checkins).toBe(5);
+    expect(result.streak.total_checkins).toBe(1);
   });
 
   it('rejects future check-in dates', async () => {

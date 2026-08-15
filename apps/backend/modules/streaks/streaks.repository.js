@@ -139,7 +139,7 @@ const updateStreak = async (userId, fields, client) => {
 };
 
 /**
- * Find a check-in for one user on one date.
+ * Find the streak-counted check-in for one user on one date.
  *
  * @param {string} userId
  * @param {string} checkinDate - YYYY-MM-DD
@@ -159,7 +159,10 @@ const findCheckinByUserAndDate = async (userId, checkinDate, client) => {
      FROM workout_checkins wc
      JOIN gym_branches gb ON gb.id = wc.branch_id
      WHERE wc.user_id = $1
-       AND wc.checkin_date = $2`,
+       AND wc.checkin_date = $2
+       AND wc.counted_for_streak = true
+     ORDER BY wc.checked_in_at ASC
+     LIMIT 1`,
     [userId, checkinDate]
   );
   return rows[0] || null;
@@ -172,21 +175,35 @@ const findCheckinByUserAndDate = async (userId, checkinDate, client) => {
  * @param {string} branchId
  * @param {string} checkinDate - YYYY-MM-DD
  * @param {Date} checkedInAt
+ * @param {boolean} countedForStreak
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
-const createCheckin = async (userId, branchId, checkinDate, checkedInAt, client) => {
+const createCheckin = async (
+  userId,
+  branchId,
+  checkinDate,
+  checkedInAt,
+  countedForStreak,
+  client
+) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `INSERT INTO workout_checkins (user_id, branch_id, checkin_date, checked_in_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO workout_checkins (
+       user_id,
+       branch_id,
+       checkin_date,
+       checked_in_at,
+       counted_for_streak
+     )
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id,
                user_id,
                branch_id,
                checkin_date::TEXT AS checkin_date,
                checked_in_at,
                counted_for_streak`,
-    [userId, branchId, checkinDate, checkedInAt]
+    [userId, branchId, checkinDate, checkedInAt, countedForStreak]
   );
   return rows[0];
 };

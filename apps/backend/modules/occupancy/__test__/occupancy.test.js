@@ -256,6 +256,7 @@ describe('occupancy module', () => {
       user_id: 'user-1',
       branch_id: branch.id,
       checkin_date: today,
+      counted_for_streak: true,
     });
     repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateWorkoutStreak.mockResolvedValue({
@@ -279,6 +280,7 @@ describe('occupancy module', () => {
       branch.id,
       today,
       expect.any(Date),
+      true,
       expect.any(Object)
     );
     expect(result.branch.branch_id).toBe(branch.id);
@@ -303,11 +305,13 @@ describe('occupancy module', () => {
       checked_out_at: null,
     });
     repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    repo.findWorkoutCheckinByUserAndDate.mockResolvedValue(null);
     repo.createWorkoutCheckin.mockResolvedValue({
       id: 'checkin-1',
       user_id: 'user-1',
       branch_id: branch.id,
       checkin_date: today,
+      counted_for_streak: true,
     });
     repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
@@ -352,11 +356,13 @@ describe('occupancy module', () => {
       checked_out_at: null,
     });
     repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    repo.findWorkoutCheckinByUserAndDate.mockResolvedValue(null);
     repo.createWorkoutCheckin.mockResolvedValue({
       id: 'checkin-full',
       user_id: 'user-1',
       branch_id: branch.id,
       checkin_date: today,
+      counted_for_streak: true,
     });
     repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
     repo.updateWorkoutStreak.mockResolvedValue({
@@ -385,6 +391,65 @@ describe('occupancy module', () => {
       { role: 'member' }
     );
     expect(result.occupancy.is_full).toBe(true);
+  });
+
+  it('allows a second same-day check-in after checkout without counting another streak day', async () => {
+    const today = dateOnly();
+
+    repo.findUserById.mockResolvedValue(member);
+    repo.findActiveMembership.mockResolvedValue(membership);
+    repo.findBranchById.mockResolvedValue(branch);
+    repo.findOpenSessionByUser.mockResolvedValue(null);
+    repo.countOpenSessions.mockResolvedValueOnce(5);
+    repo.createSession.mockResolvedValue({
+      id: 'session-2',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checked_in_at: new Date(),
+      checked_out_at: null,
+    });
+    repo.ensureWorkoutStreak.mockResolvedValue({ id: 'streak-1' });
+    repo.findWorkoutCheckinByUserAndDate.mockResolvedValue({
+      id: 'checkin-1',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checkin_date: today,
+      counted_for_streak: true,
+    });
+    repo.createWorkoutCheckin.mockResolvedValue({
+      id: 'checkin-2',
+      user_id: 'user-1',
+      branch_id: branch.id,
+      checkin_date: today,
+      counted_for_streak: false,
+    });
+    repo.findWorkoutCheckinDatesByUser.mockResolvedValue([today]);
+    repo.updateWorkoutStreak.mockResolvedValue({
+      id: 'streak-1',
+      user_id: 'user-1',
+      current_streak: 1,
+      longest_streak: 1,
+      last_active_date: today,
+    });
+
+    const result = await service.checkIn(member, { branch_id: branch.id });
+
+    expect(repo.findOpenSessionByUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.any(Object)
+    );
+    expect(repo.createSession).toHaveBeenCalled();
+    expect(repo.createWorkoutCheckin).toHaveBeenCalledWith(
+      'user-1',
+      branch.id,
+      today,
+      expect.any(Date),
+      false,
+      expect.any(Object)
+    );
+    expect(result.workout_checkin_created).toBe(true);
+    expect(result.workout_checkin.counted_for_streak).toBe(false);
+    expect(result.streak.current_streak).toBe(1);
   });
 
   it('rejects check-in when the member already has an open session', async () => {

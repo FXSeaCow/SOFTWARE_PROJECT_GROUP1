@@ -223,8 +223,9 @@ const listMyCheckins = async (userId, query) => {
 /**
  * Record a workout check-in and update the user's streak atomically.
  *
- * Multiple check-ins on the same date are stored as separate visits, while the
- * streak counters are calculated from distinct calendar dates.
+ * Multiple check-ins on the same date are stored as separate visits. Only the
+ * first visit on a calendar date is marked counted_for_streak so summaries and
+ * streak counters stay day-based.
  *
  * @param {string} userId
  * @param {{ branch_id: string, checkin_date?: string }} data
@@ -237,12 +238,19 @@ const recordCheckin = async (userId, data = {}) => {
   const result = await withTransaction(async (client) => {
     await ensureStreakRecord(userId, client);
     const branch = await requireBranch(data.branch_id, client);
+    const countedCheckin = await repo.findCheckinByUserAndDate(
+      userId,
+      checkinDate,
+      client
+    );
+    const countedForStreak = !countedCheckin;
 
     const checkin = await repo.createCheckin(
       userId,
       branch.id,
       checkinDate,
       checkedInAt,
+      countedForStreak,
       client
     );
     const dates = await repo.findCheckinDatesByUser(userId, client);
