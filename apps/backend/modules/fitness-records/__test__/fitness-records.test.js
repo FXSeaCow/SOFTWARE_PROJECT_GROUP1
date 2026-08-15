@@ -11,6 +11,7 @@ jest.mock('../fitness-records.repository', () => ({
   findByIdAndUser: jest.fn(),
   findById: jest.fn(),
   findLatestByUser: jest.fn(),
+  findByUserAndRecordedDate: jest.fn(),
   findAll: jest.fn(),
   findForProgress: jest.fn(),
   updateRecord: jest.fn(),
@@ -53,6 +54,7 @@ const baseRecord = {
 describe('fitness-records module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    repo.findByUserAndRecordedDate.mockResolvedValue(null);
   });
 
   it('loads the Express router', () => {
@@ -175,12 +177,39 @@ describe('fitness-records module', () => {
         body_fat_pct: expect.any(Number),
       })
     );
+    expect(repo.findByUserAndRecordedDate).toHaveBeenCalledWith(
+      'user-1',
+      '2026-07-01',
+      null
+    );
     expect(repo.createRecord.mock.calls[0][0]).not.toHaveProperty('bmi');
     expect(result).toMatchObject({
       id: 'record-created',
       bmi: 22.86,
       bmi_category: 'normal',
     });
+  });
+
+  it('rejects creating a second record for the same day', async () => {
+    repo.findByUserAndRecordedDate.mockResolvedValue(baseRecord);
+
+    await expect(
+      service.createRecord('user-1', {
+        recorded_date: '2026-07-01',
+        weight_kg: 70,
+        height_cm: 175,
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'A fitness record already exists for this date',
+    });
+
+    expect(repo.findByUserAndRecordedDate).toHaveBeenCalledWith(
+      'user-1',
+      '2026-07-01',
+      null
+    );
+    expect(repo.createRecord).not.toHaveBeenCalled();
   });
 
   it('lists member records with pagination metadata', async () => {
@@ -247,6 +276,32 @@ describe('fitness-records module', () => {
     );
     expect(repo.updateRecord.mock.calls[0][2]).not.toHaveProperty('bmi');
     expect(result.bmi).toBe(23.51);
+  });
+
+  it('rejects updating a record to a date that already has another record', async () => {
+    repo.findByIdAndUser.mockResolvedValue(baseRecord);
+    repo.findByUserAndRecordedDate.mockResolvedValue({
+      ...baseRecord,
+      id: 'record-2',
+      recorded_date: '2026-07-08',
+      recorded_at: '2026-07-08',
+    });
+
+    await expect(
+      service.updateRecord('record-1', 'user-1', {
+        recorded_date: '2026-07-08',
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'A fitness record already exists for this date',
+    });
+
+    expect(repo.findByUserAndRecordedDate).toHaveBeenCalledWith(
+      'user-1',
+      '2026-07-08',
+      'record-1'
+    );
+    expect(repo.updateRecord).not.toHaveBeenCalled();
   });
 
   it('deletes an owned record and returns 404 for missing records', async () => {

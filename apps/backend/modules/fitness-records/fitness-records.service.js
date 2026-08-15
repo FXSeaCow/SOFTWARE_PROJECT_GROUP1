@@ -15,6 +15,9 @@ const { analyzeProgress } = require('./progressAnalyzer');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
+const {
+  FITNESS_RECORD_MESSAGES,
+} = require('./fitness-records.constants');
 
 /**
  * Convert numeric strings from pg NUMERIC columns into JSON numbers.
@@ -132,6 +135,30 @@ const buildUpdatePayload = (existing, fields) => {
 };
 
 /**
+ * Ensure a member has at most one measurement snapshot per recorded_date.
+ *
+ * @param {string} userId
+ * @param {string|Date|null} recordedDate
+ * @param {string|null} excludeRecordId
+ * @returns {Promise<void>}
+ */
+const ensureRecordDateIsAvailable = async (
+  userId,
+  recordedDate,
+  excludeRecordId = null
+) => {
+  const existing = await repo.findByUserAndRecordedDate(
+    userId,
+    recordedDate || null,
+    excludeRecordId
+  );
+
+  if (existing) {
+    throw ApiError.conflict(FITNESS_RECORD_MESSAGES.DAILY_RECORD_EXISTS);
+  }
+};
+
+/**
  * Create a new fitness record for a member.
  *
  * @param {string} userId
@@ -143,6 +170,8 @@ const createRecord = async (userId, data) => {
     ...data,
     user_id: userId,
   });
+
+  await ensureRecordDateIsAvailable(userId, payload.recorded_date);
 
   const record = await repo.createRecord(payload);
   logger.info('Fitness record created', { userId, recordId: record.id });
@@ -248,6 +277,15 @@ const updateRecord = async (recordId, userId, fields) => {
   if (!existing) throw ApiError.notFound('Fitness record');
 
   const payload = buildUpdatePayload(existing, fields);
+
+  if (payload.recorded_date !== undefined) {
+    await ensureRecordDateIsAvailable(
+      userId,
+      payload.recorded_date,
+      recordId
+    );
+  }
+
   const updated = await repo.updateRecord(recordId, userId, payload);
 
   logger.info('Fitness record updated', { userId, recordId });
