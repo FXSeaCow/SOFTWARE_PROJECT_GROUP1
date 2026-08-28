@@ -276,6 +276,36 @@ const updateStatus = async (membershipId, status, adminId, dates = {}, client) =
 };
 
 /**
+ * Update all stacked memberships for a user when an admin deactivates them.
+ * This prevents another active membership row from keeping the user active
+ * after the admin suspends or cancels one of the user's memberships.
+ *
+ * @param {string} userId
+ * @param {'suspended' | 'cancelled'} status
+ * @param {string} adminId
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<number>} number of rows updated
+ */
+const updateStatusByUser = async (userId, status, adminId, client) => {
+  const runner = client || db;
+  const whereClause =
+    status === 'cancelled'
+      ? `user_id = $3 AND status IN ('active', 'suspended')`
+      : `user_id = $3 AND status = 'active'`;
+
+  const { rowCount } = await runner.query(
+    `UPDATE memberships
+     SET status = $1,
+         updated_by = $2,
+         updated_at = now()
+     WHERE ${whereClause}`,
+    [status, adminId, userId]
+  );
+
+  return rowCount;
+};
+
+/**
  * Admin: list all memberships with optional filters and pagination.
  * Supports FR-28 (monitor active/expired memberships).
  *
@@ -360,6 +390,7 @@ module.exports = {
   issueActivationCode,
   activateByCode,
   updateStatus,
+  updateStatusByUser,
   findAll,
   expireOverdueMemberships,
 };

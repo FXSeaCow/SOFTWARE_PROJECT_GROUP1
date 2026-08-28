@@ -17,6 +17,7 @@
     "docker:dev": "docker compose up --build"
   },
   "devDependencies": {
+    "jest": "^25.0.0",
     "msw": "^2.12.0"
   },
   "dependencies": {

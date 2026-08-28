@@ -299,6 +299,8 @@ const broadcastBranchCrowding = async (branch, occupancy, reason = 'crowded') =>
 
 /**
  * Synchronize workout_checkins and workout_streaks after a gym check-in.
+ * The first visit on a calendar date counts for streaks; later same-day visits
+ * are still saved but left out of streak calculations.
  *
  * @param {string} userId
  * @param {string} branchId
@@ -315,12 +317,19 @@ const syncWorkoutCheckinAndStreak = async (
   client
 ) => {
   await repo.ensureWorkoutStreak(userId, client);
+  const countedCheckin = await repo.findWorkoutCheckinByUserAndDate(
+    userId,
+    checkinDate,
+    client
+  );
+  const countedForStreak = !countedCheckin;
 
   const workoutCheckin = await repo.createWorkoutCheckin(
     userId,
     branchId,
     checkinDate,
     checkedInAt,
+    countedForStreak,
     client
   );
 

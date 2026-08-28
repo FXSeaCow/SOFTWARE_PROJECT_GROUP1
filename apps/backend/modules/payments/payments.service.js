@@ -13,10 +13,22 @@
 
 const repo                       = require('./payments.repository');
 const membershipRepo             = require('../memberships/memberships.repository');
+const notificationsRepo          = require('../notifications/notifications.repository');
+const { NOTIFICATION_TYPE }      = require('../notifications/notifications.constants');
 const { withTransaction }        = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError                   = require('../../utils/Apierror');
 const logger                     = require('../../utils/Logger');
+
+const PAYMENT_REJECTED_TITLE = 'Payment rejected';
+
+const buildPaymentRejectedBody = (payment, reason) => {
+  const membershipName = payment.plan_name
+    ? `the ${payment.plan_name} membership`
+    : 'your membership';
+
+  return `Your payment for ${membershipName} was rejected. Reason: ${reason}`;
+};
 
 // ─── FR-25: Member requests a payment ────────────────────────────────────────
 
@@ -158,6 +170,13 @@ const rejectPayment = async (paymentId, adminId, reason) => {
       WHERE id = $2`,
       [adminId, payment.membership_id]
     );
+
+    await notificationsRepo.createNotification({
+      user_id: payment.user_id,
+      type: NOTIFICATION_TYPE.MEMBERSHIP,
+      title: PAYMENT_REJECTED_TITLE,
+      body: buildPaymentRejectedBody(payment, reason),
+    }, client);
 
     return rj;
   });

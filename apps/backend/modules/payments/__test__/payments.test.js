@@ -632,6 +632,37 @@ describe('POST /api/payments/admin/:paymentId/reject', () => {
     expect(rows[0].provider_tx_id).toContain(admin.id);
   });
 
+  it('should notify the member with the rejection reason', async () => {
+    const { user: member, accessToken: memberToken } = await registerAndLogin();
+    const plan       = await seedPlan();
+    const membership = await seedMembership(member.id, plan.id);
+    const payment    = await seedPayment(member.id, membership.id, { status: 'pending' });
+    const { accessToken: adminToken } = await registerAndLoginAdmin();
+    const reason = 'Receipt image is unreadable';
+
+    await request(app)
+      .post(`/api/payments/admin/${payment.id}/reject`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ reason });
+
+    const res = await request(app)
+      .get('/api/notifications/me')
+      .set('Authorization', `Bearer ${memberToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          user_id: member.id,
+          type: 'membership',
+          title: 'Payment rejected',
+          is_read: false,
+          body: expect.stringContaining(reason),
+        }),
+      ])
+    );
+  });
+
   it('should NOT activate the membership when payment is rejected', async () => {
     const { user: member } = await registerAndLogin();
     const plan       = await seedPlan();

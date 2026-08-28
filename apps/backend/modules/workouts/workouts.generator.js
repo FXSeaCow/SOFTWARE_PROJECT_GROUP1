@@ -342,7 +342,7 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, 
   return days;
 };
 
-// ─── Natural language → goal resolver (Gemini API) ────────────────────────────
+// ─── Natural language → goal resolver (Groq API) ────────────────────────────
 
 const VALID_GOALS    = Object.keys(GOALS);
 const VALID_CONFIDENCE = ['high', 'medium', 'low'];
@@ -558,14 +558,14 @@ const classifyGoalLocally = (cleanText) => {
 };
 
 /**
- * System prompt for Gemini.
+ * System prompt for Groq.
  *
  * Key design decisions:
  *   - Returns 4 fields so we handle fitness/non-fitness in ONE call (no second request).
  *   - is_fitness_related = false triggers a friendly redirect message to the caller.
- *   - redirect_message is written by Gemini in the member's own language/tone.
+ *   - redirect_message is written by Groq in the member's own language/tone.
  *   - temperature = 0 keeps the goal classification deterministic.
- *   - responseMimeType = 'application/json' forces Gemini to skip markdown fences.
+ *   - responseMimeType = 'application/json' forces Groq to skip markdown fences.
  */
 const SYSTEM_PROMPT = `
 You are a fitness goal classifier embedded in a gym management app called GymHub.
@@ -677,11 +677,11 @@ Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_mess
  *   confidence:         string|null,   — 'high'|'medium'|'low', or null
  *   redirect_message:   string|null,   — friendly message to show user, or null
  *   raw_text:           string,        — original trimmed input
- *   fallback:           boolean,       — true if Gemini was unavailable
+ *   fallback:           boolean,       — true if Groq was unavailable
  *   preferred_slots:    Array<{ day_of_week: number, period: string|null }>,
  * }>}
  *
- * @throws {Error} only for empty input — Gemini errors are caught and return fallback
+ * @throws {Error} only for empty input — Groq errors are caught and return fallback
  */
 const resolveGoalFromText = async (userText) => {
   if (!userText || !userText.trim()) {
@@ -690,7 +690,7 @@ const resolveGoalFromText = async (userText) => {
 
   const cleanText = userText.trim().slice(0, 500); // guard against huge inputs
 
-  // ── Gemini API call ──────────────────────────────────────────────────────────
+  // ── Groq API call ──────────────────────────────────────────────────────────
   try {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
@@ -718,12 +718,12 @@ const resolveGoalFromText = async (userText) => {
 
     if (!response.ok) {
       const errBody = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errBody}`);
+      throw new Error(`Groq API error ${response.status}: ${errBody}`);
     }
 
     const data = await response.json();
 
-    // Extract raw text content from Gemini's nested response structure
+    // Extract raw text content from Groq's nested response structure
     const rawContent = data?.choices?.[0]?.message?.content || '';
 
     // Defensive strip of any accidental markdown fences
@@ -734,7 +734,7 @@ const resolveGoalFromText = async (userText) => {
 
     const parsed = JSON.parse(jsonText);
 
-    // ── Validate and sanitise every field from Gemini ─────────────────────────
+    // ── Validate and sanitise every field from Groq ─────────────────────────
 
     const isFitnessRelated = Boolean(parsed.is_fitness_related);
 
@@ -774,10 +774,10 @@ const resolveGoalFromText = async (userText) => {
     };
 
   } catch (err) {
-    // ── Graceful fallback when Gemini is unavailable ───────────────────────────
+    // ── Graceful fallback when Groq is unavailable ───────────────────────────
     // Never throw to the caller — return a safe default instead.
     const logger = require('../../utils/Logger');
-    logger.warn('resolveGoalFromText: Gemini call failed, using fallback', {
+    logger.warn('resolveGoalFromText: Groq call failed, using fallback', {
       error: err.message,
       input: cleanText,
     });

@@ -70,6 +70,7 @@ const findUsers = async ({ role } = {}) => {
  * Create one notification.
  *
  * @param {{ user_id, type, title, body, announcement_id? }} data
+ * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
 const createNotification = async ({
@@ -78,8 +79,9 @@ const createNotification = async ({
   title,
   body,
   announcement_id,
-}) => {
-  const { rows } = await db.query(
+}, client) => {
+  const runner = client || db;
+  const { rows } = await runner.query(
     `INSERT INTO notifications (user_id, announcement_id, type, title, body)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING ${notificationSelect('notifications')}`,

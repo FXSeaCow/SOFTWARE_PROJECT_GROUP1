@@ -158,12 +158,15 @@ CREATE TABLE IF NOT EXISTS workout_checkins (
   branch_id          UUID NOT NULL REFERENCES gym_branches(id) ON DELETE RESTRICT,
   checkin_date       DATE NOT NULL,
   checked_in_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  counted_for_streak BOOLEAN NOT NULL DEFAULT true,
-  UNIQUE (user_id, checkin_date)
+  counted_for_streak BOOLEAN NOT NULL DEFAULT true
 );
 
 CREATE INDEX IF NOT EXISTS idx_workout_checkins_user_date
   ON workout_checkins (user_id, checkin_date DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_checkins_user_date_counted_once
+  ON workout_checkins (user_id, checkin_date)
+  WHERE counted_for_streak = true;
 
 CREATE TABLE IF NOT EXISTS exercises (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

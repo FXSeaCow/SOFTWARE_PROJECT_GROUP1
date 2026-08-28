@@ -153,6 +153,40 @@ const findLatestByUser = async (userId) => {
 };
 
 /**
+ * Find one record for a user on a specific recorded_date.
+ *
+ * @param {string} userId
+ * @param {string|Date|null} recordedDate
+ * @param {string|null} excludeRecordId
+ * @returns {Promise<object|null>}
+ */
+const findByUserAndRecordedDate = async (
+  userId,
+  recordedDate,
+  excludeRecordId = null
+) => {
+  const values = [userId, recordedDate || null];
+  let excludeClause = '';
+
+  if (excludeRecordId) {
+    excludeClause = 'AND fr.id <> $3';
+    values.push(excludeRecordId);
+  }
+
+  const { rows } = await db.query(
+    `SELECT ${recordSelect('fr')}
+     FROM fitness_records fr
+     WHERE fr.user_id = $1
+       AND fr.recorded_date = COALESCE($2::date, CURRENT_DATE)
+       ${excludeClause}
+     LIMIT 1`,
+    values
+  );
+
+  return rows[0] || null;
+};
+
+/**
  * List records with optional filters and pagination.
  *
  * @param {{ user_id?: string, from_date?: string|Date, to_date?: string|Date, limit: number, offset: number }} opts
@@ -277,6 +311,7 @@ module.exports = {
   findByIdAndUser,
   findById,
   findLatestByUser,
+  findByUserAndRecordedDate,
   findAll,
   findForProgress,
   updateRecord,

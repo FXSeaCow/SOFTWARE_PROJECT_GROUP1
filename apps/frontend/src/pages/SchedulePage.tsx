@@ -22,26 +22,28 @@ import { ScheduleSection } from "../components/schedule/ScheduleSection";
 import { WeekDateSelector } from "../components/schedule/WeekDateSelector";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { AppShell } from "../layouts/AppShell";
-import { getCurrentUser } from "../services/authService";
 import {
   applyGeneratedPlanToWeeklySchedule,
+  applySavedPlanToWeeklySchedule,
+  activateWorkoutPlan,
   createEmptySchedule,
   createScheduleBoardId,
   createScheduleEntry,
-  deleteScheduleBoardData,
+  deleteWorkoutPlan,
   generateSmartWorkoutPlan,
+  getWorkoutPlanSchedule,
   getScheduleCellKey,
-  loadScheduleBoards,
-  loadWeeklySchedule,
+  listWorkoutPlans,
   resolveWorkoutGoal,
   saveCustomWeeklySchedule,
-  saveScheduleBoards,
-  saveWeeklySchedule,
   scheduleDays,
   schedulePeriods,
   ScheduleEntry,
   SchedulePeriod,
+  updateSavedWeeklySchedule,
   WeeklySchedule,
+  WorkoutPlanDayRef,
+  WorkoutPlanSummary,
 } from "../services/scheduleService";
 import { Exercise, getExercises } from "../services/workoutService";
 
@@ -138,6 +140,34 @@ const calendarDayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday
 // The backend still requires a fitness_level enum on generate/save calls,
 // but it's no longer a user-facing control now that boards replace it.
 const DEFAULT_FITNESS_LEVEL = "beginner" as const;
+const DEFAULT_DRAFT_SCHEDULE_IDS = ["draft-1", "draft-2", "draft-3"];
+
+function getDraftScheduleIdsStorageKey() {
+  return "gym-web.schedule-draft-ids";
+}
+
+function loadDraftScheduleIds() {
+  const raw = localStorage.getItem(getDraftScheduleIdsStorageKey());
+
+  if (!raw) {
+    return [...DEFAULT_DRAFT_SCHEDULE_IDS];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+      return parsed;
+    }
+  } catch {
+    localStorage.removeItem(getDraftScheduleIdsStorageKey());
+  }
+
+  return [...DEFAULT_DRAFT_SCHEDULE_IDS];
+}
+
+function saveDraftScheduleIds(ids: string[]) {
+  localStorage.setItem(getDraftScheduleIdsStorageKey(), JSON.stringify(ids));
+}
 
 const GOAL_SUGGESTIONS = [
   "I want to lose weight and tone up",
@@ -251,30 +281,31 @@ function getGuidedGroupsForDay(
 export function SchedulePage() {
   const isMobile = useIsMobile();
   const isCompactLayout = useIsMobile(1100);
-  const currentUser = getCurrentUser();
   const scheduleGridRef = useRef<HTMLElement | null>(null);
   const calendarSectionsRef = useRef<HTMLDivElement | null>(null);
   const exerciseLibraryRef = useRef<HTMLDivElement | null>(null);
-  const skipNextScheduleSaveRef = useRef(false);
   const pendingDayIndexRef = useRef<number | null>(null);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
-  const initialWeekStartKey = formatDateKey(getWeekDates(0)[0]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [boardIds, setBoardIds] = useState<string[]>(() => loadScheduleBoards(currentUser?.id));
-  const [activeBoardId, setActiveBoardId] = useState<string>(() => boardIds[0]);
+  const [draftScheduleIds, setDraftScheduleIds] = useState<string[]>(loadDraftScheduleIds);
+  const [draftSchedules, setDraftSchedules] = useState<Record<string, WeeklySchedule>>({});
+  const [activeScheduleId, setActiveScheduleId] = useState<string>(() => loadDraftScheduleIds()[0] ?? DEFAULT_DRAFT_SCHEDULE_IDS[0]);
+  const [savedScheduleSnapshots, setSavedScheduleSnapshots] = useState<Record<string, string>>({});
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
-  const [schedule, setSchedule] = useState<WeeklySchedule>(() =>
-    loadWeeklySchedule(currentUser?.id, initialWeekStartKey, activeBoardId),
-  );
+  const [schedule, setSchedule] = useState<WeeklySchedule>(() => createEmptySchedule());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("all");
   const [activeDropKey, setActiveDropKey] = useState<string | null>(null);
   const [selectedCellKey, setSelectedCellKey] = useState(DEFAULT_SELECTED_CELL_KEY);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [savedPlans, setSavedPlans] = useState<WorkoutPlanSummary[]>([]);
+  const [savedPlanDays, setSavedPlanDays] = useState<Record<string, WorkoutPlanDayRef[]>>({});
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [goalText, setGoalText] = useState("");
   const [daysPerWeek, setDaysPerWeek] = useState(3);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -287,6 +318,11 @@ export function SchedulePage() {
   const [guidedFocusGroups, setGuidedFocusGroups] = useState<string[]>([]);
   const [guidedDayPeriods, setGuidedDayPeriods] = useState<Partial<Record<number, SchedulePeriod>>>({});
   const [guidedMessage, setGuidedMessage] = useState<string | null>(null);
+  const [deletePrompt, setDeletePrompt] = useState<{
+    scheduleId: string;
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -307,6 +343,37 @@ export function SchedulePage() {
 
     void loadCatalog();
   }, []);
+
+  async function loadSavedPlans() {
+    setIsLoadingPlans(true);
+
+    try {
+      const plans = await listWorkoutPlans();
+      setSavedPlans(plans);
+      const preferredPlan = plans.find((plan) => plan.is_active) ?? plans[0] ?? null;
+
+      if (preferredPlan && DEFAULT_DRAFT_SCHEDULE_IDS.includes(activeScheduleId) && !draftSchedules[activeScheduleId]) {
+        const saved = await getWorkoutPlanSchedule(preferredPlan.id);
+        const nextSchedule = applySavedPlanToWeeklySchedule(saved.schedule);
+        setActiveScheduleId(preferredPlan.id);
+        setSchedule(nextSchedule);
+        setSavedPlanDays((current) => ({ ...current, [preferredPlan.id]: saved.schedule }));
+        setSavedScheduleSnapshots((current) => ({ ...current, [preferredPlan.id]: JSON.stringify(nextSchedule) }));
+      }
+    } catch {
+      setSavedPlans([]);
+    } finally {
+      setIsLoadingPlans(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadSavedPlans();
+  }, []);
+
+  useEffect(() => {
+    saveDraftScheduleIds(draftScheduleIds);
+  }, [draftScheduleIds]);
 
   useEffect(() => {
     if (!isBoardMenuOpen) {
@@ -329,6 +396,32 @@ export function SchedulePage() {
   const weekRangeLabel = useMemo(() => {
     return `${formatShortDate(weekDates[0])} - ${formatShortDate(weekDates[6])}`;
   }, [weekDates]);
+  const activePlan = useMemo(() => savedPlans.find((plan) => plan.is_active) ?? null, [savedPlans]);
+  const currentBoardPlan = useMemo(
+    () => savedPlans.find((plan) => plan.id === activeScheduleId) ?? null,
+    [activeScheduleId, savedPlans],
+  );
+  const scheduleItems = useMemo(
+    () => [
+      ...savedPlans.map((plan) => ({ id: plan.id, type: "saved" as const, plan })),
+      ...draftScheduleIds.map((id) => ({ id, type: "draft" as const, plan: null })),
+    ],
+    [draftScheduleIds, savedPlans],
+  );
+  const activeScheduleIndex = Math.max(
+    0,
+    scheduleItems.findIndex((item) => item.id === activeScheduleId),
+  );
+  const currentScheduleSnapshot = useMemo(() => JSON.stringify(schedule), [schedule]);
+  const currentSavedScheduleSnapshot = savedScheduleSnapshots[activeScheduleId] ?? JSON.stringify(createEmptySchedule());
+  const hasUnsavedBackendChanges = currentSavedScheduleSnapshot !== currentScheduleSnapshot;
+  const hasScheduleExercises = useMemo(
+    () => Object.values(schedule).some((cell) => cell.entries.length > 0),
+    [schedule],
+  );
+  const isCurrentScheduleActive = Boolean(
+    currentBoardPlan && activePlan && currentBoardPlan.id === activePlan.id && !hasUnsavedBackendChanges,
+  );
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   useEffect(() => {
@@ -356,43 +449,166 @@ export function SchedulePage() {
   }
 
   useEffect(() => {
-    skipNextScheduleSaveRef.current = true;
-    setSchedule(loadWeeklySchedule(currentUser?.id, weekStartKey, activeBoardId));
-    setSelectedCellKey(DEFAULT_SELECTED_CELL_KEY);
-  }, [currentUser?.id, weekStartKey, activeBoardId]);
-
-  useEffect(() => {
-    if (skipNextScheduleSaveRef.current) {
-      skipNextScheduleSaveRef.current = false;
+    if (!hasUnsavedBackendChanges) {
       return;
     }
 
-    saveWeeklySchedule(currentUser?.id, schedule, weekStartKey, activeBoardId);
-  }, [currentUser?.id, schedule, weekStartKey, activeBoardId]);
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedBackendChanges]);
+
+  async function selectSchedule(nextScheduleId: string, skipUnsavedConfirm = false) {
+    if (nextScheduleId === activeScheduleId) {
+      setIsBoardMenuOpen(false);
+      return;
+    }
+
+    if (!skipUnsavedConfirm && hasUnsavedBackendChanges && !window.confirm("Switch schedules without saving current changes?")) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSaveMessage(null);
+    setActiveScheduleId(nextScheduleId);
+    setSelectedCellKey(DEFAULT_SELECTED_CELL_KEY);
+
+    const plan = savedPlans.find((item) => item.id === nextScheduleId);
+
+    if (plan) {
+      try {
+        const saved = await getWorkoutPlanSchedule(plan.id);
+        const nextSchedule = applySavedPlanToWeeklySchedule(saved.schedule);
+        setSchedule(nextSchedule);
+        setSavedPlanDays((current) => ({ ...current, [plan.id]: saved.schedule }));
+        setSavedScheduleSnapshots((current) => ({ ...current, [plan.id]: JSON.stringify(nextSchedule) }));
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load saved schedule.");
+      } finally {
+        setIsBoardMenuOpen(false);
+      }
+      return;
+    }
+
+    const nextDraftSchedule = draftSchedules[nextScheduleId] ?? createEmptySchedule();
+    setSchedule(nextDraftSchedule);
+    setSavedScheduleSnapshots((current) => ({ ...current, [nextScheduleId]: JSON.stringify(createEmptySchedule()) }));
+    setIsBoardMenuOpen(false);
+  }
 
   useEffect(() => {
-    saveScheduleBoards(currentUser?.id, boardIds);
-  }, [currentUser?.id, boardIds]);
+    if (currentBoardPlan) {
+      return;
+    }
+
+    setDraftSchedules((current) => ({ ...current, [activeScheduleId]: schedule }));
+  }, [activeScheduleId, currentBoardPlan, schedule]);
 
   function handleAddScheduleBoard() {
     const newBoardId = createScheduleBoardId();
-    setBoardIds((current) => [...current, newBoardId]);
-    setActiveBoardId(newBoardId);
+    setDraftScheduleIds((current) => [...current, newBoardId]);
+    setActiveScheduleId(newBoardId);
+    setSchedule(createEmptySchedule());
+    setSavedScheduleSnapshots((current) => ({ ...current, [newBoardId]: JSON.stringify(createEmptySchedule()) }));
     setSaveMessage(null);
   }
 
-  function handleDeleteScheduleBoard(boardId: string) {
-    if (boardIds.length <= 1) {
+  function requestDeleteScheduleBoard(boardId: string) {
+    if (scheduleItems.length <= 1) {
       return;
     }
 
-    const nextBoardIds = boardIds.filter((id) => id !== boardId);
-    deleteScheduleBoardData(currentUser?.id, boardId);
-    setBoardIds(nextBoardIds);
+    const plan = savedPlans.find((item) => item.id === boardId);
+    const isCurrent = activeScheduleId === boardId;
+    const scheduleToDelete = isCurrent ? schedule : draftSchedules[boardId] ?? createEmptySchedule();
+    const hasDraftChanges = JSON.stringify(scheduleToDelete) !== JSON.stringify(createEmptySchedule());
+    setErrorMessage(null);
+    setSaveMessage(null);
 
-    if (activeBoardId === boardId) {
-      setActiveBoardId(nextBoardIds[0]);
+    if (plan) {
+      setDeletePrompt({
+        scheduleId: boardId,
+        title: "Delete saved schedule?",
+        message: "This will delete the saved workout plan from the server.",
+      });
+      return;
     }
+
+    if (hasDraftChanges) {
+      setDeletePrompt({
+        scheduleId: boardId,
+        title: "Delete unsaved draft?",
+        message: "This draft has unsaved changes. Deleting it will discard those changes.",
+      });
+      return;
+    }
+
+    void deleteScheduleBoard(boardId);
+  }
+
+  async function deleteScheduleBoard(boardId: string) {
+    if (scheduleItems.length <= 1) {
+      setDeletePrompt(null);
+      return;
+    }
+
+    const plan = savedPlans.find((item) => item.id === boardId);
+    const isCurrent = activeScheduleId === boardId;
+    setDeletingScheduleId(boardId);
+    setErrorMessage(null);
+    setSaveMessage(null);
+
+    if (plan) {
+      try {
+        await deleteWorkoutPlan(plan.id);
+        setSavedPlans((current) => current.filter((savedPlan) => savedPlan.id !== plan.id));
+        setSavedPlanDays((current) => {
+          const next = { ...current };
+          delete next[plan.id];
+          return next;
+        });
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to delete schedule.");
+        setDeletingScheduleId(null);
+        setDeletePrompt(null);
+        return;
+      }
+    }
+
+    setDraftScheduleIds((current) => current.filter((id) => id !== boardId));
+    setDraftSchedules((current) => {
+      const next = { ...current };
+      delete next[boardId];
+      return next;
+    });
+    setSavedScheduleSnapshots((current) => {
+      const next = { ...current };
+      delete next[boardId];
+      return next;
+    });
+
+    if (isCurrent) {
+      const nextItems = scheduleItems.filter((item) => item.id !== boardId);
+      const nextId = nextItems[0]?.id;
+
+      if (nextId) {
+        await selectSchedule(nextId, true);
+      } else {
+        const fallbackDraftId = DEFAULT_DRAFT_SCHEDULE_IDS[0];
+        const emptySchedule = createEmptySchedule();
+        setDraftScheduleIds([fallbackDraftId]);
+        setActiveScheduleId(fallbackDraftId);
+        setSchedule(emptySchedule);
+        setSavedScheduleSnapshots((current) => ({ ...current, [fallbackDraftId]: JSON.stringify(emptySchedule) }));
+      }
+    }
+
+    setDeletingScheduleId(null);
+    setDeletePrompt(null);
   }
 
   const muscleGroups = useMemo(() => {
@@ -606,7 +822,7 @@ export function SchedulePage() {
     );
     setSaveMessage(null);
     setGuidedMessage(
-      `Generated ${guidedSelectedDays.length} session(s). Review the schedule, then click Save to keep it as your active plan.`,
+      `Generated ${guidedSelectedDays.length} session(s). Review the schedule, then click Save as Active to keep it as your active plan.`,
     );
     const scrollTarget = isCompactLayout ? calendarSectionsRef.current : scheduleGridRef.current;
     window.setTimeout(() => scrollTarget?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -784,7 +1000,7 @@ export function SchedulePage() {
       setSmartMessage(
         resolved.fallback
           ? `Generated a schedule for the goal "${formatLabel(goal)}" (AI was temporarily unavailable, used a fallback suggestion).`
-          : `Generated a schedule for the goal "${formatLabel(goal)}". Click Save if you want to keep this schedule.`,
+          : `Generated a schedule for the goal "${formatLabel(goal)}". Click Save as Active if you want to keep this schedule.`,
       );
     } catch (error) {
       setSmartError(
@@ -800,14 +1016,63 @@ export function SchedulePage() {
     setSaveMessage(null);
     setErrorMessage(null);
 
+    if (!hasScheduleExercises) {
+      setErrorMessage("Add at least one exercise before setting this schedule active.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
-      await saveCustomWeeklySchedule({
+      if (currentBoardPlan && !hasUnsavedBackendChanges) {
+        const activated = await activateWorkoutPlan(currentBoardPlan.id);
+        setSavedPlans((current) =>
+          current.map((plan) => ({
+            ...plan,
+            is_active: plan.id === activated.id,
+          })),
+        );
+        setSaveMessage("This saved schedule is now active.");
+        return;
+      }
+
+      if (currentBoardPlan && hasUnsavedBackendChanges) {
+        const savedDays = savedPlanDays[currentBoardPlan.id] ?? (await getWorkoutPlanSchedule(currentBoardPlan.id)).schedule;
+        await updateSavedWeeklySchedule({
+          planId: currentBoardPlan.id,
+          savedDays,
+          schedule,
+        });
+        const activated = await activateWorkoutPlan(currentBoardPlan.id);
+        setSavedPlans((current) =>
+          current.map((plan) => ({
+            ...plan,
+            is_active: plan.id === activated.id,
+          })),
+        );
+        setSavedPlanDays((current) => ({ ...current, [currentBoardPlan.id]: savedDays }));
+        setSavedScheduleSnapshots((current) => ({ ...current, [currentBoardPlan.id]: currentScheduleSnapshot }));
+        setSaveMessage("Saved changes. This schedule is now active.");
+        return;
+      }
+
+      const saved = await saveCustomWeeklySchedule({
         title: `Custom weekly schedule ${new Date().toLocaleDateString()}`,
         goal: "Custom schedule",
         fitnessLevel: DEFAULT_FITNESS_LEVEL,
         schedule,
       });
-      setSaveMessage("Schedule saved as your active workout plan.");
+
+      await loadSavedPlans();
+      setActiveScheduleId(saved.plan.id);
+      setDraftScheduleIds((current) => current.filter((id) => id !== activeScheduleId));
+      setDraftSchedules((current) => {
+        const next = { ...current };
+        delete next[activeScheduleId];
+        return next;
+      });
+      setSavedPlanDays((current) => ({ ...current, [saved.plan.id]: saved.schedule }));
+      setSavedScheduleSnapshots((current) => ({ ...current, [saved.plan.id]: currentScheduleSnapshot }));
+      setSaveMessage("Saved. This schedule is now used for workout reminders.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to save schedule.");
     } finally {
@@ -817,6 +1082,78 @@ export function SchedulePage() {
 
   return (
     <AppShell activeItem="schedule">
+      {deletePrompt ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-schedule-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 120,
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(0,0,0,0.62)",
+            padding: 18,
+          }}
+        >
+          <div
+            style={{
+              width: "min(420px, 100%)",
+              borderRadius: 16,
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "#171717",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
+              padding: 20,
+            }}
+          >
+            <div id="delete-schedule-title" style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>
+              {deletePrompt.title}
+            </div>
+            <div style={{ color: "#b8c2cf", fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
+              {deletePrompt.message}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setDeletePrompt(null)}
+                disabled={deletingScheduleId !== null}
+                style={{
+                  minHeight: 38,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  background: "#222222",
+                  color: "#f5f5f5",
+                  padding: "0 16px",
+                  fontWeight: 900,
+                  cursor: deletingScheduleId !== null ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteScheduleBoard(deletePrompt.scheduleId)}
+                disabled={deletingScheduleId !== null}
+                style={{
+                  minHeight: 38,
+                  borderRadius: 999,
+                  border: "1px solid rgba(248,113,113,0.28)",
+                  background: "#4a1919",
+                  color: "#fecaca",
+                  padding: "0 16px",
+                  fontWeight: 900,
+                  cursor: deletingScheduleId !== null ? "not-allowed" : "pointer",
+                  opacity: deletingScheduleId !== null ? 0.7 : 1,
+                }}
+              >
+                {deletingScheduleId !== null ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section
         style={{
           display: "flex",
@@ -957,7 +1294,60 @@ export function SchedulePage() {
                 cursor: "pointer",
               }}
             >
-              <span>Schedule {boardIds.indexOf(activeBoardId) + 1}</span>
+              <span>Schedule {activeScheduleIndex + 1}</span>
+              {isCurrentScheduleActive ? (
+                <span
+                  style={{
+                    borderRadius: 999,
+                    background: "rgba(34,197,94,0.18)",
+                    color: "#86efac",
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Active
+                </span>
+              ) : currentBoardPlan && hasUnsavedBackendChanges ? (
+                <span
+                  style={{
+                    borderRadius: 999,
+                    background: "rgba(245,158,11,0.16)",
+                    color: "#fde68a",
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Unsaved
+                </span>
+              ) : currentBoardPlan ? (
+                <span
+                  style={{
+                    borderRadius: 999,
+                    background: "rgba(96,165,250,0.14)",
+                    color: "#bfdbfe",
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Saved
+                </span>
+              ) : (
+                <span
+                  style={{
+                    borderRadius: 999,
+                    background: "rgba(255,255,255,0.08)",
+                    color: "#cfd5df",
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Draft
+                </span>
+              )}
               <ChevronDown
                 size={16}
                 style={{
@@ -982,41 +1372,70 @@ export function SchedulePage() {
                   zIndex: 70,
                 }}
               >
-                {boardIds.map((boardId, index) => {
-                  const isActive = activeBoardId === boardId;
+                {scheduleItems.map((item, index) => {
+                  const isSelected = activeScheduleId === item.id;
+                  const boardPlan = item.plan;
+                  const isActivePlan = Boolean(boardPlan?.is_active);
 
                   return (
                     <div
-                      key={boardId}
-                      onClick={() => {
-                        setActiveBoardId(boardId);
-                        setIsBoardMenuOpen(false);
-                      }}
+                      key={item.id}
+                      onClick={() => void selectSchedule(item.id)}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: 8,
                         padding: "10px 10px 10px 14px",
-                        background: isActive ? "rgba(96,165,250,0.16)" : "transparent",
+                        background: isSelected ? "rgba(96,165,250,0.16)" : "transparent",
                         cursor: "pointer",
                       }}
                     >
                       <span
                         style={{
-                          color: isActive ? "#60a5fa" : "#f5f5f5",
+                          color: isSelected ? "#60a5fa" : "#f5f5f5",
                           fontSize: 14,
                           fontWeight: 700,
                         }}
                       >
                         Schedule {index + 1}
                       </span>
-                      {boardIds.length > 1 ? (
+                      {isActivePlan ? (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            borderRadius: 999,
+                            background: "rgba(34,197,94,0.18)",
+                            color: "#86efac",
+                            padding: "2px 7px",
+                            fontSize: 10,
+                            fontWeight: 900,
+                          }}
+                        >
+                          Active
+                        </span>
+                      ) : boardPlan ? (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            borderRadius: 999,
+                            background: "rgba(96,165,250,0.14)",
+                            color: "#bfdbfe",
+                            padding: "2px 7px",
+                            fontSize: 10,
+                            fontWeight: 900,
+                          }}
+                        >
+                          Saved
+                        </span>
+                      ) : null}
+                      {scheduleItems.length > 1 ? (
                         <button
                           type="button"
+                          disabled={deletingScheduleId !== null}
                           onClick={(event) => {
                             event.stopPropagation();
-                            handleDeleteScheduleBoard(boardId);
+                            requestDeleteScheduleBoard(item.id);
                           }}
                           aria-label={`Delete Schedule ${index + 1}`}
                           style={{
@@ -1028,7 +1447,8 @@ export function SchedulePage() {
                             color: "#cfd5df",
                             display: "grid",
                             placeItems: "center",
-                            cursor: "pointer",
+                            cursor: deletingScheduleId !== null ? "not-allowed" : "pointer",
+                            opacity: deletingScheduleId === item.id ? 0.5 : 1,
                             flex: "0 0 auto",
                           }}
                         >
@@ -1079,7 +1499,7 @@ export function SchedulePage() {
             }}
           >
             <Save size={18} />
-            {isSaving ? "Saving" : "Save"}
+            {isSaving ? "Saving" : "Save as Active"}
           </button>
 
           <button
@@ -1101,6 +1521,32 @@ export function SchedulePage() {
           </button>
         </div>
       </section>
+
+      <div
+        style={{
+          marginTop: -8,
+          marginBottom: 18,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          color: "#9ca8b7",
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        <span>
+          {activePlan ? `Active schedule: ${activePlan.title}` : "No active schedule"}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.24)" }}>|</span>
+        <span>
+          {hasUnsavedBackendChanges
+            ? "Current schedule has unsaved changes."
+            : currentBoardPlan
+              ? "Current schedule is saved."
+              : "Current schedule is a local draft until you Save as Active."}
+        </span>
+      </div>
 
       {errorMessage ? (
         <div

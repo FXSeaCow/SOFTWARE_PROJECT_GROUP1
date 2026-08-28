@@ -5,7 +5,7 @@
  * This file matches gym.sql:
  *   - gym_branches(id, name, capacity, is_active, ...)
  *   - gym_sessions(user_id, branch_id, checked_in_at, checked_out_at, duration_minutes)
- *   - workout_checkins(user_id, branch_id, checkin_date, checked_in_at)
+ *   - workout_checkins(user_id, branch_id, checkin_date, checked_in_at, counted_for_streak)
  */
 
 const db = require('../../config/db');
@@ -505,7 +505,7 @@ const findSessionsByDate = async (date, branchId = null) => {
 };
 
 /**
- * Find a workout check-in by user and date.
+ * Find the streak-counted workout check-in by user and date.
  *
  * @param {string} userId
  * @param {string} checkinDate - YYYY-MM-DD
@@ -519,7 +519,10 @@ const findWorkoutCheckinByUserAndDate = async (userId, checkinDate, client) => {
             checked_in_at, counted_for_streak
      FROM workout_checkins
      WHERE user_id = $1
-       AND checkin_date = $2`,
+       AND checkin_date = $2
+       AND counted_for_streak = true
+     ORDER BY checked_in_at ASC
+     LIMIT 1`,
     [userId, checkinDate]
   );
   return rows[0] || null;
@@ -532,6 +535,7 @@ const findWorkoutCheckinByUserAndDate = async (userId, checkinDate, client) => {
  * @param {string} branchId
  * @param {string} checkinDate - YYYY-MM-DD
  * @param {Date} checkedInAt
+ * @param {boolean} countedForStreak
  * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object>}
  */
@@ -540,15 +544,22 @@ const createWorkoutCheckin = async (
   branchId,
   checkinDate,
   checkedInAt,
+  countedForStreak,
   client
 ) => {
   const runner = getRunner(client);
   const { rows } = await runner.query(
-    `INSERT INTO workout_checkins (user_id, branch_id, checkin_date, checked_in_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO workout_checkins (
+       user_id,
+       branch_id,
+       checkin_date,
+       checked_in_at,
+       counted_for_streak
+     )
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, user_id, branch_id, checkin_date::TEXT AS checkin_date,
                checked_in_at, counted_for_streak`,
-    [userId, branchId, checkinDate, checkedInAt]
+    [userId, branchId, checkinDate, checkedInAt, countedForStreak]
   );
   return rows[0];
 };

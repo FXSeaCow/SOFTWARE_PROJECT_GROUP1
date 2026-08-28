@@ -94,6 +94,7 @@ const FITNESS_RECORD_MESSAGES = {
   LIST_FETCHED: 'Fitness records fetched successfully',
   LATEST_FETCHED: 'Latest fitness record fetched successfully',
   PROGRESS_FETCHED: 'Fitness progress fetched successfully',
+  DAILY_RECORD_EXISTS: 'A fitness record already exists for this date',
 };
 
 module.exports = {
