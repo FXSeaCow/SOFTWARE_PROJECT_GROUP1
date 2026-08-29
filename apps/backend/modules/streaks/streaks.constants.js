@@ -12,7 +12,7 @@
  * not_started: the member has no workout check-ins yet.
  * active:      the member checked in today.
  * at_risk:     the member checked in yesterday but not today.
- * broken:      the member missed at least one full day after the last check-in.
+ * broken:      the member has been inactive past the configured grace window.
  */
 const STREAK_STATUS = {
   NOT_STARTED: 'not_started',
@@ -43,6 +43,7 @@ const STREAK_LIMITS = {
   MAX_LIMIT: 100,
   DEFAULT_LEADERBOARD_LIMIT: 10,
   MAX_LEADERBOARD_LIMIT: 50,
+  BREAK_AFTER_INACTIVE_DAYS: 5,
 };
 
 /**

@@ -34,14 +34,42 @@ const hoursAgo = (hours) => {
 };
 
 /**
+ * Convert a Date or date string to YYYY-MM-DD using local calendar fields.
+ *
+ * @param {Date|string} value
+ * @returns {string}
+ */
+const toDateOnlyString = (value = new Date()) => {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Return a Date object at the start of a local calendar date.
+ *
+ * @param {Date|string} value
+ * @returns {Date}
+ */
+const startOfLocalDate = (value = new Date()) => {
+  const dateOnly = toDateOnlyString(value);
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
+/**
  * Return a Date object at the start of the current local day.
  *
  * @returns {Date}
  */
 const startOfToday = () => {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
+  return startOfLocalDate();
 };
 
 /**
@@ -373,11 +401,13 @@ const sendMembershipExpiryWarnings = async (
  *
  * @returns {Promise<object>}
  */
-const sendStreakRiskWarnings = async () => {
+const sendStreakRiskWarnings = async (targetDate = toDateOnlyString()) => {
+  const warningDate = toDateOnlyString(targetDate);
   const resetStreaks = await repo.resetStreaksPastThreshold(
-    NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS
+    NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS,
+    warningDate
   );
-  const streaks = await repo.findStreaksAtRisk(1);
+  const streaks = await repo.findStreaksAtRisk(1, warningDate);
   const since = hoursAgo(24);
   const created = [];
   let skipped = 0;
@@ -406,6 +436,7 @@ const sendStreakRiskWarnings = async () => {
   }
 
   logger.info('Streak risk notification job completed', {
+    warningDate,
     reset: resetStreaks.length,
     scanned: streaks.length,
     created: created.length,
@@ -413,6 +444,7 @@ const sendStreakRiskWarnings = async () => {
   });
 
   return {
+    warning_date: warningDate,
     reset_count: resetStreaks.length,
     reset_streaks: resetStreaks,
     scanned_count: streaks.length,
@@ -430,9 +462,10 @@ const sendStreakRiskWarnings = async () => {
  *
  * @returns {Promise<object>}
  */
-const sendWorkoutReminderNotifications = async () => {
-  const recipients = await repo.findWorkoutReminderRecipients();
-  const since = startOfToday();
+const sendWorkoutReminderNotifications = async (targetDate = toDateOnlyString()) => {
+  const reminderDate = toDateOnlyString(targetDate);
+  const recipients = await repo.findWorkoutReminderRecipients(reminderDate);
+  const since = startOfLocalDate(reminderDate);
   const created = [];
   let skipped = 0;
 
@@ -454,18 +487,21 @@ const sendWorkoutReminderNotifications = async () => {
       {
         plan_title: recipient.workout_plan_title,
         day_label: recipient.day_label,
+        schedule_date: reminderDate,
       }
     );
     created.push(notification);
   }
 
   logger.info('Workout reminder notification job completed', {
+    reminderDate,
     scanned: recipients.length,
     created: created.length,
     skipped,
   });
 
   return {
+    reminder_date: reminderDate,
     scanned_count: recipients.length,
     created_count: created.length,
     skipped_count: skipped,
@@ -548,5 +584,7 @@ module.exports = {
 
   // Exported for focused unit tests.
   normalizeNotification,
+  toDateOnlyString,
+  startOfLocalDate,
   startOfToday,
 };

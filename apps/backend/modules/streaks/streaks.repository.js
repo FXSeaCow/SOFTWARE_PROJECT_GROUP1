@@ -358,6 +358,34 @@ const findLeaderboard = async ({ limit }) => {
   return rows;
 };
 
+/**
+ * Reset streaks that have been inactive for more than the allowed threshold.
+ *
+ * @param {number} thresholdDays
+ * @param {string} targetDate - YYYY-MM-DD local scheduler/API date.
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object[]>}
+ */
+const resetStreaksPastThreshold = async (thresholdDays, targetDate, client) => {
+  const runner = getRunner(client);
+  const { rows } = await runner.query(
+    `UPDATE workout_streaks
+     SET current_streak = 0,
+         updated_at = now()
+     WHERE current_streak > 0
+       AND last_active_date IS NOT NULL
+       AND last_active_date < ($2::date - $1::INT)::date
+     RETURNING id,
+               user_id,
+               current_streak::INT AS current_streak,
+               longest_streak::INT AS longest_streak,
+               last_active_date::TEXT AS last_active_date,
+               updated_at`,
+    [thresholdDays, targetDate]
+  );
+  return rows;
+};
+
 module.exports = {
   findUserById,
   findBranchById,
@@ -370,4 +398,5 @@ module.exports = {
   findCheckinsByUser,
   findCheckinDatesByUser,
   findLeaderboard,
+  resetStreaksPastThreshold,
 };

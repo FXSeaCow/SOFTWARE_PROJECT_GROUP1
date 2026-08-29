@@ -408,6 +408,8 @@ describe('notifications module', () => {
   });
 
   it('sends streak risk warnings', async () => {
+    const targetDate = '2026-08-06';
+
     repo.resetStreaksPastThreshold.mockResolvedValue([{ user_id: 'reset-1' }]);
     repo.findStreaksAtRisk.mockResolvedValue([
       {
@@ -424,22 +426,26 @@ describe('notifications module', () => {
       id: 'created-streak',
     }));
 
-    const result = await service.sendStreakRiskWarnings();
+    const result = await service.sendStreakRiskWarnings(targetDate);
 
     expect(repo.resetStreaksPastThreshold).toHaveBeenCalledWith(
-      NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS
+      NOTIFICATION_SCHEDULER.STREAK_RESET_THRESHOLD_DAYS,
+      targetDate
     );
-    expect(repo.findStreaksAtRisk).toHaveBeenCalledWith(1);
+    expect(repo.findStreaksAtRisk).toHaveBeenCalledWith(1, targetDate);
     expect(repo.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         type: NOTIFICATION_TYPE.STREAK_WARNING,
       })
     );
+    expect(result.warning_date).toBe(targetDate);
     expect(result.reset_count).toBe(1);
     expect(result.created_count).toBe(1);
   });
 
   it('sends workout reminders while skipping reminders already sent today', async () => {
+    const targetDate = '2026-08-06';
+
     repo.findWorkoutReminderRecipients.mockResolvedValue([
       {
         user_id: 'user-1',
@@ -464,13 +470,16 @@ describe('notifications module', () => {
       id: 'created-workout-reminder',
     }));
 
-    const result = await service.sendWorkoutReminderNotifications();
+    const result = await service.sendWorkoutReminderNotifications(targetDate);
 
-    expect(repo.findWorkoutReminderRecipients).toHaveBeenCalledTimes(1);
+    expect(repo.findWorkoutReminderRecipients).toHaveBeenCalledWith(targetDate);
     expect(repo.findRecentByType).toHaveBeenCalledWith(
       'user-1',
       NOTIFICATION_TYPE.WORKOUT_REMINDER,
       expect.any(Date)
+    );
+    expect(repo.findRecentByType.mock.calls[0][2]).toEqual(
+      new Date(2026, 7, 6, 0, 0, 0, 0)
     );
     expect(repo.createNotification).toHaveBeenCalledTimes(1);
     expect(repo.createNotification).toHaveBeenCalledWith(
@@ -485,6 +494,7 @@ describe('notifications module', () => {
       scanned_count: 2,
       created_count: 1,
       skipped_count: 1,
+      reminder_date: targetDate,
     });
   });
 
@@ -548,6 +558,13 @@ describe('notifications module', () => {
         new Date(2026, 7, 6, 23, 45, 0)
       )
     ).toBe(15 * 60 * 1000);
+
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        '00:00',
+        new Date(2026, 7, 6, 0, 0, 0)
+      )
+    ).toBe(0);
   });
 
   it('starts and stops the scheduler without jobs when all options are disabled', () => {

@@ -6,6 +6,8 @@
  * sync as the product adds more notification types.
  */
 
+const { STREAK_LIMITS } = require('../streaks/streaks.constants');
+
 /**
  * In-app notification types.
  */
@@ -60,7 +62,9 @@ const NOTIFICATION_LIMITS = {
  */
 const NOTIFICATION_SCHEDULER = {
   MEMBERSHIP_WARNING_DAYS: Number.parseInt(process.env.MEMBERSHIP_WARNING_DAYS, 10) || 7,
-  STREAK_RESET_THRESHOLD_DAYS: Number.parseInt(process.env.STREAK_RESET_THRESHOLD_DAYS, 10) || 4,
+  STREAK_RESET_THRESHOLD_DAYS:
+    Number.parseInt(process.env.STREAK_RESET_THRESHOLD_DAYS, 10) ||
+    STREAK_LIMITS.BREAK_AFTER_INACTIVE_DAYS,
   MEMBERSHIP_JOB_MS: Number.parseInt(process.env.NOTIFICATION_MEMBERSHIP_JOB_MS, 10) || 3600000,
   STREAK_JOB_MS: Number.parseInt(process.env.NOTIFICATION_STREAK_JOB_MS, 10) || 3600000,
   WORKOUT_REMINDER_DAILY_TIME: process.env.NOTIFICATION_WORKOUT_REMINDER_DAILY_TIME || '00:00',

@@ -33,7 +33,7 @@ const millisecondsUntilDailyTime = (dailyTime, now = new Date()) => {
 
   target.setHours(hour, minute, 0, 0);
 
-  if (target <= now) {
+  if (target < now) {
     target.setDate(target.getDate() + 1);
   }
 
@@ -98,7 +98,7 @@ const cleanupJob = async () => {
 };
 
 /**
- * Schedule a job for the next configured daily time, then repeat daily.
+ * Schedule a job for the next configured daily time, then reschedule it.
  *
  * @param {string} jobName
  * @param {Function} job
@@ -117,7 +117,7 @@ const scheduleDailyJob = (jobName, job, dailyTime) => {
     }
 
     schedulerState.handles.push(
-      setInterval(run, NOTIFICATION_SCHEDULER.WORKOUT_REMINDER_JOB_MS)
+      scheduleDailyJob(jobName, job, dailyTime)
     );
   }, delay);
 };

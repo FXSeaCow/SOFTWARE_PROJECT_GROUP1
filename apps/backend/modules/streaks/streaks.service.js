@@ -15,7 +15,7 @@ const { withTransaction } = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
-const { STREAK_STATUS } = require('./streaks.constants');
+const { STREAK_STATUS, STREAK_LIMITS } = require('./streaks.constants');
 
 /**
  * Convert a Date or date string to YYYY-MM-DD using local calendar fields.
@@ -55,6 +55,49 @@ const toUtcDayNumber = (dateString) => {
  */
 const daysBetween = (dateA, dateB) => {
   return toUtcDayNumber(dateB) - toUtcDayNumber(dateA);
+};
+
+/**
+ * A streak remains recoverable during the inactive grace window and breaks
+ * only after the member has missed more than BREAK_AFTER_INACTIVE_DAYS.
+ *
+ * @param {string|null} lastActiveDate
+ * @param {string} [currentDate]
+ * @returns {boolean}
+ */
+const isPastBreakWindow = (
+  lastActiveDate,
+  currentDate = toDateOnlyString()
+) => {
+  if (!lastActiveDate) return false;
+  return daysBetween(lastActiveDate, currentDate) > STREAK_LIMITS.BREAK_AFTER_INACTIVE_DAYS;
+};
+
+/**
+ * Reset stale current streak counters while preserving longest streak history.
+ *
+ * @param {{ current_streak?: number, longest_streak?: number, last_active_date?: string|null, user_id?: string }} stats
+ * @param {string} [currentDate]
+ * @returns {{ current_streak: number, longest_streak: number, last_active_date: string|null }}
+ */
+const applyInactiveBreak = (stats, currentDate = toDateOnlyString()) => {
+  const normalized = {
+    current_streak: Number(stats.current_streak || 0),
+    longest_streak: Number(stats.longest_streak || 0),
+    last_active_date: stats.last_active_date || null,
+  };
+
+  if (
+    normalized.current_streak > 0 &&
+    isPastBreakWindow(normalized.last_active_date, currentDate)
+  ) {
+    return {
+      ...normalized,
+      current_streak: 0,
+    };
+  }
+
+  return normalized;
 };
 
 /**
@@ -129,8 +172,10 @@ const resolveStatus = (lastActiveDate) => {
   const diff = daysBetween(lastActiveDate, today);
 
   if (diff <= 0) return STREAK_STATUS.ACTIVE;
-  if (diff === 1) return STREAK_STATUS.AT_RISK;
-  return STREAK_STATUS.BROKEN;
+  if (diff > STREAK_LIMITS.BREAK_AFTER_INACTIVE_DAYS) {
+    return STREAK_STATUS.BROKEN;
+  }
+  return STREAK_STATUS.AT_RISK;
 };
 
 /**
@@ -171,6 +216,23 @@ const ensureStreakRecord = async (userId, client) => {
 };
 
 /**
+ * Persist a broken current streak when the stored row is past the grace window.
+ *
+ * @param {object} streak
+ * @param {import('pg').PoolClient} [client]
+ * @returns {Promise<object>}
+ */
+const breakInactiveStreak = async (streak, client) => {
+  const adjusted = applyInactiveBreak(streak);
+
+  if (adjusted.current_streak === Number(streak.current_streak || 0)) {
+    return streak;
+  }
+
+  return repo.updateStreak(streak.user_id, adjusted, client);
+};
+
+/**
  * Ensure the selected branch exists and can receive check-ins.
  *
  * @param {string} branchId
@@ -191,8 +253,9 @@ const requireBranch = async (branchId, client) => {
  */
 const getMyStreak = async (userId) => {
   const streak = await ensureStreakRecord(userId);
+  const currentStreak = await breakInactiveStreak(streak);
   const totalCheckins = await repo.countCheckinsByUser(userId);
-  return decorateStreak(streak, totalCheckins);
+  return decorateStreak(currentStreak, totalCheckins);
 };
 
 /**
@@ -254,7 +317,7 @@ const recordCheckin = async (userId, data = {}) => {
       client
     );
     const dates = await repo.findCheckinDatesByUser(userId, client);
-    const stats = calculateStreakStats(dates);
+    const stats = applyInactiveBreak(calculateStreakStats(dates));
     const updatedStreak = await repo.updateStreak(userId, stats, client);
     const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
 
@@ -283,17 +346,26 @@ const recordCheckin = async (userId, data = {}) => {
  * @returns {Promise<object[]>}
  */
 const getLeaderboard = async (query = {}) => {
+  await repo.resetStreaksPastThreshold(
+    STREAK_LIMITS.BREAK_AFTER_INACTIVE_DAYS,
+    toDateOnlyString()
+  );
   const rows = await repo.findLeaderboard({ limit: query.limit });
 
-  return rows.map((row, index) => ({
-    rank: index + 1,
-    user_id: row.user_id,
-    full_name: row.full_name,
-    current_streak: Number(row.current_streak || 0),
-    longest_streak: Number(row.longest_streak || 0),
-    last_active_date: row.last_active_date || null,
-    status: resolveStatus(row.last_active_date || null),
-  }));
+  return rows.map((row, index) => {
+    const status = resolveStatus(row.last_active_date || null);
+
+    return {
+      rank: index + 1,
+      user_id: row.user_id,
+      full_name: row.full_name,
+      current_streak:
+        status === STREAK_STATUS.BROKEN ? 0 : Number(row.current_streak || 0),
+      longest_streak: Number(row.longest_streak || 0),
+      last_active_date: row.last_active_date || null,
+      status,
+    };
+  });
 };
 
 /**
@@ -307,11 +379,12 @@ const getUserStreak = async (userId) => {
   if (!user) throw ApiError.notFound('User');
 
   const streak = await ensureStreakRecord(userId);
+  const currentStreak = await breakInactiveStreak(streak);
   const totalCheckins = await repo.countCheckinsByUser(userId);
 
   return {
     user,
-    streak: decorateStreak(streak, totalCheckins),
+    streak: decorateStreak(currentStreak, totalCheckins),
   };
 };
 
@@ -328,7 +401,7 @@ const recalculateUserStreak = async (userId) => {
   const recalculated = await withTransaction(async (client) => {
     await ensureStreakRecord(userId, client);
     const dates = await repo.findCheckinDatesByUser(userId, client);
-    const stats = calculateStreakStats(dates);
+    const stats = applyInactiveBreak(calculateStreakStats(dates));
     const updatedStreak = await repo.updateStreak(userId, stats, client);
     const totalCheckins = await repo.countCheckinsByUser(userId, {}, client);
 
@@ -352,5 +425,7 @@ module.exports = {
 
   // Exported for focused unit tests without needing database access.
   calculateStreakStats,
+  applyInactiveBreak,
+  isPastBreakWindow,
   resolveStatus,
 };

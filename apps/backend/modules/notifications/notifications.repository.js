@@ -354,9 +354,10 @@ const findMembershipsExpiringSoon = async (warningDays) => {
 /**
  * Find workout streaks that are at risk today.
  *
+ * @param {string} targetDate - YYYY-MM-DD local schedule date.
  * @returns {Promise<object[]>}
  */
-const findStreaksAtRisk = async (warningAfterDays = 1) => {
+const findStreaksAtRisk = async (warningAfterDays = 1, targetDate) => {
   const { rows } = await db.query(
     `SELECT ws.user_id,
             ws.last_active_date::TEXT AS last_active_date,
@@ -366,8 +367,8 @@ const findStreaksAtRisk = async (warningAfterDays = 1) => {
      FROM workout_streaks ws
      JOIN users u ON u.id = ws.user_id
      WHERE ws.current_streak > 0
-       AND ws.last_active_date = (CURRENT_DATE - $1::INT)::date`,
-    [warningAfterDays]
+       AND ws.last_active_date = ($2::date - $1::INT)::date`,
+    [warningAfterDays, targetDate]
   );
   return rows;
 };
@@ -379,11 +380,16 @@ const findStreaksAtRisk = async (warningAfterDays = 1) => {
  * workout plan selected for today's non-rest day, but no workout check-in yet
  * today. The active workout plan is the user's selected plan.
  *
+ * @param {string} targetDate - YYYY-MM-DD local schedule date.
  * @returns {Promise<object[]>}
  */
-const findWorkoutReminderRecipients = async () => {
+const findWorkoutReminderRecipients = async (targetDate) => {
   const { rows } = await db.query(
-    `SELECT DISTINCT ON (u.id)
+    `WITH target_day AS (
+       SELECT $1::date AS reminder_date,
+              EXTRACT(ISODOW FROM $1::date)::INT AS day_of_week
+     )
+     SELECT DISTINCT ON (u.id)
             u.id AS user_id,
             u.full_name,
             u.email,
@@ -393,12 +399,13 @@ const findWorkoutReminderRecipients = async () => {
             wd.day_label,
             wd.day_of_week
      FROM users u
+     CROSS JOIN target_day td
      JOIN workout_plans wp
        ON wp.user_id = u.id
       AND wp.is_active = true
      JOIN workout_days wd
        ON wd.workout_plan_id = wp.id
-      AND wd.day_of_week = EXTRACT(ISODOW FROM CURRENT_DATE)::INT
+      AND wd.day_of_week = td.day_of_week
       AND wd.is_rest_day = false
      WHERE u.role = 'member'
        AND COALESCE(u.account_status, 'active') = 'active'
@@ -407,16 +414,17 @@ const findWorkoutReminderRecipients = async () => {
          FROM memberships m
          WHERE m.user_id = u.id
            AND m.status = 'active'
-           AND m.start_date <= CURRENT_DATE
-           AND m.end_date >= CURRENT_DATE
+           AND m.start_date <= td.reminder_date
+           AND m.end_date >= td.reminder_date
        )
        AND NOT EXISTS (
          SELECT 1
          FROM workout_checkins wc
          WHERE wc.user_id = u.id
-           AND wc.checkin_date = CURRENT_DATE
+           AND wc.checkin_date = td.reminder_date
        )
-     ORDER BY u.id, wp.updated_at DESC, wp.created_at DESC`
+     ORDER BY u.id, wp.updated_at DESC, wp.created_at DESC`,
+    [targetDate]
   );
 
   return rows;
@@ -426,21 +434,22 @@ const findWorkoutReminderRecipients = async () => {
  * Reset streaks that have been inactive past the configured threshold.
  *
  * @param {number} thresholdDays
+ * @param {string} targetDate - YYYY-MM-DD local scheduler date.
  * @returns {Promise<object[]>}
  */
-const resetStreaksPastThreshold = async (thresholdDays) => {
+const resetStreaksPastThreshold = async (thresholdDays, targetDate) => {
   const { rows } = await db.query(
     `UPDATE workout_streaks
      SET current_streak = 0,
          updated_at = now()
      WHERE current_streak > 0
        AND last_active_date IS NOT NULL
-       AND last_active_date <= (CURRENT_DATE - $1::INT)::date
+       AND last_active_date < ($2::date - $1::INT)::date
      RETURNING user_id,
                current_streak::INT AS current_streak,
                longest_streak::INT AS longest_streak,
                last_active_date::TEXT AS last_active_date`,
-    [thresholdDays]
+    [thresholdDays, targetDate]
   );
   return rows;
 };

@@ -18,6 +18,7 @@ jest.mock('../streaks.repository', () => ({
   findCheckinsByUser: jest.fn(),
   findCheckinDatesByUser: jest.fn(),
   findLeaderboard: jest.fn(),
+  resetStreaksPastThreshold: jest.fn(),
 }));
 
 jest.mock('../../../utils/Transaction', () => ({
@@ -90,7 +91,46 @@ describe('streaks module', () => {
     expect(service.resolveStatus(null)).toBe(STREAK_STATUS.NOT_STARTED);
     expect(service.resolveStatus(dateOnly(0))).toBe(STREAK_STATUS.ACTIVE);
     expect(service.resolveStatus(dateOnly(-1))).toBe(STREAK_STATUS.AT_RISK);
-    expect(service.resolveStatus(dateOnly(-3))).toBe(STREAK_STATUS.BROKEN);
+    expect(service.resolveStatus(dateOnly(-5))).toBe(STREAK_STATUS.AT_RISK);
+    expect(service.resolveStatus(dateOnly(-6))).toBe(STREAK_STATUS.BROKEN);
+  });
+
+  it('resets a stale current streak after more than five inactive days', async () => {
+    const staleDate = dateOnly(-6);
+
+    repo.findStreakByUserId.mockResolvedValue({
+      id: 'streak-1',
+      user_id: 'user-1',
+      current_streak: 7,
+      longest_streak: 9,
+      last_active_date: staleDate,
+    });
+    repo.updateStreak.mockResolvedValue({
+      id: 'streak-1',
+      user_id: 'user-1',
+      current_streak: 0,
+      longest_streak: 9,
+      last_active_date: staleDate,
+    });
+    repo.countCheckinsByUser.mockResolvedValue(12);
+
+    const result = await service.getMyStreak('user-1');
+
+    expect(repo.updateStreak).toHaveBeenCalledWith(
+      'user-1',
+      {
+        current_streak: 0,
+        longest_streak: 9,
+        last_active_date: staleDate,
+      },
+      undefined
+    );
+    expect(result).toMatchObject({
+      current_streak: 0,
+      longest_streak: 9,
+      status: STREAK_STATUS.BROKEN,
+      is_broken: true,
+    });
   });
 
   it('returns the authenticated member streak summary', async () => {
@@ -268,6 +308,10 @@ describe('streaks module', () => {
 
     const result = await service.getLeaderboard({ limit: 5 });
 
+    expect(repo.resetStreaksPastThreshold).toHaveBeenCalledWith(
+      5,
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+    );
     expect(repo.findLeaderboard).toHaveBeenCalledWith({ limit: 5 });
     expect(result[0]).toMatchObject({
       rank: 1,

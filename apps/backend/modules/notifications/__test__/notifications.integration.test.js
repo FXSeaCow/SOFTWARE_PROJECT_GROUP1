@@ -9,14 +9,27 @@ const db = require('../../../config/db');
 const service = require('../notifications.service');
 const { NOTIFICATION_TYPE } = require('../notifications.constants');
 
-const getDbToday = async () => {
-  const {
-    rows: [today],
-  } = await db.query(
-    `SELECT CURRENT_DATE::TEXT AS date,
-            EXTRACT(ISODOW FROM CURRENT_DATE)::INT AS day_of_week`
-  );
-  return today;
+const dateOnly = (offsetDays = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isoDayOfWeek = (dateString) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const localDay = new Date(year, month - 1, day).getDay();
+  return localDay === 0 ? 7 : localDay;
+};
+
+const scheduleDate = (offsetDays = 0) => {
+  const date = dateOnly(offsetDays);
+  return {
+    date,
+    day_of_week: isoDayOfWeek(date),
+  };
 };
 
 const createMember = async (email) => {
@@ -32,7 +45,7 @@ const createMember = async (email) => {
   return user;
 };
 
-const grantActiveMembership = async (userId) => {
+const grantActiveMembership = async (userId, activeDate) => {
   const {
     rows: [membershipPlan],
   } = await db.query(
@@ -44,12 +57,12 @@ const grantActiveMembership = async (userId) => {
 
   await db.query(
     `INSERT INTO memberships (user_id, plan_id, status, start_date, end_date)
-     VALUES ($1, $2, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days')`,
-    [userId, membershipPlan.id]
+     VALUES ($1, $2, 'active', $3::date - 1, $3::date + 30)`,
+    [userId, membershipPlan.id, activeDate]
   );
 };
 
-const createWorkoutPlanForToday = async (
+const createWorkoutPlanForDate = async (
   userId,
   { title, isActive, isRestDay, dayOfWeek }
 ) => {
@@ -87,12 +100,12 @@ const workoutCheckinsHasBranchId = async () => {
   return column.exists;
 };
 
-const createTodayCheckin = async (userId) => {
+const createCheckinOnDate = async (userId, checkinDate) => {
   if (!(await workoutCheckinsHasBranchId())) {
     await db.query(
       `INSERT INTO workout_checkins (user_id, checkin_date)
-       VALUES ($1, CURRENT_DATE)`,
-      [userId]
+       VALUES ($1, $2::date)`,
+      [userId, checkinDate]
     );
     return;
   }
@@ -108,8 +121,8 @@ const createTodayCheckin = async (userId) => {
 
   await db.query(
     `INSERT INTO workout_checkins (user_id, branch_id, checkin_date)
-     VALUES ($1, $2, CURRENT_DATE)`,
-    [userId, branch.id]
+     VALUES ($1, $2, $3::date)`,
+    [userId, branch.id, checkinDate]
   );
 };
 
@@ -118,53 +131,54 @@ describe('workout reminder integration', () => {
     await global.truncateAll();
   });
 
-  it('sends reminders only for the selected active plan and members without a check-in today', async () => {
-    const today = await getDbToday();
+  it('sends reminders only for the selected active plan and members without a check-in on the target date', async () => {
+    const today = scheduleDate(2);
     const shouldReceive = await createMember('reminder-target@example.com');
     const inactivePlanOnly = await createMember('inactive-plan@example.com');
     const alreadyCheckedIn = await createMember('checked-in@example.com');
 
-    await grantActiveMembership(shouldReceive.id);
-    await grantActiveMembership(inactivePlanOnly.id);
-    await grantActiveMembership(alreadyCheckedIn.id);
+    await grantActiveMembership(shouldReceive.id, today.date);
+    await grantActiveMembership(inactivePlanOnly.id, today.date);
+    await grantActiveMembership(alreadyCheckedIn.id, today.date);
 
-    await createWorkoutPlanForToday(shouldReceive.id, {
+    await createWorkoutPlanForDate(shouldReceive.id, {
       title: 'Selected Plan',
       isActive: true,
       isRestDay: false,
       dayOfWeek: today.day_of_week,
     });
-    await createWorkoutPlanForToday(shouldReceive.id, {
+    await createWorkoutPlanForDate(shouldReceive.id, {
       title: 'Old Plan',
       isActive: false,
       isRestDay: false,
       dayOfWeek: today.day_of_week,
     });
 
-    await createWorkoutPlanForToday(inactivePlanOnly.id, {
+    await createWorkoutPlanForDate(inactivePlanOnly.id, {
       title: 'Selected Rest Plan',
       isActive: true,
       isRestDay: true,
       dayOfWeek: today.day_of_week,
     });
-    await createWorkoutPlanForToday(inactivePlanOnly.id, {
+    await createWorkoutPlanForDate(inactivePlanOnly.id, {
       title: 'Inactive Workout Plan',
       isActive: false,
       isRestDay: false,
       dayOfWeek: today.day_of_week,
     });
 
-    await createWorkoutPlanForToday(alreadyCheckedIn.id, {
+    await createWorkoutPlanForDate(alreadyCheckedIn.id, {
       title: 'Checked In Plan',
       isActive: true,
       isRestDay: false,
       dayOfWeek: today.day_of_week,
     });
-    await createTodayCheckin(alreadyCheckedIn.id);
+    await createCheckinOnDate(alreadyCheckedIn.id, today.date);
 
-    const result = await service.sendWorkoutReminderNotifications();
+    const result = await service.sendWorkoutReminderNotifications(today.date);
 
     expect(result).toMatchObject({
+      reminder_date: today.date,
       scanned_count: 1,
       created_count: 1,
       skipped_count: 0,
@@ -186,23 +200,24 @@ describe('workout reminder integration', () => {
     ]);
   });
 
-  it('completes silently when all active-plan members have checked in today', async () => {
-    const today = await getDbToday();
+  it('completes silently when all active-plan members have checked in on the target date', async () => {
+    const today = scheduleDate(1);
     const member = await createMember('already-done@example.com');
 
-    await grantActiveMembership(member.id);
-    await createWorkoutPlanForToday(member.id, {
+    await grantActiveMembership(member.id, today.date);
+    await createWorkoutPlanForDate(member.id, {
       title: 'Selected Plan',
       isActive: true,
       isRestDay: false,
       dayOfWeek: today.day_of_week,
     });
-    await createTodayCheckin(member.id);
+    await createCheckinOnDate(member.id, today.date);
 
-    const result = await service.sendWorkoutReminderNotifications();
+    const result = await service.sendWorkoutReminderNotifications(today.date);
     const { rows: notifications } = await db.query(`SELECT id FROM notifications`);
 
     expect(result).toMatchObject({
+      reminder_date: today.date,
       scanned_count: 0,
       created_count: 0,
       skipped_count: 0,
