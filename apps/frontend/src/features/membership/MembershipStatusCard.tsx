@@ -94,7 +94,7 @@ export function MembershipStatusCard({
             Your membership
           </div>
           <div style={{ margin: "6px 0 0", fontSize: 22, fontWeight: 900, color: "#f8fafc" }}>
-            {membership.plan_name}
+            {membership.status === "active" ? "Active membership" : status.label}
           </div>
         </div>
 

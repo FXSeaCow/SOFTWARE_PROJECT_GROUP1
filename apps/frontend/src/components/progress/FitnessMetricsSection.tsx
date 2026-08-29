@@ -119,6 +119,7 @@ export function FitnessMetricsSection() {
         .map((point) => ({
           label: formatDateLabel(point.recorded_date),
           value: point.weight_kg as number,
+          date: point.recorded_date,
         })),
     [progress],
   );
@@ -130,6 +131,7 @@ export function FitnessMetricsSection() {
         .map((point) => ({
           label: formatDateLabel(point.recorded_date),
           value: point.body_fat_pct as number,
+          date: point.recorded_date,
         })),
     [progress],
   );
@@ -380,7 +382,11 @@ export function FitnessMetricsSection() {
 
         {loadError ? <div style={{ color: "#fca5a5", fontSize: 13, marginBottom: 14 }}>{loadError}</div> : null}
 
-        <FitnessMetricsChart points={weightSeries} unit="kg" />
+        <FitnessMetricsChart
+          points={weightSeries}
+          unit="kg"
+          emptyMessage="Add another body measurement to see your weight trend."
+        />
       </section>
 
       <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>
@@ -388,7 +394,12 @@ export function FitnessMetricsSection() {
           Body Fat Trend
         </div>
 
-        <FitnessMetricsChart points={bodyFatSeries} unit="%" accent="#4fa3ff" />
+        <FitnessMetricsChart
+          points={bodyFatSeries}
+          unit="%"
+          accent="#4fa3ff"
+          emptyMessage="Add another body measurement to see your body fat trend."
+        />
       </section>
 
       <section className="interactive-card dashboard-card-enter" style={{ ...panelStyle, marginBottom: 24 }}>

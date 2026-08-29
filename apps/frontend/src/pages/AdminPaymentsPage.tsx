@@ -151,6 +151,7 @@ export function AdminPaymentsPage() {
       .map((row) => ({
         label: new Date(row.report_date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
         value: Number(row.total_revenue || 0),
+        date: row.report_date,
       }));
 
     return { totalRevenue, totalTransactions, chartPoints };
@@ -404,7 +405,12 @@ export function AdminPaymentsPage() {
         {isLoadingRevenue ? (
           <Skeleton height={140} width="100%" radius={12} />
         ) : (
-          <FitnessMetricsChart points={revenueStats.chartPoints} unit=" VND" accent="#60a5fa" />
+          <FitnessMetricsChart
+            points={revenueStats.chartPoints}
+            unit=" VND"
+            accent="#60a5fa"
+            emptyMessage="Revenue trend will appear after there are transactions on at least two dates."
+          />
         )}
       </section>
 

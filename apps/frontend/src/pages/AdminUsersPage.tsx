@@ -1175,8 +1175,10 @@ export function AdminUsersPage() {
                             day: "numeric",
                           }),
                           value: point.weight_kg as number,
+                          date: point.recorded_date,
                         }))}
                       unit="kg"
+                      emptyMessage="Add another body measurement to show this member's weight trend."
                     />
                   </>
                 ) : (
