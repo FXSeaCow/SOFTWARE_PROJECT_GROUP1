@@ -18,14 +18,7 @@ export function FitnessMetricsChart({
   emptyMessage?: string;
 }) {
   const gradientId = `fitness-chart-fill-${useId()}`;
-
-  if (points.length === 0) {
-    return (
-      <div style={{ color: "#8d98a7", fontSize: 14, padding: "24px 0" }}>
-        {emptyMessage}
-      </div>
-    );
-  }
+  void emptyMessage;
 
   const width = 640;
   const height = 200;
@@ -33,8 +26,8 @@ export function FitnessMetricsChart({
   const paddingY = 20;
 
   const values = points.map((point) => point.value);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
+  const minValue = values.length > 0 ? Math.min(...values) : 0;
+  const maxValue = values.length > 0 ? Math.max(...values) : 0;
   const valueRange = maxValue - minValue || 1;
 
   const plotWidth = width - paddingX * 2;
@@ -67,8 +60,14 @@ export function FitnessMetricsChart({
     return { x, y, point };
   });
 
+  const emptyLineY = height - paddingY - 0.18 * (height - paddingY * 2);
   const lineCoords =
-    coords.length === 1
+    coords.length === 0
+      ? [
+          { x: paddingX, y: emptyLineY },
+          { x: width - paddingX, y: emptyLineY },
+        ]
+      : coords.length === 1
       ? [
           { ...coords[0], x: paddingX },
           { ...coords[0], x: width - paddingX },
@@ -80,6 +79,7 @@ export function FitnessMetricsChart({
     .join(" ");
 
   const areaPath = `${linePath} L ${lineCoords[lineCoords.length - 1].x.toFixed(1)} ${height - paddingY} L ${lineCoords[0].x.toFixed(1)} ${height - paddingY} Z`;
+  const hasData = coords.length > 0;
 
   return (
     <div style={{ width: "100%", overflowX: "auto" }}>
@@ -95,8 +95,15 @@ export function FitnessMetricsChart({
           </linearGradient>
         </defs>
 
-        <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
-        <path d={linePath} fill="none" stroke={accent} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        {hasData ? <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" /> : null}
+        <path
+          d={linePath}
+          fill="none"
+          stroke={hasData ? accent : "rgba(141,152,167,0.42)"}
+          strokeWidth={hasData ? 2.5 : 2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
 
         {coords.map((coord, index) => (
           <circle key={index} cx={coord.x} cy={coord.y} r={3.5} fill={accent} stroke="#111111" strokeWidth={1.5} />
