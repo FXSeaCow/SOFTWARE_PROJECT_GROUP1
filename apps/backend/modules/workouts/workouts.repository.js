@@ -256,9 +256,11 @@ const createDay = async ({ workout_plan_id, day_of_week, day_label, is_rest_day 
  * Update a workout day label or rest status.
  * @param {string} dayId
  * @param {{ day_label?, is_rest_day? }} fields
+ * @param {import('pg').PoolClient} [client]
  * @returns {Promise<object|null>}
  */
-const updateDay = async (dayId, fields) => {
+const updateDay = async (dayId, fields, client) => {
+  const runner = client || db;
   const setClauses = [];
   const values     = [];
   let   idx        = 1;
@@ -269,7 +271,7 @@ const updateDay = async (dayId, fields) => {
   if (setClauses.length === 0) return null;
 
   values.push(dayId);
-  const { rows } = await db.query(
+  const { rows } = await runner.query(
     `UPDATE workout_days SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
     values
   );

@@ -15,6 +15,10 @@ const { parse: parsePagination } = require('../../utils/Pagination');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
 const {
+  dateOnlyInTimeZone,
+  startOfDateInTimeZone,
+} = require('../../utils/Timezone');
+const {
   NOTIFICATION_TYPE,
   NOTIFICATION_TEMPLATE,
   NOTIFICATION_LIMITS,
@@ -34,37 +38,35 @@ const hoursAgo = (hours) => {
 };
 
 /**
- * Convert a Date or date string to YYYY-MM-DD using local calendar fields.
+ * Convert a Date or date string to YYYY-MM-DD using the scheduler timezone.
  *
  * @param {Date|string} value
+ * @param {string} timeZone
  * @returns {string}
  */
-const toDateOnlyString = (value = new Date()) => {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+const toDateOnlyString = (
+  value = new Date(),
+  timeZone = NOTIFICATION_SCHEDULER.TIME_ZONE
+) => {
+  return dateOnlyInTimeZone(value, timeZone);
 };
 
 /**
- * Return a Date object at the start of a local calendar date.
+ * Return a Date object for midnight at the start of a scheduler calendar date.
  *
  * @param {Date|string} value
+ * @param {string} timeZone
  * @returns {Date}
  */
-const startOfLocalDate = (value = new Date()) => {
-  const dateOnly = toDateOnlyString(value);
-  const [year, month, day] = dateOnly.split('-').map(Number);
-  return new Date(year, month - 1, day, 0, 0, 0, 0);
+const startOfLocalDate = (
+  value = new Date(),
+  timeZone = NOTIFICATION_SCHEDULER.TIME_ZONE
+) => {
+  return startOfDateInTimeZone(value, timeZone);
 };
 
 /**
- * Return a Date object at the start of the current local day.
+ * Return a Date object at the start of the current scheduler day.
  *
  * @returns {Date}
  */

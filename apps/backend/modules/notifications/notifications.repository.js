@@ -377,8 +377,8 @@ const findStreaksAtRisk = async (warningAfterDays = 1, targetDate) => {
  * Find members who should receive today's workout reminder.
  *
  * A member qualifies only when they have an active membership and an active
- * workout plan selected for today's non-rest day, but no workout check-in yet
- * today. The active workout plan is the user's selected plan.
+ * workout plan selected for today's scheduled exercise day, but no workout
+ * check-in yet today. The active workout plan is the user's selected plan.
  *
  * @param {string} targetDate - YYYY-MM-DD local schedule date.
  * @returns {Promise<object[]>}
@@ -406,9 +406,13 @@ const findWorkoutReminderRecipients = async (targetDate) => {
      JOIN workout_days wd
        ON wd.workout_plan_id = wp.id
       AND wd.day_of_week = td.day_of_week
-      AND wd.is_rest_day = false
      WHERE u.role = 'member'
        AND COALESCE(u.account_status, 'active') = 'active'
+       AND EXISTS (
+         SELECT 1
+         FROM workout_day_exercises wde
+         WHERE wde.workout_day_id = wd.id
+       )
        AND EXISTS (
          SELECT 1
          FROM memberships m

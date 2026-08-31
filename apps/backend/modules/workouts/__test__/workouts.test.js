@@ -882,6 +882,12 @@ describe('PUT /api/workouts/:planId/days/:dayId/exercises', () => {
     expect(res.body.data.length).toBe(2);
     expect(res.body.data[0].order_index).toBe(0);
     expect(res.body.data[1].order_index).toBe(1);
+
+    const { rows: [updatedDay] } = await db.query(
+      `SELECT is_rest_day FROM workout_days WHERE id = $1`,
+      [monday.id]
+    );
+    expect(updatedDay.is_rest_day).toBe(false);
   });
 
   it('should replace existing exercises (not append)', async () => {
@@ -937,6 +943,12 @@ describe('PUT /api/workouts/:planId/days/:dayId/exercises', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBe(0);
+
+    const { rows: [updatedDay] } = await db.query(
+      `SELECT is_rest_day FROM workout_days WHERE id = $1`,
+      [monday.id]
+    );
+    expect(updatedDay.is_rest_day).toBe(true);
   });
 
   it('should return 400 for a non-existent exercise_id', async () => {

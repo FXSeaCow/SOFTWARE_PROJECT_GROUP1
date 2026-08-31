@@ -9,6 +9,9 @@
 const service = require('./notifications.service');
 const logger = require('../../utils/Logger');
 const {
+  millisecondsUntilDailyTime: calculateMillisecondsUntilDailyTime,
+} = require('../../utils/Timezone');
+const {
   NOTIFICATION_LIMITS,
   NOTIFICATION_SCHEDULER,
 } = require('./notifications.constants');
@@ -23,21 +26,15 @@ let schedulerState = {
  *
  * @param {string} dailyTime
  * @param {Date} now
+ * @param {string} timeZone
  * @returns {number}
  */
-const millisecondsUntilDailyTime = (dailyTime, now = new Date()) => {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(dailyTime || '');
-  const hour = match ? Number(match[1]) : 0;
-  const minute = match ? Number(match[2]) : 0;
-  const target = new Date(now);
-
-  target.setHours(hour, minute, 0, 0);
-
-  if (target < now) {
-    target.setDate(target.getDate() + 1);
-  }
-
-  return target.getTime() - now.getTime();
+const millisecondsUntilDailyTime = (
+  dailyTime,
+  now = new Date(),
+  timeZone = NOTIFICATION_SCHEDULER.TIME_ZONE
+) => {
+  return calculateMillisecondsUntilDailyTime(dailyTime, now, timeZone);
 };
 
 /**
@@ -103,11 +100,17 @@ const cleanupJob = async () => {
  * @param {string} jobName
  * @param {Function} job
  * @param {string} dailyTime
+ * @param {string} timeZone
  * @returns {NodeJS.Timeout}
  */
-const scheduleDailyJob = (jobName, job, dailyTime) => {
+const scheduleDailyJob = (
+  jobName,
+  job,
+  dailyTime,
+  timeZone = NOTIFICATION_SCHEDULER.TIME_ZONE
+) => {
   const run = safeJob(jobName, job);
-  const delay = millisecondsUntilDailyTime(dailyTime);
+  const delay = millisecondsUntilDailyTime(dailyTime, new Date(), timeZone);
 
   return setTimeout(async () => {
     await run();
@@ -117,7 +120,7 @@ const scheduleDailyJob = (jobName, job, dailyTime) => {
     }
 
     schedulerState.handles.push(
-      scheduleDailyJob(jobName, job, dailyTime)
+      scheduleDailyJob(jobName, job, dailyTime, timeZone)
     );
   }, delay);
 };
@@ -169,7 +172,8 @@ const startNotificationScheduler = (options = {}) => {
       scheduleDailyJob(
         'workoutReminderJob',
         workoutReminderJob,
-        NOTIFICATION_SCHEDULER.WORKOUT_REMINDER_DAILY_TIME
+        NOTIFICATION_SCHEDULER.WORKOUT_REMINDER_DAILY_TIME,
+        NOTIFICATION_SCHEDULER.TIME_ZONE
       )
     );
   }
@@ -183,7 +187,10 @@ const startNotificationScheduler = (options = {}) => {
     );
   }
 
-  logger.info('Notification scheduler started', config);
+  logger.info('Notification scheduler started', {
+    ...config,
+    timeZone: NOTIFICATION_SCHEDULER.TIME_ZONE,
+  });
 
   return {
     stop: stopNotificationScheduler,

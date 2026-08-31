@@ -64,8 +64,9 @@ const grantActiveMembership = async (userId, activeDate) => {
 
 const createWorkoutPlanForDate = async (
   userId,
-  { title, isActive, isRestDay, dayOfWeek }
+  { title, isActive, isRestDay, dayOfWeek, hasExercises }
 ) => {
+  const shouldCreateExercises = hasExercises ?? !isRestDay;
   const {
     rows: [workoutPlan],
   } = await db.query(
@@ -75,11 +76,32 @@ const createWorkoutPlanForDate = async (
     [userId, title, isActive]
   );
 
-  await db.query(
+  const {
+    rows: [workoutDay],
+  } = await db.query(
     `INSERT INTO workout_days (workout_plan_id, day_of_week, day_label, is_rest_day)
-     VALUES ($1, $2, $3, $4)`,
+     VALUES ($1, $2, $3, $4)
+     RETURNING id`,
     [workoutPlan.id, dayOfWeek, `${title} today`, isRestDay]
   );
+
+  if (shouldCreateExercises) {
+    const {
+      rows: [exercise],
+    } = await db.query(
+      `INSERT INTO exercises (name, muscle_group, equipment, difficulty, goal_tags)
+       VALUES ($1, 'full_body', 'bodyweight', 'beginner', $2)
+       RETURNING id`,
+      [`${title} exercise`, ['general_fitness']]
+    );
+
+    await db.query(
+      `INSERT INTO workout_day_exercises
+         (workout_day_id, exercise_id, sets, reps, rest_seconds, order_index)
+       VALUES ($1, $2, 3, 10, 60, 0)`,
+      [workoutDay.id, exercise.id]
+    );
+  }
 
   return workoutPlan;
 };
@@ -223,5 +245,38 @@ describe('workout reminder integration', () => {
       skipped_count: 0,
     });
     expect(notifications).toHaveLength(0);
+  });
+
+  it('sends reminders for exercise days even when the rest-day flag is stale', async () => {
+    const today = scheduleDate(3);
+    const member = await createMember('stale-rest-flag@example.com');
+
+    await grantActiveMembership(member.id, today.date);
+    await createWorkoutPlanForDate(member.id, {
+      title: 'Stale Rest Flag Plan',
+      isActive: true,
+      isRestDay: true,
+      hasExercises: true,
+      dayOfWeek: today.day_of_week,
+    });
+
+    const result = await service.sendWorkoutReminderNotifications(today.date);
+    const { rows: notifications } = await db.query(
+      `SELECT user_id, type
+       FROM notifications`
+    );
+
+    expect(result).toMatchObject({
+      reminder_date: today.date,
+      scanned_count: 1,
+      created_count: 1,
+      skipped_count: 0,
+    });
+    expect(notifications).toEqual([
+      {
+        user_id: member.id,
+        type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
+      },
+    ]);
   });
 });

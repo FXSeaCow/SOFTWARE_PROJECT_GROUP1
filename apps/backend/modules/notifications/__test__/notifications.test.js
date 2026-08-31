@@ -479,7 +479,7 @@ describe('notifications module', () => {
       expect.any(Date)
     );
     expect(repo.findRecentByType.mock.calls[0][2]).toEqual(
-      new Date(2026, 7, 6, 0, 0, 0, 0)
+      new Date('2026-08-05T17:00:00.000Z')
     );
     expect(repo.createNotification).toHaveBeenCalledTimes(1);
     expect(repo.createNotification).toHaveBeenCalledWith(
@@ -541,30 +541,59 @@ describe('notifications module', () => {
     expect(
       scheduler.millisecondsUntilDailyTime(
         '09:30',
-        new Date(2026, 7, 6, 8, 0, 0)
+        new Date('2026-08-06T08:00:00.000Z'),
+        'UTC'
       )
     ).toBe(90 * 60 * 1000);
 
     expect(
       scheduler.millisecondsUntilDailyTime(
         '09:30',
-        new Date(2026, 7, 6, 10, 0, 0)
+        new Date('2026-08-06T10:00:00.000Z'),
+        'UTC'
       )
     ).toBe((23 * 60 + 30) * 60 * 1000);
 
     expect(
       scheduler.millisecondsUntilDailyTime(
         'not-a-time',
-        new Date(2026, 7, 6, 23, 45, 0)
+        new Date('2026-08-06T23:45:00.000Z'),
+        'UTC'
       )
     ).toBe(15 * 60 * 1000);
 
     expect(
       scheduler.millisecondsUntilDailyTime(
         '00:00',
-        new Date(2026, 7, 6, 0, 0, 0)
+        new Date('2026-08-06T00:00:00.000Z'),
+        'UTC'
       )
     ).toBe(0);
+
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        '00:00',
+        new Date('2026-08-30T16:59:00.000Z'),
+        'Asia/Ho_Chi_Minh'
+      )
+    ).toBe(60 * 1000);
+
+    expect(
+      scheduler.millisecondsUntilDailyTime(
+        '00:00',
+        new Date('2026-08-30T17:00:00.000Z'),
+        'Asia/Ho_Chi_Minh'
+      )
+    ).toBe(0);
+  });
+
+  it('uses the notification timezone for scheduler job dates', () => {
+    expect(
+      service.toDateOnlyString(new Date('2026-08-05T17:00:00.000Z'))
+    ).toBe('2026-08-06');
+    expect(service.startOfLocalDate('2026-08-06').toISOString()).toBe(
+      '2026-08-05T17:00:00.000Z'
+    );
   });
 
   it('starts and stops the scheduler without jobs when all options are disabled', () => {

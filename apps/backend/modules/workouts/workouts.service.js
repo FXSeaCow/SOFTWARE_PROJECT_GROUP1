@@ -369,6 +369,7 @@ const setDayExercises = async (planId, dayId, userId, exercises) => {
 
   const inserted = await withTransaction(async (client) => {
     const rows = await repo.replaceDayExercises(dayId, exercises, client);
+    await repo.updateDay(dayId, { is_rest_day: rows.length === 0 }, client);
     await repo.updatePlan(planId, { is_customized: true }, client);
     return rows;
   });
