@@ -414,27 +414,13 @@ const LOCAL_GOAL_KEYWORDS = {
     'fitness',
     'gym',
     'workout',
+    'work out',
     'exercise',
     'wellness',
     'active',
     'energy',
   ],
 };
-
-const LOCAL_NON_FITNESS_KEYWORDS = [
-  'pasta',
-  'carbonara',
-  'recipe',
-  'cook',
-  'cooking',
-  'weather',
-  'coding',
-  'code',
-  'javascript',
-  'movie',
-  'music',
-  'travel',
-];
 
 const LOCAL_REDIRECT_MESSAGE =
   'GymHub is here to help with fitness goals. Tell me what you want to improve at the gym, such as building muscle, losing weight, or improving stamina.';
@@ -537,23 +523,15 @@ const classifyGoalLocally = (cleanText) => {
   scores.sort((a, b) => b.score - a.score);
 
   const best = scores[0];
-  const nonFitnessScore = countKeywordMatches(text, LOCAL_NON_FITNESS_KEYWORDS);
-
   if (!best || best.score === 0) {
-    if (nonFitnessScore > 0) {
-      return {
-        is_fitness_related: false,
-        goal: null,
-        confidence: null,
-        redirect_message: LOCAL_REDIRECT_MESSAGE,
-      };
-    }
-
+    // A fallback classifier must not turn an unknown or unrelated message
+    // into a workout request. General fitness is only appropriate when the
+    // member actually mentions fitness, health, exercise, or training.
     return {
-      is_fitness_related: true,
-      goal: 'general_fitness',
-      confidence: 'low',
-      redirect_message: null,
+      is_fitness_related: false,
+      goal: null,
+      confidence: null,
+      redirect_message: LOCAL_REDIRECT_MESSAGE,
     };
   }
 
@@ -683,6 +661,30 @@ const formatGroqError = (errBody) => {
 };
 
 /**
+ * Parse a JSON object even when a model adds a short explanation around it.
+ * JSON mode normally makes this unnecessary, but it keeps the retry path
+ * compatible with models that reject response_format or emit extra text.
+ *
+ * @param {string} content
+ * @returns {object}
+ */
+const parseGroqJson = (content) => {
+  const cleaned = String(content || '')
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start < 0 || end <= start) throw new Error('Groq returned invalid JSON');
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
+};
+
+/**
  * True when Groq rejected a model id or the project does not have access.
  *
  * These failures are safe to retry against other candidate models.
@@ -758,10 +760,8 @@ const resolveGoalFromText = async (userText) => {
   try {
     const apiKey = process.env.GROQ_API_KEY;
 
-    let lastError = null;
-
     for (const model of GROQ_MODEL_CANDIDATES) {
-      const response = await fetch(`${GROQ_API_URL}?key=${apiKey}`, {
+      const requestGroq = (useJsonMode) => fetch(`${GROQ_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -774,23 +774,35 @@ const resolveGoalFromText = async (userText) => {
             { role: 'user', content: cleanText },
           ],
           temperature: 0,
-          max_tokens: 200,
-          // Forces Groq to output valid JSON matching your schema
-          response_format: { type: 'json_object' },
+          // Reasoning models may spend tokens before emitting the JSON.
+          max_tokens: 500,
+          ...(useJsonMode ? { response_format: { type: 'json_object' } } : {}),
         }),
       });
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        const errMsg = `Groq API error ${response.status} on model ${model}: ${formatGroqError(errBody)}`;
-        const err = new Error(errMsg);
-        lastError = err;
+      let response = await requestGroq(true);
 
-        if (isModelAccessError(response.status, errBody) && model !== GROQ_MODEL_CANDIDATES[GROQ_MODEL_CANDIDATES.length - 1]) {
-          continue;
+      if (!response.ok) {
+        let errBody = await response.text();
+        // Some Groq reasoning models occasionally fail JSON mode validation.
+        // Retry once without response_format; the prompt still requires JSON.
+        if (response.status === 400 && /failed_generation/i.test(errBody)) {
+          response = await requestGroq(false);
+          if (!response.ok) errBody = await response.text();
         }
 
-        throw err;
+        if (response.ok) {
+          // Continue below and parse the successful retry response.
+        } else {
+          const errMsg = `Groq API error ${response.status} on model ${model}: ${formatGroqError(errBody)}`;
+          const err = new Error(errMsg);
+
+          if (isModelAccessError(response.status, errBody) && model !== GROQ_MODEL_CANDIDATES[GROQ_MODEL_CANDIDATES.length - 1]) {
+            continue;
+          }
+
+          throw err;
+        }
       }
 
       const data = await response.json();
@@ -799,12 +811,7 @@ const resolveGoalFromText = async (userText) => {
       const rawContent = data?.choices?.[0]?.message?.content || '';
 
       // Defensive strip of any accidental markdown fences
-      const jsonText = rawContent
-        .replace(/```json\s*/gi, '')
-        .replace(/```\s*/g, '')
-        .trim();
-
-      const parsed = JSON.parse(jsonText);
+      const parsed = parseGroqJson(rawContent);
 
       // ── Validate and sanitise every field from Groq ─────────────────────────
 
@@ -874,6 +881,7 @@ module.exports = {
   scoreExercise,
   pickBestExercises,
   classifyGoalLocally,
+  parseGroqJson,
   parsePreferredSlotsLocally,
   GOAL_PROFILES,
   SPLITS,
