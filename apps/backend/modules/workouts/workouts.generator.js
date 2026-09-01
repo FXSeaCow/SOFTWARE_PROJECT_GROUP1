@@ -346,8 +346,16 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, 
 
 const VALID_GOALS    = Object.keys(GOALS);
 const VALID_CONFIDENCE = ['high', 'medium', 'low'];
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_REMOTE_DISABLED = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.GROQ_DISABLE_REMOTE || '').toLowerCase()
+);
+const GROQ_MODEL_CANDIDATES = [
+  process.env.GROQ_MODEL,
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.6-27b',
+  'llama-3.3-70b-versatile',
+].filter(Boolean);
 
 const LOCAL_GOAL_KEYWORDS = {
   muscle_gain: [
@@ -658,6 +666,39 @@ Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_mess
 `.trim();
 
 /**
+ * Extract a short human-readable error from a Groq response body.
+ *
+ * This keeps the logs useful without depending on the exact error schema.
+ *
+ * @param {string} errBody
+ * @returns {string}
+ */
+const formatGroqError = (errBody) => {
+  try {
+    const parsed = JSON.parse(errBody);
+    return parsed?.error?.message || parsed?.error?.code || errBody;
+  } catch {
+    return errBody;
+  }
+};
+
+/**
+ * True when Groq rejected a model id or the project does not have access.
+ *
+ * These failures are safe to retry against other candidate models.
+ *
+ * @param {number} status
+ * @param {string} errBody
+ * @returns {boolean}
+ */
+const isModelAccessError = (status, errBody) => {
+  const body = String(errBody || '');
+  return status === 404
+    || status === 403
+    || /model_not_found|model_permission_blocked|does not exist/i.test(body);
+};
+
+/**
  * resolveGoalFromText
  * Calls the Gemini API to:
  *   1. Detect whether the member's input is fitness-related.
@@ -690,88 +731,120 @@ const resolveGoalFromText = async (userText) => {
 
   const cleanText = userText.trim().slice(0, 500); // guard against huge inputs
 
+  // If remote generation is explicitly disabled, use the local classifier only.
+  if (GROQ_REMOTE_DISABLED) {
+    const localResult = classifyGoalLocally(cleanText);
+
+    return {
+      ...localResult,
+      raw_text:        cleanText,
+      fallback:        true,
+      preferred_slots: parsePreferredSlotsLocally(cleanText),
+    };
+  }
+
+  if (!process.env.GROQ_API_KEY) {
+    const localResult = classifyGoalLocally(cleanText);
+
+    return {
+      ...localResult,
+      raw_text:        cleanText,
+      fallback:        true,
+      preferred_slots: parsePreferredSlotsLocally(cleanText),
+    };
+  }
+
   // ── Groq API call ──────────────────────────────────────────────────────────
   try {
     const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      throw new Error('GROQ_API_KEY is not set in environment variables');
+
+    let lastError = null;
+
+    for (const model of GROQ_MODEL_CANDIDATES) {
+      const response = await fetch(`${GROQ_API_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: cleanText },
+          ],
+          temperature: 0,
+          max_tokens: 200,
+          // Forces Groq to output valid JSON matching your schema
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        const errMsg = `Groq API error ${response.status} on model ${model}: ${formatGroqError(errBody)}`;
+        const err = new Error(errMsg);
+        lastError = err;
+
+        if (isModelAccessError(response.status, errBody) && model !== GROQ_MODEL_CANDIDATES[GROQ_MODEL_CANDIDATES.length - 1]) {
+          continue;
+        }
+
+        throw err;
+      }
+
+      const data = await response.json();
+
+      // Extract raw text content from Groq's nested response structure
+      const rawContent = data?.choices?.[0]?.message?.content || '';
+
+      // Defensive strip of any accidental markdown fences
+      const jsonText = rawContent
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
+      const parsed = JSON.parse(jsonText);
+
+      // ── Validate and sanitise every field from Groq ─────────────────────────
+
+      const isFitnessRelated = Boolean(parsed.is_fitness_related);
+
+      // Ensure goal is a recognised key, or null if not fitness-related
+      const goal = isFitnessRelated
+        ? (VALID_GOALS.includes(parsed.goal) ? parsed.goal : 'general_fitness')
+        : null;
+
+      // Ensure confidence is valid, or null if not fitness-related
+      const confidence = isFitnessRelated
+        ? (VALID_CONFIDENCE.includes(parsed.confidence) ? parsed.confidence : 'low')
+        : null;
+
+      // Sanitise redirect_message: only present when not fitness-related
+      const redirectMessage = !isFitnessRelated && typeof parsed.redirect_message === 'string'
+        ? parsed.redirect_message.trim()
+        : null;
+
+      // Sanitise preferred_slots: must be an array of { day_of_week: 1-7, period }
+      const rawSlots = Array.isArray(parsed.preferred_slots) ? parsed.preferred_slots : [];
+      const preferredSlots = rawSlots
+        .filter((slot) => slot && Number.isInteger(slot.day_of_week)
+          && slot.day_of_week >= 1 && slot.day_of_week <= 7)
+        .map((slot) => ({
+          day_of_week: slot.day_of_week,
+          period: ['morning', 'afternoon'].includes(slot.period) ? slot.period : null,
+        }));
+
+      return {
+        is_fitness_related: isFitnessRelated,
+        goal,
+        confidence,
+        redirect_message: redirectMessage,
+        raw_text:         cleanText,
+        fallback:         false,
+        preferred_slots:  preferredSlots,
+      };
     }
-
-    const response = await fetch(`${GROQ_API_URL}?key=${apiKey}`, {
-      method:  'POST',
-      headers: 
-      { 'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-       },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: cleanText }
-        ],
-        temperature: 0,
-        max_tokens: 200,
-        // Forces Groq to output valid JSON matching your schema
-        response_format: { type: 'json_object' }
-      }),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`Groq API error ${response.status}: ${errBody}`);
-    }
-
-    const data = await response.json();
-
-    // Extract raw text content from Groq's nested response structure
-    const rawContent = data?.choices?.[0]?.message?.content || '';
-
-    // Defensive strip of any accidental markdown fences
-    const jsonText = rawContent
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim();
-
-    const parsed = JSON.parse(jsonText);
-
-    // ── Validate and sanitise every field from Groq ─────────────────────────
-
-    const isFitnessRelated = Boolean(parsed.is_fitness_related);
-
-    // Ensure goal is a recognised key, or null if not fitness-related
-    const goal = isFitnessRelated
-      ? (VALID_GOALS.includes(parsed.goal) ? parsed.goal : 'general_fitness')
-      : null;
-
-    // Ensure confidence is valid, or null if not fitness-related
-    const confidence = isFitnessRelated
-      ? (VALID_CONFIDENCE.includes(parsed.confidence) ? parsed.confidence : 'low')
-      : null;
-
-    // Sanitise redirect_message: only present when not fitness-related
-    const redirectMessage = !isFitnessRelated && typeof parsed.redirect_message === 'string'
-      ? parsed.redirect_message.trim()
-      : null;
-
-    // Sanitise preferred_slots: must be an array of { day_of_week: 1-7, period }
-    const rawSlots = Array.isArray(parsed.preferred_slots) ? parsed.preferred_slots : [];
-    const preferredSlots = rawSlots
-      .filter((slot) => slot && Number.isInteger(slot.day_of_week)
-        && slot.day_of_week >= 1 && slot.day_of_week <= 7)
-      .map((slot) => ({
-        day_of_week: slot.day_of_week,
-        period: ['morning', 'afternoon'].includes(slot.period) ? slot.period : null,
-      }));
-
-    return {
-      is_fitness_related: isFitnessRelated,
-      goal,
-      confidence,
-      redirect_message: redirectMessage,
-      raw_text:         cleanText,
-      fallback:         false,
-      preferred_slots:  preferredSlots,
-    };
 
   } catch (err) {
     // ── Graceful fallback when Groq is unavailable ───────────────────────────
