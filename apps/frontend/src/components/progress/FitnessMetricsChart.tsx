@@ -6,6 +6,19 @@ export type ChartPoint = {
   date?: string;
 };
 
+function parseChartPointTime(date: string): number | null {
+  const dateOnlyMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const parsed = new Date(date).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function FitnessMetricsChart({
   points,
   unit,
@@ -31,14 +44,7 @@ export function FitnessMetricsChart({
   const valueRange = maxValue - minValue || 1;
 
   const plotWidth = width - paddingX * 2;
-  const parsedTimes = points.map((point) => {
-    if (!point.date) {
-      return null;
-    }
-
-    const parsed = new Date(`${point.date}T00:00:00`).getTime();
-    return Number.isFinite(parsed) ? parsed : null;
-  });
+  const parsedTimes = points.map((point) => (point.date ? parseChartPointTime(point.date) : null));
   const validTimes = parsedTimes.filter((time): time is number => time !== null);
   const minTime = validTimes.length === points.length ? Math.min(...validTimes) : null;
   const maxTime = validTimes.length === points.length ? Math.max(...validTimes) : null;
