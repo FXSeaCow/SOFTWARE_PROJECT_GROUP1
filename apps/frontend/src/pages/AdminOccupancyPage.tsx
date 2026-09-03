@@ -271,7 +271,11 @@ export function AdminOccupancyPage() {
     try {
       const result = await resetOpenSessions(branchId);
       setFeedback(`${result.closed_count} open session(s) closed.`);
-      await Promise.all([loadOccupancy(), loadSessions(statusFilter, sessionsBranchId)]);
+      await Promise.all([
+        loadOccupancy(),
+        loadReport(reportDate, reportBranchId),
+        loadSessions(statusFilter, sessionsBranchId),
+      ]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to reset open sessions.");
     } finally {
@@ -288,7 +292,11 @@ export function AdminOccupancyPage() {
     try {
       const result = await checkInGym(checkInBranchId, token);
       setFeedback(`${result.member.full_name} checked in at ${result.branch.branch_name}.`);
-      await Promise.all([loadOccupancy(), loadSessions(statusFilter, sessionsBranchId)]);
+      await Promise.all([
+        loadOccupancy(),
+        loadReport(reportDate, reportBranchId),
+        loadSessions(statusFilter, sessionsBranchId),
+      ]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to check in this member.");
     } finally {
@@ -305,7 +313,11 @@ export function AdminOccupancyPage() {
     try {
       const result = await checkOutGym(token);
       setFeedback(`${result.member.full_name} checked out of ${result.branch.branch_name}.`);
-      await Promise.all([loadOccupancy(), loadSessions(statusFilter, sessionsBranchId)]);
+      await Promise.all([
+        loadOccupancy(),
+        loadReport(reportDate, reportBranchId),
+        loadSessions(statusFilter, sessionsBranchId),
+      ]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to check out this member.");
     } finally {
