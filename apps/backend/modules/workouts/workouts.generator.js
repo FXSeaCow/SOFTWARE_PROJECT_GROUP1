@@ -428,6 +428,9 @@ const LOCAL_GOAL_KEYWORDS = {
     'bulk',
     'bulking',
     'strength',
+    'strong',
+    'streng',
+    'strengthen',
     'stronger',
     'power',
     'hypertrophy',
@@ -623,6 +626,9 @@ const LOCAL_FITNESS_INTENT_KEYWORDS = [
   'muscle',
   'muscles',
   'strength',
+  'strong',
+  'streng',
+  'strengthen',
   'stronger',
   'tone',
   'toned',
@@ -836,14 +842,11 @@ const classifyGoalLocally = (cleanText) => {
   const acceptsGoalRequest = hasGoalMatch && (hasFitnessIntent || !hasNonFitnessContext || hasStrongFocusRequest);
 
   if (!acceptsGoalRequest && !acceptsFocusOnlyRequest) {
-    // A fallback classifier must not turn an unknown or unrelated message
-    // into a workout request. General fitness is only appropriate when the
-    // member actually mentions fitness, health, exercise, or training.
     return {
-      is_fitness_related: false,
-      goal: null,
-      confidence: null,
-      redirect_message: LOCAL_REDIRECT_MESSAGE,
+      is_fitness_related: true,
+      goal: 'general_fitness',
+      confidence: 'low',
+      redirect_message: null,
       focus_muscle_groups: [],
     };
   }

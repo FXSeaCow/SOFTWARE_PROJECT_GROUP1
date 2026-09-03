@@ -989,15 +989,9 @@ export function SchedulePage() {
 
     try {
       const resolved = await resolveWorkoutGoal(goalText);
-      if (!resolved.is_fitness_related || !resolved.goal) {
-        setSmartError(
-          resolved.redirect_message ||
-            "Please describe a workout goal, such as building muscle, losing weight, or improving endurance.",
-        );
-        return;
-      }
-
-      const goal = resolved.goal;
+      const goal = resolved.is_fitness_related && resolved.goal
+        ? resolved.goal
+        : "general_fitness";
 
       const generated = await generateSmartWorkoutPlan({
         title: `Smart plan ${new Date().toLocaleDateString()}`,

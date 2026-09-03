@@ -120,10 +120,6 @@ const generatePlan = async (userId, {
   if (source_text && source_text.trim()) {
     const localIntent = classifyGoalLocally(source_text);
 
-    if (!localIntent.is_fitness_related) {
-      throw ApiError.badRequest(localIntent.redirect_message);
-    }
-
     if (!resolvedFocusGroups?.length && localIntent.focus_muscle_groups?.length) {
       resolvedFocusGroups = localIntent.focus_muscle_groups;
     }
