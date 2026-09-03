@@ -1114,6 +1114,20 @@ describe('workouts.generator (unit)', () => {
       const pool = [{ id: 'a', name: 'Solo', goal_tags: ['muscle_gain'] }];
       expect(pickBestExercises(pool, 10, profile).length).toBe(1);
     });
+
+    it('should rotate ranked exercises when an offset is provided', () => {
+      const pool = [
+        { id: 'a', name: 'A Exercise', goal_tags: ['muscle_gain'] },
+        { id: 'b', name: 'B Exercise', goal_tags: ['muscle_gain'] },
+        { id: 'c', name: 'C Exercise', goal_tags: ['muscle_gain'] },
+        { id: 'd', name: 'D Exercise', goal_tags: ['muscle_gain'] },
+      ];
+      const firstSession = pickBestExercises(pool, 2, profile, 0).map((exercise) => exercise.id);
+      const secondSession = pickBestExercises(pool, 2, profile, 2).map((exercise) => exercise.id);
+
+      expect(firstSession).toEqual(['a', 'b']);
+      expect(secondSession).toEqual(['c', 'd']);
+    });
   });
 
   // ── buildWeeklyPlan ─────────────────────────────────────────────────────────
@@ -1289,6 +1303,23 @@ describe('workouts.generator (unit)', () => {
       activeDays.forEach((day) => {
         expect(day.day_label).toBe('Focus: Core');
       });
+    });
+
+    it('should vary focused core exercises across sessions when the catalog allows it', () => {
+      const plan = buildWeeklyPlan({
+        goal: 'general_fitness',
+        fitness_level: 'beginner',
+        days_per_week: 3,
+        exerciseCatalog: makeCatalog(),
+        focus_muscle_groups: ['core'],
+      });
+      const activeDays = plan.filter((day) => !day.is_rest_day);
+      const firstSessionIds = activeDays[0].exercises.map((exercise) => exercise.exercise_id);
+      const secondSessionIds = activeDays[1].exercises.map((exercise) => exercise.exercise_id);
+      const uniqueIds = new Set(activeDays.flatMap((day) => day.exercises.map((exercise) => exercise.exercise_id)));
+
+      expect(firstSessionIds).not.toEqual(secondSessionIds);
+      expect(uniqueIds.size).toBeGreaterThan(2);
     });
   });
 

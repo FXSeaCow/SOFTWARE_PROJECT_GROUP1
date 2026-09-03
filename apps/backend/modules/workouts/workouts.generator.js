@@ -227,14 +227,15 @@ const scoreExercise = (exercise, priorityTags, secondaryTags) => {
  *   1. Get all exercises for the group from the pre-built index
  *   2. Score each by goal relevance
  *   3. Sort: highest score first, then alphabetically (deterministic tie-break)
- *   4. Take the top N
+ *   4. Rotate the ranked pool by session offset, then take N
  *
  * @param {object[]} pool          — exercises for a specific muscle_group
  * @param {number}   count         — how many to pick
  * @param {object}   goalProfile   — from GOAL_PROFILES
+ * @param {number}   offset        - deterministic rotation offset for variety
  * @returns {object[]}
  */
-const pickBestExercises = (pool, count, goalProfile) => {
+const pickBestExercises = (pool, count, goalProfile, offset = 0) => {
   if (pool.length === 0) return [];
 
   const { priorityTags, secondaryTags } = goalProfile;
@@ -251,7 +252,14 @@ const pickBestExercises = (pool, count, goalProfile) => {
       : a.ex.name.localeCompare(b.ex.name)
   );
 
-  return scored.slice(0, count).map(({ ex }) => ex);
+  if (count >= scored.length) {
+    return scored.map(({ ex }) => ex);
+  }
+
+  const start = offset % scored.length;
+  return Array.from({ length: count }, (_, index) => (
+    scored[(start + index) % scored.length].ex
+  ));
 };
 
 // ─── Main builder ─────────────────────────────────────────────────────────────
@@ -327,6 +335,8 @@ const buildWeeklyPlan = ({
 
   const days = [];
 
+  let activeSessionIndex = 0;
+
   for (let dow = 1; dow <= 7; dow++) {
     const activeDay = activeDayByDow.get(dow);
 
@@ -355,7 +365,12 @@ const buildWeeklyPlan = ({
 
     for (const group of groups) {
       const pool   = byGroup[group] || [];
-      const picked = pickBestExercises(pool, exPerGroup, goalProfile);
+      const picked = pickBestExercises(
+        pool,
+        exPerGroup,
+        goalProfile,
+        activeSessionIndex * exPerGroup
+      );
 
       for (const ex of picked) {
         exercises.push({
@@ -371,6 +386,7 @@ const buildWeeklyPlan = ({
     }
 
     days.push({ day_of_week: dow, day_label: label, is_rest_day: false, exercises });
+    activeSessionIndex++;
   }
 
   return days;
