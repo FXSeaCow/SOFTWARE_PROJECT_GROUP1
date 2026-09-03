@@ -223,11 +223,6 @@ export function AdminOccupancyPage() {
 
   const branchOptions: BranchOccupancy[] = occupancy?.branches ?? [];
 
-  const maxHourly = useMemo(() => {
-    if (!report) return 1;
-    return Math.max(...report.hourly_occupancy.map((point) => point.occupancy), 1);
-  }, [report]);
-
   function openCreateBranchModal() {
     setEditingBranch(null);
     setIsBranchModalOpen(true);
@@ -794,46 +789,33 @@ export function AdminOccupancyPage() {
           <Skeleton height={180} width="100%" radius={14} />
         ) : report ? (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16, marginBottom: 20 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                color: "#9ca8b7",
+                fontSize: 12,
+                marginBottom: 16,
+              }}
+            >
+              <span>{report.branch ? report.branch.branch_name : `${report.branches_count} active branches`}</span>
+              <span>Capacity tracked: {report.capacity}</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
               <ReportStat label="Total visits" value={String(report.total_visits)} />
               <ReportStat label="Unique members" value={String(report.unique_members)} icon={<Users size={16} />} />
               <ReportStat label="Currently open" value={String(report.open_sessions)} />
               <ReportStat
                 label="Peak hour"
-                value={report.peak_hour.hour ? `${report.peak_hour.hour} (${report.peak_hour.occupancy})` : "—"}
+                value={report.peak_hour.hour ? `${report.peak_hour.hour} (${report.peak_hour.occupancy})` : "-"}
               />
               <ReportStat label="Avg. occupancy" value={`${report.average_occupancy} (${report.average_occupancy_rate}%)`} />
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(24, minmax(0, 1fr))",
-                gap: 3,
-                alignItems: "end",
-                height: 110,
-              }}
-            >
-              {report.hourly_occupancy.map((point) => (
-                <div
-                  key={point.hour}
-                  title={`${point.hour}: ${point.occupancy}`}
-                  style={{
-                    height: `${Math.max((point.occupancy / maxHourly) * 100, point.occupancy > 0 ? 6 : 2)}%`,
-                    borderRadius: 4,
-                    background:
-                      point.occupancy > 0
-                        ? "linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%)"
-                        : "rgba(255,255,255,0.06)",
-                  }}
-                />
-              ))}
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, color: "#8d98a7", fontSize: 11 }}>
-              <span>00:00</span>
-              <span>12:00</span>
-              <span>23:00</span>
-            </div>
+            <DailyReportChart report={report} />
           </>
         ) : (
           <div style={{ color: "#9ca8b7", fontSize: 14 }}>No report data.</div>
@@ -1017,9 +999,169 @@ export function AdminOccupancyPage() {
   );
 }
 
+function DailyReportChart({ report }: { report: DailyOccupancyReport }) {
+  const maxHourly = Math.max(
+    ...report.hourly_occupancy.map((point) => point.occupancy),
+    1
+  );
+  const hasActivity = report.total_visits > 0 || maxHourly > 1;
+  const midTick = Math.ceil(maxHourly / 2);
+
+  return (
+    <div
+      style={{
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        background: "rgba(255,255,255,0.015)",
+        padding: "14px 14px 10px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 12,
+          color: "#9ca8b7",
+          fontSize: 12,
+        }}
+      >
+        <span>Hourly occupancy</span>
+        <span>{hasActivity ? `Max ${maxHourly} member${maxHourly === 1 ? "" : "s"}` : "No visits recorded"}</span>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "34px 1fr",
+          gap: 10,
+          alignItems: "stretch",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            height: 150,
+            color: "#6f7b8b",
+            fontSize: 10,
+            textAlign: "right",
+            paddingTop: 2,
+            paddingBottom: 1,
+          }}
+        >
+          <span>{maxHourly}</span>
+          <span>{midTick}</span>
+          <span>0</span>
+        </div>
+
+        <div>
+          <div
+            style={{
+              position: "relative",
+              height: 150,
+              borderBottom: "1px solid rgba(255,255,255,0.12)",
+              background:
+                "linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, transparent calc(50% - 1px), rgba(255,255,255,0.06) calc(50% - 1px), rgba(255,255,255,0.06) 50%, transparent 50%)",
+              backgroundSize: "100% 50%, 100% 100%",
+            }}
+          >
+            {!hasActivity ? (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 3,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.12)",
+                }}
+              />
+            ) : null}
+            <div
+              style={{
+                position: "absolute",
+                inset: "0 0 0 0",
+                display: "grid",
+                gridTemplateColumns: "repeat(24, minmax(8px, 1fr))",
+                gap: 4,
+                alignItems: "end",
+              }}
+            >
+              {report.hourly_occupancy.map((point) => {
+                const isPeak =
+                  report.peak_hour.hour === point.hour && point.occupancy > 0;
+                const height = point.occupancy > 0
+                  ? Math.max((point.occupancy / maxHourly) * 100, 8)
+                  : 0;
+
+                return (
+                  <div
+                    key={point.hour}
+                    title={`${point.hour}: ${point.occupancy} member${point.occupancy === 1 ? "" : "s"}`}
+                    style={{
+                      height: point.occupancy > 0 ? `${height}%` : 3,
+                      minHeight: point.occupancy > 0 ? 8 : 3,
+                      borderRadius: "4px 4px 0 0",
+                      background: point.occupancy > 0
+                        ? isPeak
+                          ? "linear-gradient(180deg, #fbbf24 0%, #f97316 100%)"
+                          : "linear-gradient(180deg, #93c5fd 0%, #3b82f6 100%)"
+                        : hasActivity
+                          ? "rgba(255,255,255,0.08)"
+                          : "transparent",
+                      boxShadow: isPeak ? "0 0 14px rgba(249,115,22,0.32)" : "none",
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(24, minmax(8px, 1fr))",
+              gap: 4,
+              marginTop: 8,
+              color: "#7c8797",
+              fontSize: 10,
+            }}
+          >
+            {report.hourly_occupancy.map((point, index) => (
+              <span
+                key={point.hour}
+                style={{
+                  visibility: [0, 6, 12, 18, 23].includes(index)
+                    ? "visible"
+                    : "hidden",
+                  textAlign: index === 23 ? "right" : "left",
+                }}
+              >
+                {point.hour}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReportStat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div>
+    <div
+      style={{
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 8,
+        background: "rgba(255,255,255,0.018)",
+        padding: "12px 14px",
+        minHeight: 72,
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#8d98a7", fontSize: 12, marginBottom: 6 }}>
         {icon}
         {label}

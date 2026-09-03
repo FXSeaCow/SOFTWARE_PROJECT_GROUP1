@@ -21,6 +21,23 @@ const GOALS = {
   general_fitness: 'general_fitness',
 };
 
+const VALID_FOCUS_GROUPS = [
+  'chest',
+  'back',
+  'legs',
+  'shoulders',
+  'arms',
+  'core',
+  'cardio',
+  'full_body',
+];
+
+const formatGroupLabel = (group) =>
+  String(group)
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
 // ─── Split templates ──────────────────────────────────────────────────────────
 // day: 1=Mon … 7=Sun
 // groups: primary muscle groups targeted that day
@@ -263,7 +280,14 @@ const pickBestExercises = (pool, count, goalProfile) => {
  *   }>
  * }>}
  */
-const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, preferredSlots }) => {
+const buildWeeklyPlan = ({
+  goal,
+  fitness_level,
+  days_per_week,
+  exerciseCatalog,
+  preferredSlots,
+  focus_muscle_groups,
+}) => {
   const goalProfile = GOAL_PROFILES[goal] || GOAL_PROFILES['general_fitness'];
   const volume       = goalProfile.volumeOverrides[fitness_level]
                     || goalProfile.volumeOverrides['beginner'];
@@ -271,6 +295,9 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, 
 
   // ── Pre-compute catalog index ONCE for the entire plan ────────────────────
   const { byGroup } = buildCatalogIndex(exerciseCatalog);
+  const focusGroups = Array.isArray(focus_muscle_groups)
+    ? focus_muscle_groups.filter((group) => byGroup[group])
+    : [];
 
   // If the member specified exact days/periods (e.g. "chiều thứ 5 và sáng thứ 7"),
   // honor those days instead of the fixed SPLITS template. The split template is
@@ -308,13 +335,20 @@ const buildWeeklyPlan = ({ goal, fitness_level, days_per_week, exerciseCatalog, 
       continue;
     }
 
-    // Merge base groups with goal-injected extra groups (deduplicated)
-    const groups = [...new Set([...activeDay.groups, ...goalProfile.extraGroups])];
+    // A requested body-part focus overrides the generic split template.
+    // Without this, "train abs" still becomes push/pull/legs.
+    const groups = focusGroups.length > 0
+      ? focusGroups
+      : [...new Set([...activeDay.groups, ...goalProfile.extraGroups])];
 
     // Build label: "Push day + Cardio" etc.
-    const label = goalProfile.labelSuffix
-      ? `${activeDay.label} ${goalProfile.labelSuffix}`
-      : activeDay.label;
+    const label = focusGroups.length > 0
+      ? `Focus: ${focusGroups.map(formatGroupLabel).join(' + ')}`
+      : (
+        goalProfile.labelSuffix
+          ? `${activeDay.label} ${goalProfile.labelSuffix}`
+          : activeDay.label
+      );
 
     const exercises  = [];
     let   orderIndex = 0;
@@ -422,6 +456,23 @@ const LOCAL_GOAL_KEYWORDS = {
   ],
 };
 
+const LOCAL_FOCUS_KEYWORDS = {
+  chest: ['chest', 'pec', 'pecs', 'nguc'],
+  back: ['back', 'lat', 'lats', 'xung lung', 'lung'],
+  legs: ['leg', 'legs', 'quad', 'quads', 'glute', 'glutes', 'hamstring', 'chan', 'mong', 'dui'],
+  shoulders: ['shoulder', 'shoulders', 'delt', 'delts', 'vai'],
+  arms: ['arm', 'arms', 'bicep', 'biceps', 'tricep', 'triceps', 'tay'],
+  core: ['abs', 'six pack', 'six-pack', 'core', 'abdominal', 'belly', 'stomach', 'mui bung', 'co bung', 'bung'],
+  cardio: ['cardio', 'run', 'running', 'treadmill', 'stamina', 'endurance', 'chay bo'],
+  full_body: ['full body', 'whole body', 'toan than'],
+};
+
+const normalizeSearchText = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
 const LOCAL_REDIRECT_MESSAGE =
   'GymHub is here to help with fitness goals. Tell me what you want to improve at the gym, such as building muscle, losing weight, or improving stamina.';
 
@@ -508,6 +559,13 @@ const countKeywordMatches = (text, keywords) =>
     text.includes(keyword) ? count + 1 : count
   ), 0);
 
+const extractFocusGroupsLocally = (cleanText) => {
+  const text = normalizeSearchText(cleanText);
+  return Object.entries(LOCAL_FOCUS_KEYWORDS)
+    .filter(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))
+    .map(([group]) => group);
+};
+
 /**
  * Lightweight local fallback used when Groq is unavailable.
  *
@@ -515,7 +573,8 @@ const countKeywordMatches = (text, keywords) =>
  * @returns {object}
  */
 const classifyGoalLocally = (cleanText) => {
-  const text = cleanText.toLowerCase();
+  const text = normalizeSearchText(cleanText);
+  const focusMuscleGroups = extractFocusGroupsLocally(cleanText);
   const scores = Object.entries(LOCAL_GOAL_KEYWORDS).map(([goal, keywords]) => ({
     goal,
     score: countKeywordMatches(text, keywords),
@@ -523,7 +582,7 @@ const classifyGoalLocally = (cleanText) => {
   scores.sort((a, b) => b.score - a.score);
 
   const best = scores[0];
-  if (!best || best.score === 0) {
+  if ((!best || best.score === 0) && focusMuscleGroups.length === 0) {
     // A fallback classifier must not turn an unknown or unrelated message
     // into a workout request. General fitness is only appropriate when the
     // member actually mentions fitness, health, exercise, or training.
@@ -532,14 +591,16 @@ const classifyGoalLocally = (cleanText) => {
       goal: null,
       confidence: null,
       redirect_message: LOCAL_REDIRECT_MESSAGE,
+      focus_muscle_groups: [],
     };
   }
 
   return {
     is_fitness_related: true,
-    goal: best.goal,
-    confidence: best.score >= 2 ? 'medium' : 'low',
+    goal: best && best.score > 0 ? best.goal : 'general_fitness',
+    confidence: best && best.score >= 2 ? 'medium' : 'low',
     redirect_message: null,
+    focus_muscle_groups: focusMuscleGroups,
   };
 };
 
@@ -562,13 +623,14 @@ Your job is to read what a gym member types and do THREE things:
   3. Extract any specific days/times the member says they are free to train.
 
 ─── RESPONSE SCHEMA ────────────────────────────────────────────────────────────
-Always respond with a single JSON object containing EXACTLY these five keys:
+Always respond with a single JSON object containing EXACTLY these six keys:
 
 {
   "is_fitness_related": true | false,
   "goal":               string | null,
   "confidence":         "high" | "medium" | "low" | null,
   "redirect_message":   string | null,
+  "focus_muscle_groups": ["chest" | "back" | "legs" | "shoulders" | "arms" | "core" | "cardio" | "full_body"],
   "preferred_slots":    [{ "day_of_week": 1-7, "period": "morning" | "afternoon" | null }]
 }
 
@@ -589,6 +651,10 @@ IF the input IS fitness-related:
                           not sure what goal, beginner with no specific goal
   • Set "confidence" to how sure you are: "high", "medium", or "low"
   • Set "redirect_message" to null
+  • If the member names a body part, set "focus_muscle_groups".
+    Examples: abs / six-pack / core / belly / stomach / "mui bung" / "co bung" -> ["core"];
+    arms / biceps / triceps / "tay" -> ["arms"]; legs / glutes / "chan" -> ["legs"].
+    If no body-part focus is requested, return [].
 
 IF the input is NOT fitness-related (e.g. food recipes, weather, coding, random chat):
   • Set "is_fitness_related" to false
@@ -597,6 +663,7 @@ IF the input is NOT fitness-related (e.g. food recipes, weather, coding, random 
   • Set "redirect_message" to a SHORT, friendly message (1-2 sentences) telling
     the user this app is for fitness goals, and asking them to describe their
     fitness goal instead. Keep the tone warm and helpful, NOT robotic.
+  • Set "focus_muscle_groups" to []
   • Set "preferred_slots" to []
 
 ─── PREFERRED_SLOTS RULES ────────────────────────────────────────────────────────
@@ -613,34 +680,34 @@ IF the input is NOT fitness-related (e.g. food recipes, weather, coding, random 
 ─── EXAMPLES ────────────────────────────────────────────────────────────────────
 
 Input: "I want to lose belly fat and feel lighter"
-Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"preferred_slots":[]}
+Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"focus_muscle_groups":["core"],"preferred_slots":[]}
 
 Input: "Build bigger arms and a wider back"
-Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"preferred_slots":[]}
+Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"focus_muscle_groups":["arms","back"],"preferred_slots":[]}
 
 Input: "I want to run a 10k without stopping"
-Output: {"is_fitness_related":true,"goal":"endurance","confidence":"high","redirect_message":null,"preferred_slots":[]}
+Output: {"is_fitness_related":true,"goal":"endurance","confidence":"high","redirect_message":null,"focus_muscle_groups":["cardio"],"preferred_slots":[]}
 
 Input: "I'm pretty stiff, I can't touch my toes"
-Output: {"is_fitness_related":true,"goal":"flexibility","confidence":"high","redirect_message":null,"preferred_slots":[]}
+Output: {"is_fitness_related":true,"goal":"flexibility","confidence":"high","redirect_message":null,"focus_muscle_groups":[],"preferred_slots":[]}
 
 Input: "Just want to be healthier, I'm not sure where to start"
-Output: {"is_fitness_related":true,"goal":"general_fitness","confidence":"medium","redirect_message":null,"preferred_slots":[]}
+Output: {"is_fitness_related":true,"goal":"general_fitness","confidence":"medium","redirect_message":null,"focus_muscle_groups":[],"preferred_slots":[]}
 
 Input: "Tôi muốn giảm cân và săn chắc cơ thể, tôi rảnh vào chiều thứ 5 và sáng thứ 7"
-Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"preferred_slots":[{"day_of_week":4,"period":"afternoon"},{"day_of_week":6,"period":"morning"}]}
+Output: {"is_fitness_related":true,"goal":"weight_loss","confidence":"high","redirect_message":null,"focus_muscle_groups":[],"preferred_slots":[{"day_of_week":4,"period":"afternoon"},{"day_of_week":6,"period":"morning"}]}
 
 Input: "Tôi chỉ rảnh cuối tuần để tập gym, muốn tăng cơ"
-Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"preferred_slots":[{"day_of_week":6,"period":null},{"day_of_week":7,"period":null}]}
+Output: {"is_fitness_related":true,"goal":"muscle_gain","confidence":"high","redirect_message":null,"focus_muscle_groups":[],"preferred_slots":[{"day_of_week":6,"period":null},{"day_of_week":7,"period":null}]}
 
 Input: "How do I make pasta carbonara?"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"That sounds delicious, but GymHub is here to help with your fitness journey! 😊 Could you tell me what you'd like to achieve at the gym — like losing weight, building muscle, or improving your stamina?","preferred_slots":[]}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"That sounds delicious, but GymHub is here to help with your fitness journey! 😊 Could you tell me what you'd like to achieve at the gym — like losing weight, building muscle, or improving your stamina?","focus_muscle_groups":[],"preferred_slots":[]}
 
 Input: "What is the weather today?"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"I can only help with fitness goals here! Tell me what you'd like to work on — for example, 'I want to get stronger' or 'I want more energy'.","preferred_slots":[]}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"I can only help with fitness goals here! Tell me what you'd like to work on — for example, 'I want to get stronger' or 'I want more energy'.","focus_muscle_groups":[],"preferred_slots":[]}
 
 Input: "xyzabc123!!!"
-Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"Hmm, I didn't quite catch that! I'm here to help you build your workout plan. What fitness goal are you working toward?","preferred_slots":[]}
+Output: {"is_fitness_related":false,"goal":null,"confidence":null,"redirect_message":"Hmm, I didn't quite catch that! I'm here to help you build your workout plan. What fitness goal are you working toward?","focus_muscle_groups":[],"preferred_slots":[]}
 `.trim();
 
 /**
@@ -832,6 +899,13 @@ const resolveGoalFromText = async (userText) => {
         ? parsed.redirect_message.trim()
         : null;
 
+      const rawFocusGroups = Array.isArray(parsed.focus_muscle_groups)
+        ? parsed.focus_muscle_groups
+        : [];
+      const focusMuscleGroups = isFitnessRelated
+        ? [...new Set(rawFocusGroups.filter((group) => VALID_FOCUS_GROUPS.includes(group)))]
+        : [];
+
       // Sanitise preferred_slots: must be an array of { day_of_week: 1-7, period }
       const rawSlots = Array.isArray(parsed.preferred_slots) ? parsed.preferred_slots : [];
       const preferredSlots = rawSlots
@@ -849,6 +923,7 @@ const resolveGoalFromText = async (userText) => {
         redirect_message: redirectMessage,
         raw_text:         cleanText,
         fallback:         false,
+        focus_muscle_groups: focusMuscleGroups,
         preferred_slots:  preferredSlots,
       };
     }

@@ -471,15 +471,16 @@ const findSessions = async (opts) => {
 };
 
 /**
- * Find sessions that started on a given calendar date.
+ * Find sessions that overlap a business-day range.
  *
- * @param {string} date - YYYY-MM-DD
+ * @param {Date} startAt
+ * @param {Date} endAt
  * @param {string|null} branchId
  * @returns {Promise<object[]>}
  */
-const findSessionsByDate = async (date, branchId = null) => {
-  const values = [date];
-  const branchFilter = branchId ? 'AND gs.branch_id = $2' : '';
+const findSessionsByDate = async (startAt, endAt, branchId = null) => {
+  const values = [startAt, endAt];
+  const branchFilter = branchId ? 'AND gs.branch_id = $3' : '';
   if (branchId) values.push(branchId);
 
   const { rows } = await db.query(
@@ -495,8 +496,8 @@ const findSessionsByDate = async (date, branchId = null) => {
      FROM gym_sessions gs
      JOIN users u ON u.id = gs.user_id
      JOIN gym_branches b ON b.id = gs.branch_id
-     WHERE gs.checked_in_at >= $1::date
-       AND gs.checked_in_at < ($1::date + interval '1 day')
+     WHERE gs.checked_in_at < $2
+       AND COALESCE(gs.checked_out_at, now()) > $1
        ${branchFilter}
      ORDER BY gs.checked_in_at ASC`,
     values

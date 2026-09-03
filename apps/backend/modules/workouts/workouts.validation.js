@@ -29,6 +29,7 @@ const DIFFICULTY_LEVELS = ['beginner', 'intermediate', 'advanced'];
  * Admin adds an exercise to the catalog.
  */
 const GOAL_TAGS = ['muscle_gain', 'weight_loss', 'endurance', 'flexibility', 'general_fitness'];
+const FOCUS_MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'cardio', 'full_body'];
 
 const createExerciseSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required().messages({
@@ -100,6 +101,15 @@ const generatePlanSchema = Joi.object({
     .messages({
       'array.base': 'preferred_slots must be an array of objects with day_of_week and period',
     }),
+  focus_muscle_groups: Joi.array()
+    .items(Joi.string().valid(...FOCUS_MUSCLE_GROUPS))
+    .unique()
+    .optional()
+    .messages({
+      'array.base': 'focus_muscle_groups must be an array',
+      'any.only': `focus_muscle_groups must contain only: ${FOCUS_MUSCLE_GROUPS.join(', ')}`,
+    }),
+  source_text: Joi.string().trim().min(2).max(500).optional(),
 });
 
 /**

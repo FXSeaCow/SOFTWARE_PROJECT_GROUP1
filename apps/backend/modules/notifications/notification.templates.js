@@ -67,7 +67,11 @@ const TEMPLATES = {
     type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
     severity: NOTIFICATION_SEVERITY.INFO,
     title: 'Workout reminder',
-    body: value(context, 'body', "Don't forget your workout today! Keep your streak going."),
+    body: value(
+      context,
+      'body',
+      `You have a workout scheduled today: ${value(context, 'day_label', 'Workout day')} from ${value(context, 'plan_title', 'your active plan')}.`
+    ),
   }),
 
   [NOTIFICATION_TEMPLATE.ANNOUNCEMENT]: (context = {}) => ({

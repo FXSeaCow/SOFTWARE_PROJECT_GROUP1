@@ -17,6 +17,7 @@ const notificationsService = require('../notifications/notifications.service');
 const {
   calculateCurrentOccupancy,
   buildDailyReport,
+  getDayBounds,
 } = require('./occupancyCalculator');
 const {
   DEFAULT_GYM_CAPACITY,
@@ -30,6 +31,7 @@ const {
 const { withTransaction } = require('../../utils/Transaction');
 const { parse: parsePagination } = require('../../utils/Pagination');
 const { qrDataURLMatchesToken } = require('../../utils/Qrcode');
+const { DEFAULT_TIME_ZONE } = require('../../utils/Timezone');
 const ApiError = require('../../utils/Apierror');
 const logger = require('../../utils/Logger');
 
@@ -696,7 +698,12 @@ const listSessions = async (query = {}) => {
 const getDailyReport = async (query = {}) => {
   const date = query.date || toDateOnlyString();
   const branch = query.branch_id ? await requireBranch(query.branch_id) : null;
-  const sessions = await repo.findSessionsByDate(date, branch ? branch.id : null);
+  const { start, end } = getDayBounds(date, DEFAULT_TIME_ZONE);
+  const sessions = await repo.findSessionsByDate(
+    start,
+    end,
+    branch ? branch.id : null
+  );
   const branches = branch ? [branch] : await repo.findActiveBranches();
   const capacity = branches.reduce(
     (sum, currentBranch) => sum + getBranchCapacity(currentBranch),
@@ -705,6 +712,7 @@ const getDailyReport = async (query = {}) => {
   const report = buildDailyReport(sessions, {
     date,
     capacity: capacity || DEFAULT_GYM_CAPACITY,
+    timeZone: DEFAULT_TIME_ZONE,
   });
 
   return {

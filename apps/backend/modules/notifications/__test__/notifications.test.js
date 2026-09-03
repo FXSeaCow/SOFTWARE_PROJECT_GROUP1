@@ -100,7 +100,11 @@ describe('notifications module', () => {
       }
     );
     const workoutReminder = templates.renderTemplate(
-      NOTIFICATION_TEMPLATE.WORKOUT_REMINDER
+      NOTIFICATION_TEMPLATE.WORKOUT_REMINDER,
+      {
+        day_label: 'Push day',
+        plan_title: 'Selected Plan',
+      }
     );
     const fallback = templates.renderTemplate('unknown_template', {
       title: 'Fallback title',
@@ -123,7 +127,7 @@ describe('notifications module', () => {
       type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
       severity: NOTIFICATION_SEVERITY.INFO,
       title: 'Workout reminder',
-      body: "Don't forget your workout today! Keep your streak going.",
+      body: 'You have a workout scheduled today: Push day from Selected Plan.',
     });
     expect(fallback).toMatchObject({
       type: NOTIFICATION_TYPE.ANNOUNCEMENT,
@@ -487,7 +491,7 @@ describe('notifications module', () => {
         user_id: 'user-1',
         type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
         title: 'Workout reminder',
-        body: "Don't forget your workout today! Keep your streak going.",
+        body: 'You have a workout scheduled today: Push day from Selected Plan.',
       })
     );
     expect(result).toMatchObject({

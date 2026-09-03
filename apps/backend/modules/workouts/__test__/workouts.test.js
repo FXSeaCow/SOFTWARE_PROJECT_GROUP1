@@ -26,7 +26,14 @@
 const request    = require('supertest');
 const app        = require('../../../app');
 const db         = require('../../../config/db');
-const { buildWeeklyPlan, buildCatalogIndex, scoreExercise, pickBestExercises, GOAL_PROFILES } = require('../workouts.generator');
+const {
+  buildWeeklyPlan,
+  buildCatalogIndex,
+  scoreExercise,
+  pickBestExercises,
+  classifyGoalLocally,
+  GOAL_PROFILES,
+} = require('../workouts.generator');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1260,6 +1267,48 @@ describe('workouts.generator (unit)', () => {
         goal: 'nonexistent_goal', fitness_level: 'beginner',
         days_per_week: 3, exerciseCatalog: makeCatalog(),
       })).not.toThrow();
+    });
+
+    it('should keep focused abs requests on core exercises only', () => {
+      const plan = buildWeeklyPlan({
+        goal: 'general_fitness',
+        fitness_level: 'beginner',
+        days_per_week: 3,
+        exerciseCatalog: makeCatalog(),
+        focus_muscle_groups: ['core'],
+      });
+      const activeDays = plan.filter((day) => !day.is_rest_day);
+      const exerciseGroups = new Set(
+        activeDays
+          .flatMap((day) => day.exercises)
+          .map((exercise) => exercise.exercise_id.split('-')[0])
+      );
+
+      expect(activeDays).toHaveLength(3);
+      expect(Array.from(exerciseGroups)).toEqual(['core']);
+      activeDays.forEach((day) => {
+        expect(day.day_label).toBe('Focus: Core');
+      });
+    });
+  });
+
+  describe('classifyGoalLocally', () => {
+    it('should reject non-fitness food requests instead of generating a plan', () => {
+      const result = classifyGoalLocally('I want to eat chicken');
+
+      expect(result).toMatchObject({
+        is_fitness_related: false,
+        goal: null,
+      });
+    });
+
+    it('should detect Vietnamese abs requests as a core focus', () => {
+      const result = classifyGoalLocally('Toi muon tap mui bung');
+
+      expect(result).toMatchObject({
+        is_fitness_related: true,
+        focus_muscle_groups: ['core'],
+      });
     });
   });
 });

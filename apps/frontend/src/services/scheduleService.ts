@@ -184,6 +184,7 @@ export type ResolveGoalResult = {
   redirect_message: string | null;
   raw_text: string;
   fallback: boolean;
+  focus_muscle_groups?: string[];
   preferred_slots: PreferredSlot[];
 };
 
@@ -261,12 +262,16 @@ export async function generateSmartWorkoutPlan({
   fitnessLevel,
   daysPerWeek,
   preferredSlots,
+  focusMuscleGroups,
+  sourceText,
 }: {
   title: string;
   goal: string;
   fitnessLevel: "beginner" | "intermediate" | "advanced";
   daysPerWeek: number;
   preferredSlots?: PreferredSlot[];
+  focusMuscleGroups?: string[];
+  sourceText?: string;
 }): Promise<GenerateWorkoutPlanResponse> {
   const response = await apiClient<ApiResponse<GenerateWorkoutPlanResponse>>("/workouts/generate", {
     method: "POST",
@@ -276,6 +281,8 @@ export async function generateSmartWorkoutPlan({
       fitness_level: fitnessLevel,
       days_per_week: daysPerWeek,
       preferred_slots: preferredSlots && preferredSlots.length > 0 ? preferredSlots : undefined,
+      focus_muscle_groups: focusMuscleGroups && focusMuscleGroups.length > 0 ? focusMuscleGroups : undefined,
+      source_text: sourceText,
     },
   });
   return response.data;

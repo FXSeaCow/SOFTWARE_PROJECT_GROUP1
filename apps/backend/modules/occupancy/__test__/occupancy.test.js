@@ -121,20 +121,20 @@ describe('occupancy module', () => {
       {
         id: 'session-1',
         user_id: 'user-1',
-        checked_in_at: '2026-07-01T08:15:00',
-        checked_out_at: '2026-07-01T10:10:00',
+        checked_in_at: '2026-07-01T08:15:00+07:00',
+        checked_out_at: '2026-07-01T10:10:00+07:00',
       },
       {
         id: 'session-2',
         user_id: 'user-2',
-        checked_in_at: '2026-07-01T09:00:00',
-        checked_out_at: '2026-07-01T11:00:00',
+        checked_in_at: '2026-07-01T09:00:00+07:00',
+        checked_out_at: '2026-07-01T11:00:00+07:00',
       },
       {
         id: 'session-3',
         user_id: 'user-1',
-        checked_in_at: '2026-07-01T09:30:00',
-        checked_out_at: '2026-07-01T10:30:00',
+        checked_in_at: '2026-07-01T09:30:00+07:00',
+        checked_out_at: '2026-07-01T10:30:00+07:00',
       },
     ];
 
@@ -154,6 +154,32 @@ describe('occupancy module', () => {
     });
     expect(report.average_occupancy).toBeGreaterThan(0);
     expect(report.hourly_occupancy).toHaveLength(24);
+  });
+
+  it('buckets UTC timestamps by Vietnam business time in daily reports', () => {
+    const sessions = [
+      {
+        id: 'session-1',
+        user_id: 'user-1',
+        checked_in_at: '2026-07-01T08:15:00.000Z',
+        checked_out_at: '2026-07-01T09:10:00.000Z',
+      },
+    ];
+
+    const report = calculator.buildDailyReport(sessions, {
+      date: '2026-07-01',
+      capacity: 100,
+      timeZone: 'Asia/Ho_Chi_Minh',
+      now: '2026-07-02T00:00:00.000Z',
+    });
+
+    expect(report.hourly_occupancy.find((point) => point.hour === '08:00')).toMatchObject({
+      occupancy: 0,
+    });
+    expect(report.hourly_occupancy.find((point) => point.hour === '15:00')).toMatchObject({
+      occupancy: 1,
+    });
+    expect(report.peak_hour).toEqual({ hour: '15:00', occupancy: 1 });
   });
 
   it('returns current occupancy for all active branches', async () => {
@@ -526,7 +552,11 @@ describe('occupancy module', () => {
     expect(repo.findSessions).toHaveBeenCalledWith(
       expect.objectContaining({ branch_id: branch.id })
     );
-    expect(repo.findSessionsByDate).toHaveBeenCalledWith('2026-07-01', null);
+    expect(repo.findSessionsByDate).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+      null
+    );
     expect(list).toMatchObject({ total: 1, page: 1, limit: 5 });
     expect(report).toMatchObject({
       date: '2026-07-01',

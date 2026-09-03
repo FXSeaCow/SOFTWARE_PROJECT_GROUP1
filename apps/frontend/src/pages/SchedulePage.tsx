@@ -983,7 +983,15 @@ export function SchedulePage() {
 
     try {
       const resolved = await resolveWorkoutGoal(goalText);
-      const goal = resolved.goal ?? "general_fitness";
+      if (!resolved.is_fitness_related || !resolved.goal) {
+        setSmartError(
+          resolved.redirect_message ||
+            "Please describe a workout goal, such as building muscle, losing weight, or improving endurance.",
+        );
+        return;
+      }
+
+      const goal = resolved.goal;
 
       const generated = await generateSmartWorkoutPlan({
         title: `Smart plan ${new Date().toLocaleDateString()}`,
@@ -991,6 +999,8 @@ export function SchedulePage() {
         fitnessLevel: DEFAULT_FITNESS_LEVEL,
         daysPerWeek: resolved.preferred_slots.length || daysPerWeek,
         preferredSlots: resolved.preferred_slots,
+        focusMuscleGroups: resolved.focus_muscle_groups,
+        sourceText: goalText,
       });
 
       const nextSchedule = applyGeneratedPlanToWeeklySchedule(generated.schedule, (exerciseId) =>

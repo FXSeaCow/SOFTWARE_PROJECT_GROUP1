@@ -217,7 +217,7 @@ describe('workout reminder integration', () => {
         user_id: shouldReceive.id,
         type: NOTIFICATION_TYPE.WORKOUT_REMINDER,
         title: 'Workout reminder',
-        body: "Don't forget your workout today! Keep your streak going.",
+        body: 'You have a workout scheduled today: Selected Plan today from Selected Plan.',
       },
     ]);
   });

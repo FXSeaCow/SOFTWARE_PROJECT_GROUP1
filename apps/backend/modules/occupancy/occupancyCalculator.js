@@ -12,6 +12,10 @@ const {
   OCCUPANCY_STATUS,
   OCCUPANCY_THRESHOLDS,
 } = require('./occupancy.constants');
+const {
+  DEFAULT_TIME_ZONE,
+  startOfDateInTimeZone,
+} = require('../../utils/Timezone');
 
 /**
  * Clamp a number into a safe non-negative range.
@@ -81,15 +85,15 @@ const calculateCurrentOccupancy = (
 };
 
 /**
- * Return local day boundaries for a YYYY-MM-DD date.
+ * Return business-timezone day boundaries for a YYYY-MM-DD date.
  *
  * @param {string} dateString
+ * @param {string} timeZone
  * @returns {{ start: Date, end: Date }}
  */
-const getDayBounds = (dateString) => {
-  const start = new Date(`${dateString}T00:00:00`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
+const getDayBounds = (dateString, timeZone = DEFAULT_TIME_ZONE) => {
+  const start = startOfDateInTimeZone(dateString, timeZone);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   return { start, end };
 };
 
@@ -126,11 +130,13 @@ const overlapsHour = (session, hourStart, hourEnd, fallbackEnd) => {
  *
  * @param {object[]} sessions
  * @param {string} dateString - YYYY-MM-DD
+ * @param {{ timeZone?: string, now?: Date|string }} options
  * @returns {Array<{ hour: string, occupancy: number }>}
  */
-const calculateHourlyOccupancy = (sessions = [], dateString) => {
-  const { start, end } = getDayBounds(dateString);
-  const now = new Date();
+const calculateHourlyOccupancy = (sessions = [], dateString, options = {}) => {
+  const { timeZone = DEFAULT_TIME_ZONE, now: nowValue = new Date() } = options;
+  const { start, end } = getDayBounds(dateString, timeZone);
+  const now = toDate(nowValue);
   const fallbackEnd = now < end ? now : end;
 
   return Array.from({ length: 24 }, (_, hour) => {
@@ -156,10 +162,11 @@ const calculateHourlyOccupancy = (sessions = [], dateString) => {
  *
  * @param {object[]} sessions
  * @param {string} dateString - YYYY-MM-DD
+ * @param {{ timeZone?: string, now?: Date|string }} options
  * @returns {{ hour: string|null, occupancy: number }}
  */
-const calculatePeakHour = (sessions = [], dateString) => {
-  const hourly = calculateHourlyOccupancy(sessions, dateString);
+const calculatePeakHour = (sessions = [], dateString, options = {}) => {
+  const hourly = calculateHourlyOccupancy(sessions, dateString, options);
 
   return hourly.reduce(
     (peak, item) => (item.occupancy > peak.occupancy ? item : peak),
@@ -172,29 +179,53 @@ const calculatePeakHour = (sessions = [], dateString) => {
  *
  * @param {object[]} sessions
  * @param {string} dateString - YYYY-MM-DD
+ * @param {{ timeZone?: string, now?: Date|string }} options
  * @returns {number}
  */
-const calculateAverageOccupancy = (sessions = [], dateString) => {
-  const hourly = calculateHourlyOccupancy(sessions, dateString);
-  const total = hourly.reduce((sum, item) => sum + item.occupancy, 0);
-  return roundTwo(total / hourly.length);
+const calculateAverageOccupancy = (sessions = [], dateString, options = {}) => {
+  const hourly = calculateHourlyOccupancy(sessions, dateString, options);
+  const { timeZone = DEFAULT_TIME_ZONE, now: nowValue = new Date() } = options;
+  const { start, end } = getDayBounds(dateString, timeZone);
+  const now = toDate(nowValue);
+  const hoursInDay = hourly.length || 24;
+  const elapsedHours =
+    now > start && now < end
+      ? Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 3600000))
+      : hoursInDay;
+  const relevantHourly = hourly.slice(0, elapsedHours);
+  const total = relevantHourly.reduce((sum, item) => sum + item.occupancy, 0);
+  return roundTwo(total / relevantHourly.length);
 };
 
 /**
  * Build a complete daily occupancy report.
  *
  * @param {object[]} sessions
- * @param {{ date: string, capacity?: number }} options
+ * @param {{ date: string, capacity?: number, timeZone?: string, now?: Date|string }} options
  * @returns {object}
  */
 const buildDailyReport = (
   sessions = [],
-  { date, capacity = DEFAULT_GYM_CAPACITY }
+  {
+    date,
+    capacity = DEFAULT_GYM_CAPACITY,
+    timeZone = DEFAULT_TIME_ZONE,
+    now = new Date(),
+  }
 ) => {
   const safeCapacity = Math.max(1, Number(capacity) || DEFAULT_GYM_CAPACITY);
-  const hourlyOccupancy = calculateHourlyOccupancy(sessions, date);
-  const peakHour = calculatePeakHour(sessions, date);
-  const averageOccupancy = calculateAverageOccupancy(sessions, date);
+  const hourlyOccupancy = calculateHourlyOccupancy(sessions, date, {
+    timeZone,
+    now,
+  });
+  const peakHour = hourlyOccupancy.reduce(
+    (peak, item) => (item.occupancy > peak.occupancy ? item : peak),
+    { hour: null, occupancy: 0 }
+  );
+  const averageOccupancy = calculateAverageOccupancy(sessions, date, {
+    timeZone,
+    now,
+  });
   const uniqueMembers = new Set(sessions.map((session) => session.user_id)).size;
   const openSessions = sessions.filter(
     (session) => !(session.checked_out_at || session.check_out_at)
@@ -221,4 +252,5 @@ module.exports = {
   buildDailyReport,
   getOccupancyStatus,
   calculateHourlyOccupancy,
+  getDayBounds,
 };

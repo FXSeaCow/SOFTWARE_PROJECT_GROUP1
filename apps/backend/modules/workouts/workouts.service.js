@@ -9,7 +9,8 @@
 
 const repo                = require('./workouts.repository');
 const { buildWeeklyPlan,
-        resolveGoalFromText } = require('./workouts.generator');
+        resolveGoalFromText,
+        classifyGoalLocally } = require('./workouts.generator');
 const { withTransaction } = require('../../utils/Transaction');
 const ApiError            = require('../../utils/Apierror');
 const logger              = require('../../utils/Logger');
@@ -102,10 +103,32 @@ const resolveGoal = async (userText) => {
  *      d. Insert workout_day_exercises for each non-rest day
  *
  * @param {string} userId
- * @param {{ title, goal, fitness_level, days_per_week, preferred_slots? }} data
+ * @param {{ title, goal, fitness_level, days_per_week, preferred_slots?, focus_muscle_groups?, source_text? }} data
  * @returns {Promise<{ plan: object, schedule: object[] }>}
  */
-const generatePlan = async (userId, { title, goal, fitness_level, days_per_week, preferred_slots }) => {
+const generatePlan = async (userId, {
+  title,
+  goal,
+  fitness_level,
+  days_per_week,
+  preferred_slots,
+  focus_muscle_groups,
+  source_text,
+}) => {
+  let resolvedFocusGroups = focus_muscle_groups;
+
+  if (source_text && source_text.trim()) {
+    const localIntent = classifyGoalLocally(source_text);
+
+    if (!localIntent.is_fitness_related) {
+      throw ApiError.badRequest(localIntent.redirect_message);
+    }
+
+    if (!resolvedFocusGroups?.length && localIntent.focus_muscle_groups?.length) {
+      resolvedFocusGroups = localIntent.focus_muscle_groups;
+    }
+  }
+
   // 1. Fetch exercises matching the member's fitness level
   const catalog = await repo.findExercises({ difficulty: fitness_level });
 
@@ -123,6 +146,7 @@ const generatePlan = async (userId, { title, goal, fitness_level, days_per_week,
     days_per_week,
     exerciseCatalog: catalog,
     preferredSlots:  preferred_slots,
+    focus_muscle_groups: resolvedFocusGroups,
   });
 
   // 3. Persist everything atomically

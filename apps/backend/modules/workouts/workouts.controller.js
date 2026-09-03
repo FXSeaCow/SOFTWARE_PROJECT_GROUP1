@@ -88,9 +88,17 @@ const resolveGoal = asyncHandler(async (req, res) => {
  * Generate a complete weekly workout plan based on goal + fitness level.
  */
 const generatePlan = asyncHandler(async (req, res) => {
-  const { title, goal, fitness_level, days_per_week, preferred_slots } = req.body;
+  const {
+    title,
+    goal,
+    fitness_level,
+    days_per_week,
+    preferred_slots,
+    focus_muscle_groups,
+    source_text,
+  } = req.body;
   const result = await service.generatePlan(req.user.id, {
-    title, goal, fitness_level, days_per_week, preferred_slots,
+    title, goal, fitness_level, days_per_week, preferred_slots, focus_muscle_groups, source_text,
   });
   res.status(201).json(ApiResponse.created(result, 'Workout plan generated'));
 });
