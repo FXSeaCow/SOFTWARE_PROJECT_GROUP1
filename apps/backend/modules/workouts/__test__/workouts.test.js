@@ -1310,5 +1310,53 @@ describe('workouts.generator (unit)', () => {
         focus_muscle_groups: ['core'],
       });
     });
+
+    it('should detect numeric six-pack requests as a core focus', () => {
+      const result = classifyGoalLocally('i want to have 6 packs');
+
+      expect(result).toMatchObject({
+        is_fitness_related: true,
+        focus_muscle_groups: ['core'],
+      });
+    });
+
+    it('should detect hyphenated six-pack requests as a core focus', () => {
+      const result = classifyGoalLocally('I want a 6-pack abs workout');
+
+      expect(result).toMatchObject({
+        is_fitness_related: true,
+        focus_muscle_groups: ['core'],
+      });
+    });
+
+    it('should detect multiple body focus groups when fitness intent is present', () => {
+      const result = classifyGoalLocally('I want to build bigger chest and shoulders');
+
+      expect(result).toMatchObject({
+        is_fitness_related: true,
+        goal: 'muscle_gain',
+      });
+      expect(result.focus_muscle_groups).toEqual(expect.arrayContaining(['chest', 'shoulders']));
+    });
+
+    it('should detect Vietnamese muscle-development requests', () => {
+      const result = classifyGoalLocally('phat trien co nguc va bap tay');
+
+      expect(result).toMatchObject({
+        is_fitness_related: true,
+        goal: 'muscle_gain',
+      });
+      expect(result.focus_muscle_groups).toEqual(expect.arrayContaining(['chest', 'arms']));
+    });
+
+    it('should not treat food requests with body-part words as gym requests', () => {
+      const result = classifyGoalLocally('I want to eat chicken legs for dinner');
+
+      expect(result).toMatchObject({
+        is_fitness_related: false,
+        goal: null,
+        focus_muscle_groups: [],
+      });
+    });
   });
 });

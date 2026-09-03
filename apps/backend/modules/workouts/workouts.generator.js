@@ -394,42 +394,102 @@ const GROQ_MODEL_CANDIDATES = [
 const LOCAL_GOAL_KEYWORDS = {
   muscle_gain: [
     'muscle',
+    'muscles',
+    'build muscle',
+    'develop muscle',
+    'grow muscle',
+    'gain muscle',
+    'lean muscle',
+    'muscle growth',
+    'muscle development',
     'build',
+    'develop',
+    'grow',
     'bigger',
+    'size',
+    'mass',
     'gain mass',
     'bulk',
     'bulking',
     'strength',
     'stronger',
+    'power',
     'hypertrophy',
-    'arms',
-    'chest',
-    'back',
+    'bodybuilding',
+    'body builder',
+    'lift',
+    'lifting',
     'lift heavy',
+    'tap ta',
+    'the hinh',
+    'tang co',
+    'tang co bap',
+    'phat trien co',
+    'phat trien co bap',
+    'co bap',
   ],
   weight_loss: [
     'lose weight',
     'weight loss',
+    'lose fat',
+    'fat loss',
     'fat',
     'belly',
+    'belly fat',
+    'burn fat',
+    'reduce fat',
+    'lower body fat',
+    '6 pack',
+    '6 packs',
+    '6pack',
+    'six pack',
+    'six packs',
+    'sixpack',
+    'six-pack',
+    'six-packs',
+    'defined abs',
+    'visible abs',
+    'shredded',
+    'get shredded',
     'slim',
+    'slim down',
     'cut',
     'cutting',
+    'lean',
     'lighter',
     'calorie',
     'burn',
     'tone',
+    'toned',
+    'giam can',
+    'giam mo',
+    'giam mo bung',
+    'dot mo',
+    'san chac',
+    'eo thon',
   ],
   endurance: [
     'endurance',
     'stamina',
     'run',
     'running',
+    'runner',
     '10k',
+    '5k',
     'marathon',
     'cardio',
     'cycling',
+    'bike',
+    'biking',
+    'treadmill',
+    'aerobic',
+    'conditioning',
+    'heart health',
     'not tired',
+    'chay bo',
+    'dap xe',
+    'suc ben',
+    'the luc',
   ],
   flexibility: [
     'flexibility',
@@ -441,37 +501,198 @@ const LOCAL_GOAL_KEYWORDS = {
     'stiff',
     'touch my toes',
     'range of motion',
+    'recover',
+    'recovery',
+    'posture',
+    'balance',
+    'de deo',
+    'gian co',
+    'keo gian',
+    'linh hoat',
   ],
   general_fitness: [
     'healthy',
     'healthier',
+    'health',
     'fitness',
     'gym',
     'workout',
     'work out',
+    'training',
+    'train',
     'exercise',
+    'routine',
+    'schedule',
+    'plan',
+    'program',
     'wellness',
     'active',
     'energy',
+    'get fit',
+    'in shape',
+    'body',
+    'physique',
+    'tap',
+    'tap luyen',
+    'luyen tap',
+    'ren luyen',
+    'phong gym',
+    'lich tap',
   ],
 };
 
 const LOCAL_FOCUS_KEYWORDS = {
-  chest: ['chest', 'pec', 'pecs', 'nguc'],
-  back: ['back', 'lat', 'lats', 'xung lung', 'lung'],
-  legs: ['leg', 'legs', 'quad', 'quads', 'glute', 'glutes', 'hamstring', 'chan', 'mong', 'dui'],
-  shoulders: ['shoulder', 'shoulders', 'delt', 'delts', 'vai'],
-  arms: ['arm', 'arms', 'bicep', 'biceps', 'tricep', 'triceps', 'tay'],
-  core: ['abs', 'six pack', 'six-pack', 'core', 'abdominal', 'belly', 'stomach', 'mui bung', 'co bung', 'bung'],
-  cardio: ['cardio', 'run', 'running', 'treadmill', 'stamina', 'endurance', 'chay bo'],
-  full_body: ['full body', 'whole body', 'toan than'],
+  chest: [
+    'chest', 'pec', 'pecs', 'pectoral', 'pectorals', 'upper chest', 'lower chest',
+    'nguc', 'co nguc',
+  ],
+  back: [
+    'back', 'lat', 'lats', 'trap', 'traps', 'trapezius', 'upper back', 'lower back',
+    'rear delt', 'rear delts', 'xung lung', 'lung', 'co lung',
+  ],
+  legs: [
+    'leg', 'legs', 'quad', 'quads', 'quadricep', 'quadriceps', 'hamstring', 'hamstrings',
+    'glute', 'glutes', 'calf', 'calves', 'lower body', 'butt', 'booty',
+    'chan', 'co chan', 'dui', 'bap chan', 'mong',
+  ],
+  shoulders: [
+    'shoulder', 'shoulders', 'delt', 'delts', 'deltoid', 'deltoids', 'front delt',
+    'side delt', 'lateral delt', 'vai', 'co vai',
+  ],
+  arms: [
+    'arm', 'arms', 'bicep', 'biceps', 'tricep', 'triceps', 'forearm', 'forearms',
+    'tay', 'bap tay', 'co tay', 'co nhi dau', 'co tam dau',
+  ],
+  core: [
+    'ab', 'abs', '6 pack', '6 packs', '6pack', 'six pack', 'six packs', 'sixpack',
+    'six-pack', 'six-packs', 'core', 'abdominal', 'abdominals', 'oblique', 'obliques',
+    'belly', 'stomach', 'waist', 'midsection', 'mui bung', 'co bung', 'bung',
+  ],
+  cardio: [
+    'cardio', 'run', 'running', 'runner', 'treadmill', 'stamina', 'endurance',
+    'cycling', 'bike', 'biking', 'row', 'rowing', 'aerobic', 'heart',
+    'chay bo', 'dap xe', 'suc ben', 'the luc',
+  ],
+  full_body: ['full body', 'full-body', 'total body', 'whole body', 'all body', 'entire body', 'toan than', 'ca nguoi'],
 };
 
 const normalizeSearchText = (value) =>
   String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const LOCAL_FITNESS_INTENT_KEYWORDS = [
+  'gym',
+  'fitness',
+  'workout',
+  'work out',
+  'exercise',
+  'training',
+  'train',
+  'routine',
+  'schedule',
+  'plan',
+  'program',
+  'lift',
+  'lifting',
+  'build',
+  'develop',
+  'grow',
+  'gain',
+  'muscle',
+  'muscles',
+  'strength',
+  'stronger',
+  'tone',
+  'toned',
+  'lean',
+  'lose weight',
+  'lose fat',
+  'burn fat',
+  'cardio',
+  'run',
+  'running',
+  'stretch',
+  'mobility',
+  'bodybuilding',
+  'body builder',
+  'body',
+  'physique',
+  'tap',
+  'tap luyen',
+  'luyen tap',
+  'ren luyen',
+  'the hinh',
+  'phong gym',
+  'lich tap',
+  'phat trien',
+  'tang co',
+  'giam can',
+  'giam mo',
+  'dot mo',
+  'san chac',
+];
+
+const LOCAL_NON_FITNESS_CONTEXT_KEYWORDS = [
+  'eat',
+  'eating',
+  'food',
+  'meal',
+  'breakfast',
+  'lunch',
+  'dinner',
+  'recipe',
+  'cook',
+  'cooking',
+  'chicken',
+  'beef',
+  'pork',
+  'fish',
+  'rice',
+  'noodle',
+  'pasta',
+  'pizza',
+  'burger',
+  'weather',
+  'movie',
+  'music',
+  'song',
+  'code',
+  'coding',
+  'programming',
+  'homework',
+  'travel',
+  'an',
+  'mon an',
+  'nau an',
+  'con ga',
+  'ga',
+  'thit bo',
+  'thit heo',
+  'ca',
+];
+
+const LOCAL_STRONG_FOCUS_KEYWORDS = [
+  'abs',
+  '6 pack',
+  '6 packs',
+  '6pack',
+  'six pack',
+  'six packs',
+  'sixpack',
+  'six-pack',
+  'six-packs',
+  'core workout',
+  'defined abs',
+  'visible abs',
+  'mui bung',
+  'co bung',
+];
 
 const LOCAL_REDIRECT_MESSAGE =
   'GymHub is here to help with fitness goals. Tell me what you want to improve at the gym, such as building muscle, losing weight, or improving stamina.';
@@ -554,15 +775,24 @@ const parsePreferredSlotsLocally = (text) => {
   return Array.from(byDay.values()).sort((a, b) => a.day_of_week - b.day_of_week);
 };
 
+const keywordMatchesText = (text, keyword) => {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  if (!normalizedKeyword) return false;
+  return ` ${text} `.includes(` ${normalizedKeyword} `);
+};
+
 const countKeywordMatches = (text, keywords) =>
   keywords.reduce((count, keyword) => (
-    text.includes(keyword) ? count + 1 : count
+    keywordMatchesText(text, keyword) ? count + 1 : count
   ), 0);
+
+const hasKeywordMatch = (text, keywords) =>
+  keywords.some((keyword) => keywordMatchesText(text, keyword));
 
 const extractFocusGroupsLocally = (cleanText) => {
   const text = normalizeSearchText(cleanText);
   return Object.entries(LOCAL_FOCUS_KEYWORDS)
-    .filter(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))
+    .filter(([, keywords]) => hasKeywordMatch(text, keywords))
     .map(([group]) => group);
 };
 
@@ -575,6 +805,9 @@ const extractFocusGroupsLocally = (cleanText) => {
 const classifyGoalLocally = (cleanText) => {
   const text = normalizeSearchText(cleanText);
   const focusMuscleGroups = extractFocusGroupsLocally(cleanText);
+  const hasFitnessIntent = hasKeywordMatch(text, LOCAL_FITNESS_INTENT_KEYWORDS);
+  const hasNonFitnessContext = hasKeywordMatch(text, LOCAL_NON_FITNESS_CONTEXT_KEYWORDS);
+  const hasStrongFocusRequest = hasKeywordMatch(text, LOCAL_STRONG_FOCUS_KEYWORDS);
   const scores = Object.entries(LOCAL_GOAL_KEYWORDS).map(([goal, keywords]) => ({
     goal,
     score: countKeywordMatches(text, keywords),
@@ -582,7 +815,11 @@ const classifyGoalLocally = (cleanText) => {
   scores.sort((a, b) => b.score - a.score);
 
   const best = scores[0];
-  if ((!best || best.score === 0) && focusMuscleGroups.length === 0) {
+  const hasGoalMatch = Boolean(best && best.score > 0);
+  const acceptsFocusOnlyRequest = focusMuscleGroups.length > 0 && (hasFitnessIntent || hasStrongFocusRequest);
+  const acceptsGoalRequest = hasGoalMatch && (hasFitnessIntent || !hasNonFitnessContext || hasStrongFocusRequest);
+
+  if (!acceptsGoalRequest && !acceptsFocusOnlyRequest) {
     // A fallback classifier must not turn an unknown or unrelated message
     // into a workout request. General fitness is only appropriate when the
     // member actually mentions fitness, health, exercise, or training.
@@ -597,7 +834,7 @@ const classifyGoalLocally = (cleanText) => {
 
   return {
     is_fitness_related: true,
-    goal: best && best.score > 0 ? best.goal : 'general_fitness',
+    goal: hasGoalMatch ? best.goal : 'general_fitness',
     confidence: best && best.score >= 2 ? 'medium' : 'low',
     redirect_message: null,
     focus_muscle_groups: focusMuscleGroups,

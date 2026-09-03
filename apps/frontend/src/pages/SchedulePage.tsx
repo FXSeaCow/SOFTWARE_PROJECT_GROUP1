@@ -422,6 +422,12 @@ export function SchedulePage() {
   const isCurrentScheduleActive = Boolean(
     currentBoardPlan && activePlan && currentBoardPlan.id === activePlan.id && !hasUnsavedBackendChanges,
   );
+  const isCurrentBoardActive = Boolean(
+    currentBoardPlan && activePlan && currentBoardPlan.id === activePlan.id,
+  );
+  const saveButtonLabel = currentBoardPlan && hasUnsavedBackendChanges && isCurrentBoardActive
+    ? "Save Changes"
+    : "Save as Active";
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
 
   useEffect(() => {
@@ -1052,7 +1058,9 @@ export function SchedulePage() {
           savedDays,
           schedule,
         });
-        const activated = await activateWorkoutPlan(currentBoardPlan.id);
+        const activated = isCurrentBoardActive
+          ? currentBoardPlan
+          : await activateWorkoutPlan(currentBoardPlan.id);
         setSavedPlans((current) =>
           current.map((plan) => ({
             ...plan,
@@ -1509,7 +1517,7 @@ export function SchedulePage() {
             }}
           >
             <Save size={18} />
-            {isSaving ? "Saving" : "Save as Active"}
+            {isSaving ? "Saving" : saveButtonLabel}
           </button>
 
           <button
