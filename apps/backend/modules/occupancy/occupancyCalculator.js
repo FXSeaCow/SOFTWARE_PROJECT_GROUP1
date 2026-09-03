@@ -140,11 +140,8 @@ const calculateHourlyOccupancy = (sessions = [], dateString, options = {}) => {
   const fallbackEnd = now < end ? now : end;
 
   return Array.from({ length: 24 }, (_, hour) => {
-    const hourStart = new Date(start);
-    hourStart.setHours(hour, 0, 0, 0);
-
-    const hourEnd = new Date(hourStart);
-    hourEnd.setHours(hour + 1, 0, 0, 0);
+    const hourStart = new Date(start.getTime() + hour * 60 * 60 * 1000);
+    const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
 
     const occupancy = sessions.filter((session) =>
       overlapsHour(session, hourStart, hourEnd, fallbackEnd)
